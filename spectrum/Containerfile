@@ -59,6 +59,10 @@ RUN --mount=type=bind,from=ctx,source=/image,target=/ctx \
     UV_PROJECT_ENVIRONMENT=/tmp/spectrum-build-venv \
     bash /tmp/spectrum-src/spectrum/build.sh
 
+# Cache mount targets can leave empty /var directories behind in the final image;
+# bootc lint treats those as fatal unless tmpfiles rules own them.
+RUN rm -rf /var/cache/dnf /var/cache/libdnf5
+
 CMD ["/sbin/init"]
 
 RUN bootc container lint --fatal-warnings
