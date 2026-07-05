@@ -1,0 +1,76 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "just: check",
+      "detail": "Run the full repository validation suite.",
+      "type": "process",
+      "command": "just",
+      "args": ["check"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "just: check-format",
+      "detail": "Check repository formatting without rewriting files.",
+      "type": "process",
+      "command": "just",
+      "args": ["check-format"],
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "just: fmt",
+      "detail": "Format files managed by this repo.",
+      "type": "process",
+      "command": "just",
+      "args": ["fmt"],
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "just: doctor all",
+      "detail": "Check all commands required by local workflows.",
+      "type": "process",
+      "command": "just",
+      "args": ["doctor", "all"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "just: smoke",
+      "detail": "Build and run the Fedora smoke-test container.",
+      "type": "process",
+      "command": "just",
+      "args": ["smoke"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ]
+}
