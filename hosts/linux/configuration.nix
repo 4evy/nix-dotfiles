@@ -5,7 +5,7 @@
   ...
 }:
 let
-  dotfilesFontconfig = pkgs.runCommand "nix-dotfiles-fontconfig" { } ''
+  dotfilesFontconfig = pkgs.runCommand "dotfiles-fontconfig" { } ''
     mkdir -p "$out/etc/fonts/conf.d"
     ln -s ${../../dotfiles/dot_config/fontconfig/conf.d/45-interface-fonts.conf} "$out/etc/fonts/conf.d/45-interface-fonts.conf"
     ln -s ${../../dotfiles/dot_config/fontconfig/conf.d/50-code-monospace.conf} "$out/etc/fonts/conf.d/50-code-monospace.conf"
