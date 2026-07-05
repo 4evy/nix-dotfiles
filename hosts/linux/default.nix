@@ -6,7 +6,8 @@
       ./configuration.nix
       inputs.self.nixosModules.default
       {
-        nixOS = {
+        local = {
+          shell.enable = true;
           gnome.enable = true;
           dconf.enable = true;
           nvidia.enable = true;
@@ -16,7 +17,7 @@
       inputs.sops-nix.nixosModules.sops
       {
         sops = {
-          age.keyFile = "/home/nyx/.config/sops/age/keys.txt";
+          age.keyFile = "/home/4evy/.config/sops/age/keys.txt";
           defaultSopsFile = ../../secrets/secrets.yaml;
           validateSopsFiles = false;
           secrets.github-token = {

@@ -6,7 +6,7 @@
       binaryName = "zed-remote-server-stable-${version}";
     in
     [
-      "d /home/nyx/.zed_server 0755 nyx users - -"
-      "L+ /home/nyx/.zed_server/${binaryName} - - - - ${lib.meta.getExe' pkgs.zed-editor.remote_server binaryName}"
+      "d /home/4evy/.zed_server 0755 4evy users - -"
+      "L+ /home/4evy/.zed_server/${binaryName} - - - - ${lib.meta.getExe' pkgs.zed-editor.remote_server binaryName}"
     ];
 }

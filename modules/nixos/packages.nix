@@ -17,7 +17,7 @@ in
 {
   _class = "nixos";
 
-  options.nixOS.toolbox.enable = mkEnableOption "Distrobox prerequisites for Linux toolbox tools that are awkward outside Nix";
+  options.local.toolbox.enable = mkEnableOption "Distrobox prerequisites for Linux toolbox tools that are awkward outside Nix";
 
   config = mkMerge [
     {
@@ -25,14 +25,14 @@ in
         inherit (pkgs)
           ansible
           ansible-lint
-          immutable-activate
-          lsp-diagnostic-filter
+          system-runner
           yamllint
           zellij-theme-tools
           ;
 
         # Host/session spine and editor dependencies.
         inherit (pkgs.unstable)
+          actionlint
           bash-language-server
           binutils
           cargo
@@ -88,7 +88,7 @@ in
         RUST_SRC_PATH = "${pkgs.unstable.rustPlatform.rustLibSrc}";
       };
     }
-    (mkIf config.nixOS.toolbox.enable {
+    (mkIf config.local.toolbox.enable {
       environment.systemPackages = attrValues {
         inherit (pkgs) distrobox podman-compose;
       };

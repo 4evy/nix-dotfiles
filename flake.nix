@@ -1,13 +1,7 @@
 {
-  description = "My NixOS & Darwin System Flake";
+  description = "My NixOS system flake";
 
   inputs = {
-    nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
-    nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
-
-    dis.inputs.nixpkgs.follows = "nixpkgs-unstable";
-    dis.url = "github:FlameFlag/dis";
-
     eupkgs.inputs.nixpkgs.follows = "nixpkgs-unstable";
     eupkgs.url = "github:euvlok/pkgs";
 
@@ -24,12 +18,23 @@
   outputs =
     inputs:
     let
-      systems = [
-        "aarch64-darwin"
+      formatterSystems = [
         "x86_64-linux"
       ];
-      forAllSystems = inputs.nixpkgs.lib.genAttrs systems;
+      ghidraMcpSystems = [
+        "x86_64-linux"
+        "aarch64-darwin"
+      ];
+      forAllFormatterSystems = inputs.nixpkgs.lib.genAttrs formatterSystems;
+      forAllGhidraMcpSystems = inputs.nixpkgs.lib.genAttrs ghidraMcpSystems;
       commonNixpkgs = import ./modules/cross/nixpkgs.nix { inherit inputs; };
+      equicordParseRules = builtins.fromJSON (
+        builtins.readFile "${inputs.nixcord}/modules/plugins/parse-rules.json"
+      );
+      equicordSettings = import ./modules/equicord/settings.nix {
+        lib = inputs.nixpkgs.lib;
+        parseRules = equicordParseRules;
+      };
       mkPkgs =
         system:
         import inputs.nixpkgs {
@@ -37,9 +42,22 @@
           config.allowUnfree = true;
           inherit (commonNixpkgs.nixpkgs) overlays;
         };
+      mkEquicordSettingsPackage =
+        pkgs:
+        pkgs.runCommand "equicord-settings"
+          {
+            nativeBuildInputs = [ pkgs.jq ];
+          }
+          ''
+            mkdir -p "$out"
+            jq . ${pkgs.writeText "equicord-settings.json" (builtins.toJSON equicordSettings.jsonConfig)} > "$out/settings.json"
+            cp ${./ansible/files/apps/equicord/quickCss.css} "$out/quickCss.css"
+          '';
     in
     {
-      formatter = forAllSystems (
+      lib.equicordSettingsJson = equicordSettings.jsonConfig;
+
+      formatter = forAllFormatterSystems (
         system:
         let
           pkgs = mkPkgs system;
@@ -65,53 +83,47 @@
         }
       );
 
-      packages = forAllSystems (
+      packages = forAllGhidraMcpSystems (
         system:
         let
           pkgs = mkPkgs system;
+          ghidraMcp = pkgs.ghidra-mcp;
+          ghidraMcpHeadless = pkgs.ghidra-mcp-headless;
         in
         {
-          inherit (pkgs)
-            chezmoi-support
-            dis
-            hyper-window-tiling-gnome
-            hyper-window-tiling-kde
-            http-fixture
-            kanata
-            kanata-with-cmd
-            lldb-mcp-launcher
-            lsp-diagnostic-filter
-            nd-tools
-            system-run-mcp
-            toshy
-            zellij-theme-tools
-            ;
+          ghidra-mcp = ghidraMcp;
+          ghidra-mcp-headless = ghidraMcpHeadless;
+          ghidra-mcp-httpd = ghidraMcpHeadless.httpd;
+          ghidra-mcp-bridge = ghidraMcpHeadless.bridge;
+          ghidra-mcp-launcher = ghidraMcpHeadless.launcher;
+          ghidra = ghidraMcpHeadless.ghidra;
+          equicord-settings = mkEquicordSettingsPackage pkgs;
 
-          default = pkgs.immutable-activate;
         }
-        // inputs.nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-          portable-linux-profile-without-paid-fonts = pkgs.portable-linux-profile.override {
-            includePaidFonts = false;
+      );
+
+      apps = forAllGhidraMcpSystems (
+        system:
+        let
+          pkgs = mkPkgs system;
+          ghidraMcp = pkgs.ghidra-mcp;
+          ghidraMcpHeadless = pkgs.ghidra-mcp-headless;
+          appFor = program: {
+            type = "app";
+            inherit program;
           };
-
-          inherit (pkgs)
-            immutable-activate
-            lenovo-con-mode
-            linux-toolbox-profile
-            logitech-battery-gnome
-            macos-pointer
-            portable-linux-profile
-            sushi-preview
-            ;
-
-          immutable-profile = pkgs.portable-linux-profile;
+        in
+        {
+          ghidra-mcp = appFor "${ghidraMcp}/bin/ghidra-mcp-serve";
+          ghidra-mcp-headless = appFor "${ghidraMcpHeadless.launcher}/bin/ghidra-mcp-headless";
+          ghidra-mcp-httpd = appFor "${ghidraMcpHeadless.httpd}/bin/ghidra-mcp-httpd";
+          ghidra-mcp-bridge = appFor "${ghidraMcpHeadless.bridge}/bin/ghidra-mcp-bridge";
+          default = appFor "${ghidraMcp}/bin/ghidra-mcp-serve";
         }
       );
 
       nixosModules.default = import ./modules/nixos;
-      darwinModules.default = import ./modules/darwin;
 
-      darwinConfigurations = import ./hosts/darwin { inherit inputs; };
       nixosConfigurations = import ./hosts/linux { inherit inputs; };
     };
 }

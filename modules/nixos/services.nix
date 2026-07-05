@@ -1,23 +1,58 @@
 {
-  config,
   lib,
   pkgs,
   ...
 }:
 let
-  paidFonts = (pkgs.callPackage ../../packages/paid-fonts/build-font.nix { }).packages;
+  inherit (lib.attrsets) listToAttrs;
+  inherit (lib.filesystem) listFilesRecursive;
+  inherit (lib.path) hasPrefix;
+  inherit (lib.strings) removePrefix;
+
+  rootfs = ../../spectrum/image/rootfs;
+  rootfsSystemdSystem = rootfs + "/usr/lib/systemd/system";
+  rootfsSystemdUser = rootfs + "/usr/lib/systemd/user";
+  rootfsSystemdSystemConf = rootfs + "/usr/lib/systemd/system.conf.d";
+  rootfsSystemdUserConf = rootfs + "/usr/lib/systemd/user.conf.d";
+
+  relPath = root: path: removePrefix "${toString root}/" (toString path);
+
+  etcFilesFrom =
+    sourceRoot: etcPrefix: paths:
+    listToAttrs (
+      map (path: {
+        name = "${etcPrefix}/${relPath sourceRoot path}";
+        value.source = path;
+      }) paths
+    );
+
+  systemUnitFiles = builtins.filter (path: !(hasPrefix rootfsSystemdSystemConf path)) (
+    listFilesRecursive rootfsSystemdSystem
+  );
+  userUnitFiles = builtins.filter (path: !(hasPrefix rootfsSystemdUserConf path)) (
+    listFilesRecursive rootfsSystemdUser
+  );
 in
 {
+  environment.etc =
+    etcFilesFrom rootfsSystemdSystem "systemd/system" systemUnitFiles
+    // etcFilesFrom rootfsSystemdUser "systemd/user" userUnitFiles
+    // {
+      "uresourced.conf".source = rootfs + "/etc/uresourced.conf";
+      "systemd/user.conf.d/60-spectrum-resource-accounting.conf".source =
+        rootfsSystemdUserConf + "/60-spectrum-resource-accounting.conf";
+    };
+
   services = {
     kmscon = {
       enable = true;
       hwRender = true;
       useXkbConfig = true;
       extraOptions = "--term xterm-256color";
-      fonts = lib.mkIf config.flame.fonts.paid.enable [
+      fonts = [
         {
-          name = "TX-02 Nerd Font";
-          package = paidFonts.tx-02;
+          name = "JetBrainsMono Nerd Font";
+          package = pkgs.nerd-fonts.jetbrains-mono;
         }
       ];
     };
@@ -27,50 +62,11 @@ in
     xserver.xkb.layout = "us";
   };
 
-  systemd.user.services.nd-tools-update = {
-    description = "Run periodic nix-dotfiles tool updaters";
-    path = [
-      pkgs.bash
-      pkgs.coreutils
-      pkgs.findutils
-    ];
-    script = ''
-      exec "$HOME/.local/bin/nd-tools" update
-    '';
-    serviceConfig = {
-      Type = "oneshot";
-      CapabilityBoundingSet = "";
-      LockPersonality = true;
-      NoNewPrivileges = true;
-      PrivateDevices = true;
-      PrivateTmp = true;
-      ProtectClock = true;
-      ProtectControlGroups = true;
-      ProtectHome = false;
-      ProtectHostname = true;
-      ProtectKernelLogs = true;
-      ProtectKernelModules = true;
-      ProtectKernelTunables = true;
-      ProtectSystem = "full";
-      RestrictAddressFamilies = [
-        "AF_UNIX"
-        "AF_INET"
-        "AF_INET6"
-      ];
-      RestrictRealtime = true;
-      RestrictSUIDSGID = true;
-      SystemCallArchitectures = "native";
-      UMask = "022";
-    };
-  };
-
-  systemd.user.timers.nd-tools-update = {
-    description = "Run periodic nix-dotfiles tool updaters every six hours";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnBootSec = "10m";
-      OnUnitActiveSec = "6h";
-      Persistent = true;
+  systemd = {
+    settings.Manager = {
+      DefaultMemoryAccounting = true;
+      DefaultIOAccounting = true;
+      DefaultTasksAccounting = true;
     };
   };
 }

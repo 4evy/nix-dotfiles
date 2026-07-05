@@ -9,8 +9,8 @@ let
   inherit (lib.modules) mkIf;
   inherit (lib.strings) concatStringsSep;
 
-  desktopEnabled = config.nixOS.gnome.enable || config.nixOS.kde.enable;
-  heliumProfileDir = "/home/nyx/.config/net.imput.helium/Default";
+  desktopEnabled = config.local.gnome.enable || config.local.kde.enable;
+  heliumProfileDir = "/home/4evy/.config/net.imput.helium/Default";
   heliumPrivateSettingsFile = config.sops.secrets."helium-cookie-autodelete-settings".path;
 
   chromiumFeatures = [
@@ -99,7 +99,15 @@ let
     '';
   };
 
-  heliumBrowserTool = pkgs.callPackage ../../packages/helium-browser.nix { };
+  heliumBrowserTool = pkgs.callPackage ../../packages/go-workspace-package.nix { } {
+    pname = "helium-browser";
+    subPackages = [ "cmd/helium-browser" ];
+
+    meta = {
+      description = "Install and configure Helium browser";
+      mainProgram = "helium-browser";
+    };
+  };
 
   externalExtensionFile = id: value: {
     name = "xdg/net.imput.helium/External Extensions/${id}.json";
@@ -141,7 +149,7 @@ in
     );
 
     sops.secrets."helium-cookie-autodelete-settings" = {
-      owner = "nyx";
+      owner = "4evy";
       mode = "0400";
     };
 
@@ -152,15 +160,15 @@ in
       ];
       text = ''
         mkdir -p '${heliumProfileDir}'
-        chown nyx:users '/home/nyx/.config' '/home/nyx/.config/net.imput.helium' '${heliumProfileDir}' 2>/dev/null || true
+        chown 4evy:users '/home/4evy/.config' '/home/4evy/.config/net.imput.helium' '${heliumProfileDir}' 2>/dev/null || true
 
         if command -v runuser >/dev/null 2>&1; then
-          runuser -u nyx -- ${heliumBrowserTool}/bin/helium-browser apply-extension-settings \
+          runuser -u 4evy -- ${heliumBrowserTool}/bin/helium-browser apply-extension-settings \
             --profile-dir '${heliumProfileDir}' \
             --settings '${heliumPrivateSettingsFile}' \
             --gh-token || true
         else
-          su -s /bin/sh nyx -c '${heliumBrowserTool}/bin/helium-browser apply-extension-settings --profile-dir ${heliumProfileDir} --settings ${heliumPrivateSettingsFile} --gh-token' || true
+          su -s /bin/sh 4evy -c '${heliumBrowserTool}/bin/helium-browser apply-extension-settings --profile-dir ${heliumProfileDir} --settings ${heliumPrivateSettingsFile} --gh-token' || true
         fi
       '';
     };

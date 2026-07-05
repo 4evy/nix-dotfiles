@@ -47,11 +47,11 @@ let
   pkill = getExe' pkgs.procps "pkill";
 in
 {
-  options.nixOS.gnome.enable = mkEnableOption "GNOME";
-  options.nixOS.dconf.enable = mkEnableOption "Dconf";
+  options.local.gnome.enable = mkEnableOption "GNOME";
+  options.local.dconf.enable = mkEnableOption "Dconf";
 
   config = mkMerge [
-    (mkIf config.nixOS.gnome.enable {
+    (mkIf config.local.gnome.enable {
       services = {
         displayManager.gdm.enable = true;
         desktopManager.gnome.enable = true;
@@ -80,9 +80,13 @@ in
           totem # Videos
           ;
       };
+      systemd.user.units."gnome-catppuccin-accent.service" = {
+        text = builtins.readFile ../../dotfiles/dot_config/systemd/user/gnome-catppuccin-accent.service;
+        wantedBy = [ "default.target" ];
+      };
     })
     # Fix for GNOME suspend/resume issues with NVIDIA GPUs
-    (mkIf config.nixOS.nvidia.enable {
+    (mkIf config.local.nvidia.enable {
       systemd.services = {
         gnome-suspend = {
           description = "Suspend gnome shell";
@@ -109,7 +113,7 @@ in
         };
       };
     })
-    (mkIf config.nixOS.dconf.enable {
+    (mkIf config.local.dconf.enable {
       environment.systemPackages = attrValues {
         inherit (pkgs.gnomeExtensions) appindicator clipboard-indicator pip-on-top;
         inherit hyperWindowTilingExtension;

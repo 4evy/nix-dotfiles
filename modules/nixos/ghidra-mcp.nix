@@ -7,20 +7,23 @@
 let
   inherit (lib.options) mkOption;
 
-  cfg = config.services.ghidra-mcp;
   types = lib.types;
-  packageSet = pkgs.ghidra-mcp-headless;
-  stateDir = cfg.stateDir;
-  httpdExe = lib.getExe' packageSet.httpd "ghidra-mcp-httpd";
-  bridgeExe = lib.getExe' packageSet.bridge "ghidra-mcp-bridge";
+  stateDir = config.services.ghidra-mcp.stateDir;
 in
 {
   options.services.ghidra-mcp = {
-    enable = lib.options.mkEnableOption "Ghidra MCP headless HTTP backend plus streamable HTTP MCP bridge";
+    enable = lib.options.mkEnableOption "Ghidra MCP on-demand tools for cxg";
+
+    package = mkOption {
+      type = types.package;
+      default = pkgs.ghidra-mcp;
+      defaultText = lib.literalExpression "pkgs.ghidra-mcp";
+      description = "Package that provides ghidra-mcp-serve, ghidra-mcp-httpd, and ghidra-mcp-bridge.";
+    };
 
     user = mkOption {
       type = types.str;
-      default = "nyx";
+      default = "4evy";
       description = "User that runs the Ghidra MCP services.";
     };
 
@@ -52,7 +55,7 @@ in
 
     stateDir = mkOption {
       type = types.path;
-      default = "/home/${cfg.user}/.local/state/ghidra-mcp-headless";
+      default = "/home/${config.services.ghidra-mcp.user}/.local/state/ghidra-mcp-headless";
     };
 
     allowScripts = mkOption {
@@ -66,76 +69,41 @@ in
       default = [ ];
       example = [ "/run/keys/ghidra-mcp.env" ];
       description = ''
-        Environment files to source before starting the Ghidra MCP systemd
-        services. This is useful for values such as GHIDRA_MCP_AUTH_TOKEN
-        without putting secrets into the Nix store.
+        Environment files to use with a manually defined Ghidra MCP service.
+        The stock module installs the on-demand cxg helper package and does not
+        start a system service.
       '';
     };
 
     extraEnvironment = mkOption {
       type = types.attrsOf types.str;
       default = { };
-      description = "Extra environment variables passed to the Ghidra MCP systemd services.";
+      description = "Extra environment variables reserved for local Ghidra MCP service overrides.";
     };
   };
 
-  config = lib.modules.mkIf cfg.enable {
-    environment.systemPackages = [
-      packageSet.ghidra
-      packageSet.httpd
-      packageSet.bridge
+  config = lib.modules.mkIf config.services.ghidra-mcp.enable {
+    environment.systemPackages = with config.services.ghidra-mcp; [
+      package
+      package.ghidra
+      package.httpd
+      package.bridge
+      package.launcher
     ];
 
     systemd.tmpfiles.rules = [
-      "d ${stateDir} 0755 ${cfg.user} ${cfg.group} - -"
+      "d ${stateDir} 0755 ${config.services.ghidra-mcp.user} ${config.services.ghidra-mcp.group} - -"
     ];
 
-    systemd.services.ghidra-mcp-httpd = {
-      description = "Ghidra MCP headless HTTP backend";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "network.target" ];
-      environment = cfg.extraEnvironment // {
-        GHIDRA_MCP_BIND = cfg.httpHost;
-        GHIDRA_MCP_PORT = toString cfg.httpPort;
-        GHIDRA_MCP_ALLOW_SCRIPTS = if cfg.allowScripts then "1" else "0";
-        GHIDRA_MCP_STATE = toString stateDir;
-        JAVA_OPTS = "-Xmx4g -XX:+UseG1GC";
-      };
-      serviceConfig = {
-        ExecStart = httpdExe;
-        EnvironmentFile = cfg.environmentFiles;
-        Group = cfg.group;
-        Restart = "on-failure";
-        User = cfg.user;
-        WorkingDirectory = toString stateDir;
-      };
-    };
-
-    systemd.services.ghidra-mcp-bridge = {
-      description = "Ghidra MCP streamable HTTP bridge";
-      wantedBy = [ "multi-user.target" ];
-      after = [
-        "network.target"
-        "ghidra-mcp-httpd.service"
-      ];
-      requires = [ "ghidra-mcp-httpd.service" ];
-      environment = cfg.extraEnvironment // {
-        GHIDRA_MCP_BIND = cfg.httpHost;
-        GHIDRA_MCP_PORT = toString cfg.httpPort;
-        GHIDRA_MCP_URL = "http://${cfg.httpHost}:${toString cfg.httpPort}";
-        GHIDRA_MCP_BRIDGE_HOST = cfg.mcpHost;
-        GHIDRA_MCP_BRIDGE_PORT = toString cfg.mcpPort;
-        GHIDRA_MCP_BRIDGE_TRANSPORT = "streamable-http";
-        GHIDRA_MCP_STATE = toString stateDir;
-      };
-      serviceConfig = {
-        ExecStart = bridgeExe;
-        EnvironmentFile = cfg.environmentFiles;
-        Group = cfg.group;
-        Restart = "on-failure";
-        User = cfg.user;
-        WorkingDirectory = toString stateDir;
-      };
+    environment.sessionVariables = {
+      GHIDRA_MCP_ALLOW_SCRIPTS = if config.services.ghidra-mcp.allowScripts then "1" else "0";
+      GHIDRA_MCP_BIND = config.services.ghidra-mcp.httpHost;
+      GHIDRA_MCP_BRIDGE_HOST = config.services.ghidra-mcp.mcpHost;
+      GHIDRA_MCP_BRIDGE_PORT = toString config.services.ghidra-mcp.mcpPort;
+      GHIDRA_MCP_BRIDGE_TRANSPORT = "streamable-http";
+      GHIDRA_MCP_PORT = toString config.services.ghidra-mcp.httpPort;
+      GHIDRA_MCP_STATE = toString stateDir;
+      GHIDRA_MCP_URL = "http://${config.services.ghidra-mcp.httpHost}:${toString config.services.ghidra-mcp.httpPort}";
     };
   };
 }

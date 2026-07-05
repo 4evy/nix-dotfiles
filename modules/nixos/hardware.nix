@@ -11,8 +11,8 @@ let
   inherit (config.nixpkgs.hostPlatform) isx86_64;
 in
 {
-  options.nixOS.nvidia.enable = mkEnableOption "NVIDIA";
-  options.nixOS.amd.enable = mkEnableOption "AMD";
+  options.local.nvidia.enable = mkEnableOption "NVIDIA";
+  options.local.amd.enable = mkEnableOption "AMD";
 
   config = mkMerge [
     ({
@@ -63,7 +63,7 @@ in
         };
       };
     })
-    (mkIf config.nixOS.nvidia.enable {
+    (mkIf config.local.nvidia.enable {
       # nixpkgs.config.cudaSupport = true;
       boot.extraModprobeConfig =
         "options nvidia "
@@ -110,7 +110,7 @@ in
         };
       };
     })
-    (mkIf config.nixOS.amd.enable {
+    (mkIf config.local.amd.enable {
       # HIP libraries support - many applications hard-code HIP library paths
       systemd.tmpfiles.rules =
         let

@@ -1,7 +1,7 @@
-_: {
+{ inputs, ... }:
+{
   imports = [
     ../cross
-    ../cross/nixcord
     ./desktop-packages.nix
     ./gnome.nix
     ./ghidra-mcp.nix
@@ -10,8 +10,12 @@ _: {
     ./kde.nix
     ./networking.nix
     ./packages.nix
-    ./nixcord.nix
+    ./shell.nix
+    inputs.nixcord.nixosModules.nixcord
+    ./nixcord/settings.nix
     ./services.nix
     ./zed-remote.nix
   ];
+
+  programs.nixcord.user = "4evy";
 }

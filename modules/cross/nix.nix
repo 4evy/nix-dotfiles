@@ -17,8 +17,7 @@ in
 
       settings = {
         trusted-users = [
-          "flame"
-          "nyx"
+          "4evy"
         ];
         experimental-features = "nix-command flakes";
         builders-use-substitutes = true;
