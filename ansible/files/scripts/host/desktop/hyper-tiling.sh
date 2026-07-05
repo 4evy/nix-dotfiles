@@ -2,13 +2,9 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-case ${BASH_SOURCE[0]} in
-*/*) script_dir=${BASH_SOURCE[0]%/*} ;;
-*) script_dir=. ;;
-esac
-script_dir=$(cd -P -- "$script_dir" && pwd -P)
+script_dir=$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 
-# shellcheck disable=SC1091
+# shellcheck source=ansible/files/scripts/host/lib/entrypoint.sh
 source -p "$script_dir/../lib" entrypoint.sh
 
 require_arg_count 0 0 "$@"

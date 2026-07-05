@@ -65,6 +65,42 @@
     - discord
     - equicord
 
+- name: Install native Ghostty tip build on Linux
+  ansible.builtin.command:
+    argv:
+      - bash
+      - "{{ dotfiles_ansible_scripts_dir }}/apps/install-ghostty-tip-linux.sh"
+      - "{{ dotfiles_cache_dir }}/ghostty"
+      - "{{ dotfiles_home_dir }}/.local"
+  args:
+    chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    PATH: "{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
+  register: applications_ghostty_tip_install
+  changed_when: applications_ghostty_tip_install.stdout is search('^Installed native Ghostty tip ')
+  when: common_is_linux
+  tags:
+    - apps
+    - ghostty
+
+- name: Install native Helix tip build on Linux
+  ansible.builtin.command:
+    argv:
+      - bash
+      - "{{ dotfiles_ansible_scripts_dir }}/apps/install-helix-tip-linux.sh"
+      - "{{ dotfiles_cache_dir }}/helix"
+      - "{{ dotfiles_data_dir }}/helix-tip"
+  args:
+    chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    PATH: "{{ dotfiles_home_dir }}/.cargo/bin:{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
+  register: applications_helix_tip_install
+  changed_when: applications_helix_tip_install.stdout is search('^Installed Helix tip ')
+  when: common_is_linux
+  tags:
+    - apps
+    - helix
+
 - name: Install Helium on Linux
   ansible.builtin.command:
     argv:
@@ -82,28 +118,79 @@
   changed_when: true
   vars:
     helium_enabled_features:
-      - AcceleratedVideoDecoder
-      - AcceleratedVideoDecodeLinuxGL
-      - AcceleratedVideoEncoder
-      - ForceEnableWebGpuInterop
-      - ReduceOpsTaskSplitting
       - TouchpadOverscrollHistoryNavigation
-      - VaapiOnNvidiaGPUs
-      - VaapiVideoDecoder
-      - VaapiVideoEncoder
+    helium_disabled_features:
+      - ExtensionManifestV2Unsupported
+      - ExtensionManifestV2Disabled
       - BrowsingTopics
       - InterestGroupStorage
+      - WaylandWpColorManagerV1
     helium_common_flags: >-
       --no-first-run --no-default-browser-check --disable-search-engine-choice-screen
       --extension-mime-request-handling=always-prompt-for-install
       --omnibox-autocomplete-filtering=search --set-user-color=244,184,228
       --set-color-scheme=dark --set-color-variant=tonal_spot
     helium_linux_flags: >-
+      --ozone-platform=x11 --disable-gpu-process-crash-limit
+      --enable-gpu-rasterization
       --enable-features={{ helium_enabled_features | join(',') }}
-      --disable-features=ExtensionManifestV2Unsupported,ExtensionManifestV2Disabled,Vulkan,WaylandWpColorManagerV1
-      --disable-vulkan-surface --ignore-gpu-blocklist --enable-wayland-ime
-      --wayland-text-input-version=3 {{ helium_common_flags }}
+      --disable-features={{ helium_disabled_features | join(',') }}
+      {{ helium_common_flags }}
   when: common_is_linux
+  tags:
+    - apps
+    - helium
+
+- name: Detect AppArmor support for Helium on Linux
+  ansible.builtin.command:
+    argv:
+      - sh
+      - -c
+      - >-
+        test -r /sys/module/apparmor/parameters/enabled &&
+        grep -qi '^Y' /sys/module/apparmor/parameters/enabled &&
+        command -v apparmor_parser >/dev/null
+  changed_when: false
+  failed_when: false
+  register: applications_helium_apparmor
+  when: common_is_linux
+  tags:
+    - apps
+    - helium
+
+- name: Install AppArmor profile for Helium archive install
+  ansible.builtin.copy:
+    dest: /etc/apparmor.d/dotfiles-helium-browser
+    mode: "0644"
+    content: |
+      abi <abi/4.0>,
+      include <tunables/global>
+
+      profile dotfiles-helium-browser "{{ dotfiles_cache_dir }}/helium-browser/app/helium" flags=(default_allow) {
+        userns,
+        include if exists <local/dotfiles-helium-browser>
+      }
+  become: true
+  register: applications_helium_apparmor_profile
+  when:
+    - common_is_linux
+    - applications_helium_apparmor.rc | default(1) == 0
+  tags:
+    - apps
+    - helium
+
+- name: Reload AppArmor profile for Helium archive install
+  ansible.builtin.command:
+    argv:
+      - apparmor_parser
+      - -r
+      - /etc/apparmor.d/dotfiles-helium-browser
+  become: true
+  changed_when: applications_helium_apparmor_profile.changed
+  when:
+    - common_is_linux
+    - applications_helium_apparmor.rc | default(1) == 0
+    - applications_helium_apparmor_profile.changed | default(false)
   tags:
     - apps
     - helium

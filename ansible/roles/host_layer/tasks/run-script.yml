@@ -1,0 +1,11 @@
+---
+- name: Run host layer script for {{ host_layer_script.name }}
+  ansible.builtin.command:
+    argv: >-
+      {{
+        ['bash', dotfiles_ansible_scripts_dir ~ '/' ~ host_layer_script.path]
+        + (host_layer_script.args | default([]))
+      }}
+    chdir: "{{ dotfiles_repo_root }}"
+  changed_when: host_layer_script.changed | default(true) | bool
+  become: "{{ host_layer_script.become | default(false) | bool }}"

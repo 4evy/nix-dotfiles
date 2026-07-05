@@ -7,34 +7,46 @@
   loop:
     - "{{ dotfiles_bin_dir }}"
     - "{{ dotfiles_cache_dir }}"
+    - "{{ dotfiles_data_dir }}"
   tags:
     - common
 
-- name: Detect rpm-ostree
-  ansible.builtin.shell: command -v rpm-ostree
-  args:
-    executable: /bin/bash
-  changed_when: false
-  failed_when: false
-  register: common_rpm_ostree_command
-  tags:
-    - common
-
-- name: Detect operating system
+- name: Detect operating system name
   ansible.builtin.command:
     argv:
       - uname
       - -s
   changed_when: false
-  register: common_uname_system
+  check_mode: false
+  register: common_uname_command
+  tags:
+    - common
+
+- name: Set operating system facts
+  ansible.builtin.set_fact:
+    common_system: "{{ common_detected_system }}"
+    common_is_macos: "{{ common_detected_system == 'Darwin' }}"
+    common_is_linux: "{{ common_detected_system == 'Linux' }}"
+  vars:
+    common_detected_system: "{{ ansible_facts.get('system', common_uname_command.stdout | default('')) }}"
+  tags:
+    - common
+
+- name: Detect rpm-ostree
+  ansible.builtin.command:
+    argv:
+      - rpm-ostree
+      - --version
+  changed_when: false
+  failed_when: false
+  register: common_rpm_ostree_command
+  when: common_is_linux
   tags:
     - common
 
 - name: Detect package managers
   ansible.builtin.set_fact:
-    common_has_rpm_ostree: "{{ common_rpm_ostree_command.rc == 0 }}"
-    common_system: "{{ ansible_facts.get('system', common_uname_system.stdout) }}"
-    common_is_macos: "{{ ansible_facts.get('system', common_uname_system.stdout) == 'Darwin' }}"
-    common_is_linux: "{{ ansible_facts.get('system', common_uname_system.stdout) == 'Linux' }}"
+    common_has_rpm_ostree: >-
+      {{ common_is_linux and (common_rpm_ostree_command.rc | default(1)) == 0 }}
   tags:
     - common

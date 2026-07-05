@@ -5,6 +5,7 @@
     chdir: "{{ dotfiles_repo_root }}"
   environment:
     GOBIN: "{{ dotfiles_bin_dir }}"
+    PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
   changed_when: true
   loop: "{{ local_tools_go_tools }}"
   when: common_system in item.platforms

@@ -1,132 +1,26 @@
 ---
-- name: Configure Tailscale on Bluefin
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/apps/tailscale-bluefin.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
+- name: Run configured host layer scripts
+  ansible.builtin.include_tasks:
+    file: run-script.yml
+    apply:
+      tags: "{{ host_layer_script.tags }}"
+  loop: "{{ host_layer_scripts }}"
+  loop_control:
+    loop_var: host_layer_script
+    label: "{{ host_layer_script.name }}"
   tags:
     - host
     - scripts
     - tailscale
-
-- name: Configure RustDesk Tailscale integration
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/apps/rustdesk-tailscale.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
     - rustdesk
-
-- name: Configure hyper-window-tiling
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/desktop/hyper-tiling.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
     - hyper-window-tiling
-
-- name: Configure Sushi preview
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/desktop/sushi-preview.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
     - sushi-preview
-
-- name: Configure emoji shortcut
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/desktop/emoji-shortcut.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
+    - flatpak-nvidia
+    - flatpak-maintenance
+    - telegram-flatpak
     - emoji-shortcut
-
-- name: Disable slow boot services
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/desktop/slow-boot-services.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
     - slow-boot-services
-
-- name: Configure Logitech HID++ battery reporting
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/desktop/logitech-battery.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
-    - logitech-hidpp-battery
-
-- name: Configure SteelSeries Arctis battery reporting
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/desktop/steelseries-battery.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
-    - steelseries-arctis-battery
-
-- name: Configure Kanata
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/keyboard/kanata.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
+    - kmscon
     - kanata
-
-- name: Configure Toshy GNOME context integration
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/keyboard/toshy-gnome-context.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
     - toshy-gnome-context
-
-- name: Configure Toshy Kanata chain
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/keyboard/toshy-kanata-chain.sh"
-    chdir: "{{ dotfiles_repo_root }}"
-  changed_when: true
-  tags:
-    - host
-    - scripts
     - toshy

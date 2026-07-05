@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+set -euo pipefail
+
+default_install_root=@INSTALL_ROOT@
+default_ghidra_home=@GHIDRA_HOME@
+
+: "${GHIDRA_MCP_BIND_ADDRESS:=127.0.0.1}"
+: "${GHIDRA_MCP_PORT:=8089}"
+: "${GHIDRA_MCP_ALLOW_SCRIPTS:=}"
+: "${GHIDRA_MCP_AUTH_TOKEN:=}"
+: "${GHIDRA_MCP_ARCHIVE_URL:=}"
+: "${GHIDRA_MCP_FILE_ROOT:=}"
+: "${GHIDRA_MCP_PROJECT_FOLDER:=}"
+: "${GHIDRA_USER:=}"
+
+export GHIDRA_HOME="${GHIDRA_HOME:-$default_ghidra_home}"
+export GHIDRA_MCP_STATE="${GHIDRA_MCP_STATE:-$HOME/.local/state/ghidra-mcp-headless}"
+export GHIDRA_MCP_BIND="${GHIDRA_MCP_BIND:-$GHIDRA_MCP_BIND_ADDRESS}"
+
+mkdir -p "$GHIDRA_MCP_STATE/home" "$GHIDRA_MCP_STATE/tmp" "$GHIDRA_MCP_STATE/runtime"
+chmod 700 "$GHIDRA_MCP_STATE/runtime"
+export TMPDIR="$GHIDRA_MCP_STATE/tmp"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-$GHIDRA_MCP_STATE/runtime}"
+export HOME="$GHIDRA_MCP_STATE/home"
+
+classpath="$default_install_root/share/java/GhidraMCP-@JAR_VERSION@.jar"
+for root in Debug Features Framework Processors; do
+	root_dir="$GHIDRA_HOME/Ghidra/$root"
+	[[ -d $root_dir ]] || continue
+	while IFS= read -r -d '' jar; do
+		classpath="$classpath:$jar"
+	done < <(find "$root_dir" -type f -path '*/lib/*.jar' -print0)
+done
+
+java_bin=${JAVA_HOME:+$JAVA_HOME/bin/java}
+java_bin=${java_bin:-java}
+java_opts=()
+if [[ -n ${JAVA_OPTS:-} ]]; then
+	# Intentionally match the Nix wrapper's shell-style JAVA_OPTS splitting.
+	# shellcheck disable=SC2206
+	java_opts=(${JAVA_OPTS})
+fi
+
+args=("${java_opts[@]}")
+if [[ -n $GHIDRA_USER ]]; then
+	args+=("-Duser.name=$GHIDRA_USER")
+fi
+args+=(
+	"-Duser.home=$GHIDRA_MCP_STATE/home"
+	"-Djava.io.tmpdir=$GHIDRA_MCP_STATE/tmp"
+	"-Dghidra.home=$GHIDRA_HOME"
+	"-Dapplication.name=GhidraMCP"
+	-classpath "$classpath"
+	com.xebyte.headless.GhidraMCPHeadlessServer
+	--bind "$GHIDRA_MCP_BIND"
+	--port "$GHIDRA_MCP_PORT"
+)
+[[ -z ${PROGRAM_FILE:-} ]] || args+=(--file "$PROGRAM_FILE")
+[[ -z ${PROJECT_PATH:-} ]] || args+=(--project "$PROJECT_PATH")
+[[ -z ${PROGRAM_NAME:-} ]] || args+=(--program "$PROGRAM_NAME")
+if [[ -n ${GHIDRA_MCP_EXTRA_ARGS:-} ]]; then
+	# shellcheck disable=SC2206
+	extra_args=(${GHIDRA_MCP_EXTRA_ARGS})
+	args+=("${extra_args[@]}")
+fi
+
+exec "$java_bin" "${args[@]}"

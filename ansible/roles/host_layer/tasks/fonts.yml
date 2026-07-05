@@ -1,35 +1,14 @@
 ---
-- name: Refresh host font cache
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/fonts/cache-refresh.sh"
-  changed_when: false
+- name: Run configured host font scripts
+  ansible.builtin.include_tasks:
+    file: run-script.yml
+    apply:
+      tags: "{{ host_layer_script.tags }}"
+  loop: "{{ host_layer_font_scripts }}"
+  loop_control:
+    loop_var: host_layer_script
+    label: "{{ host_layer_script.name }}"
   tags:
     - host
     - fonts
     - font-cache
-
-- name: Stage paid host fonts
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/fonts/paid-stage.sh"
-      - "{{ dotfiles_home_dir }}"
-  changed_when: true
-  tags:
-    - host
-    - fonts
-    - paid-fonts
-
-- name: Install paid host fonts
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/host/fonts/paid-install.sh"
-      - "{{ dotfiles_home_dir }}"
-  changed_when: true
-  tags:
-    - host
-    - fonts
-    - paid-fonts

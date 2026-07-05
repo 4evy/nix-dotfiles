@@ -1,0 +1,24 @@
+---
+- name: Install repo-local script commands
+  ansible.builtin.copy:
+    src: "{{ dotfiles_repo_root }}/{{ item.source }}"
+    dest: "{{ dotfiles_bin_dir }}/{{ item.name }}"
+    mode: "0755"
+  loop: "{{ local_tools_script_tools | default([]) }}"
+  when: common_system in item.platforms
+  tags:
+    - local
+    - scripts
+
+- name: Install repo-local script support files
+  ansible.builtin.copy:
+    src: "{{ dotfiles_repo_root }}/{{ item.support_source }}/"
+    dest: "{{ dotfiles_data_dir }}/scripts/{{ item.support_name | default(item.name) }}/"
+    mode: preserve
+  loop: "{{ local_tools_script_tools | default([]) }}"
+  when:
+    - common_system in item.platforms
+    - item.support_source is defined
+  tags:
+    - local
+    - scripts

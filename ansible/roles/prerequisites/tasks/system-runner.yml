@@ -1,0 +1,24 @@
+---
+- name: Install system-runner bootstrap command
+  ansible.builtin.copy:
+    src: "{{ dotfiles_repo_root }}/ansible/files/scripts/local/system-runner.sh"
+    dest: "{{ dotfiles_bin_dir }}/system-runner"
+    mode: "0755"
+  changed_when: true
+  tags:
+    - bootstrap
+    - scripts
+    - system-runner
+
+- name: Verify system-runner bootstrap command
+  ansible.builtin.command:
+    argv:
+      - "{{ dotfiles_bin_dir }}/system-runner"
+      - --version
+  environment:
+    PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
+  changed_when: false
+  tags:
+    - bootstrap
+    - scripts
+    - system-runner

@@ -6,6 +6,6 @@ dotfiles_home_dir: "{{ ansible_facts.get('env', {}).get('HOME', lookup('env', 'H
 dotfiles_path: "{{ ansible_facts.get('env', {}).get('PATH', lookup('env', 'PATH')) }}"
 dotfiles_cache_home: "{{ ansible_facts.get('env', {}).get('XDG_CACHE_HOME', dotfiles_home_dir + '/.cache') }}"
 dotfiles_data_home: "{{ ansible_facts.get('env', {}).get('XDG_DATA_HOME', dotfiles_home_dir + '/.local/share') }}"
-dotfiles_cache_dir: "{{ dotfiles_cache_home }}/nix-dotfiles/ansible"
+dotfiles_cache_dir: "{{ dotfiles_cache_home }}/dotfiles/ansible"
 dotfiles_bin_dir: "{{ dotfiles_home_dir }}/.local/bin"
-dotfiles_data_dir: "{{ dotfiles_data_home }}/nix-dotfiles"
+dotfiles_data_dir: "{{ dotfiles_data_home }}/dotfiles"

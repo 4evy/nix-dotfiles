@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import ast
-import sys
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("binding_path")
+    parser.add_argument("current_bindings")
+    return parser.parse_args()
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
-        raise SystemExit("usage: emoji-bindings.py BINDING_PATH CURRENT_BINDINGS")
-
-    binding_path = sys.argv[1]
-    current = sys.argv[2].strip()
-
+    args = parse_args()
+    binding_path = args.binding_path
+    current = args.current_bindings.strip()
     if current.startswith("@as "):
         current = current[4:].strip()
 
@@ -27,7 +31,7 @@ def main() -> None:
     if binding_path not in bindings:
         bindings.append(binding_path)
 
-    print("[" + ", ".join(repr(binding) for binding in bindings) + "]")
+    print(repr(bindings))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+set -euo pipefail
+
+default_install_root=@INSTALL_ROOT@
+
+: "${GHIDRA_MCP_BIND:=127.0.0.1}"
+: "${GHIDRA_MCP_PORT:=8089}"
+: "${GHIDRA_MCP_BRIDGE_HOST:=127.0.0.1}"
+: "${GHIDRA_MCP_BRIDGE_PORT:=8090}"
+: "${GHIDRA_MCP_BRIDGE_TRANSPORT:=streamable-http}"
+: "${GHIDRA_MCP_ALLOW_SCRIPTS:=1}"
+
+if [[ -z ${GHIDRA_MCP_URL:-} ]]; then
+	GHIDRA_MCP_URL="http://$GHIDRA_MCP_BIND:$GHIDRA_MCP_PORT"
+fi
+if [[ -z ${GHIDRA_MCP_STATE:-} ]]; then
+	if [[ -n ${XDG_STATE_HOME:-} ]]; then
+		GHIDRA_MCP_STATE="$XDG_STATE_HOME/ghidra-mcp-headless"
+	else
+		GHIDRA_MCP_STATE="$HOME/.local/state/ghidra-mcp-headless"
+	fi
+fi
+
+export \
+	GHIDRA_MCP_ALLOW_SCRIPTS \
+	GHIDRA_MCP_BIND \
+	GHIDRA_MCP_BRIDGE_HOST \
+	GHIDRA_MCP_BRIDGE_PORT \
+	GHIDRA_MCP_BRIDGE_TRANSPORT \
+	GHIDRA_MCP_PORT \
+	GHIDRA_MCP_STATE \
+	GHIDRA_MCP_URL
+
+mkdir -p "$GHIDRA_MCP_STATE"
+"$default_install_root/bin/ghidra-mcp-httpd" &
+httpd_pid=$!
+
+cleanup() {
+	kill "$httpd_pid" >/dev/null 2>&1 || true
+	wait "$httpd_pid" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+"$default_install_root/bin/ghidra-mcp-bridge"

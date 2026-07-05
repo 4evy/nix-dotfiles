@@ -1,39 +1,12 @@
 ---
-- name: Install nix-dotfiles userland tools
+- name: Install dotfiles userland tools
   hosts: local
   gather_facts: true
   roles:
     - role: common
       tags:
-        - 1password
-        - apps
-        - binstall
-        - bootstrap
-        - bun
-        - chezmoi
+        - always
         - common
-        - duf
-        - ecosystem
-        - equicord
-        - go
-        - helium
-        - jj
-        - local
-        - macos
-        - migration
-        - nix
-        - packages
-        - prerequisites
-        - raycast
-        - releases
-        - rustdesk
-        - rustup
-        - sops
-        - tools
-        - userland
-        - uv
-        - verify
-        - vscode
     - role: prerequisites
       tags:
         - bootstrap

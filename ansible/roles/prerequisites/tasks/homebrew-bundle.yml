@@ -1,0 +1,110 @@
+---
+- name: Remove stable Ghostty cask before installing tip
+  community.general.homebrew_cask:
+    name: ghostty
+    state: absent
+    install_options: force
+    path: "{{ prerequisites_homebrew_prefix }}/bin"
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - ghostty
+    - homebrew
+
+- name: Detect installed Helix formula metadata
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_homebrew_prefix }}/bin/brew"
+      - info
+      - --json=v2
+      - --installed
+      - helix
+  environment:
+    PATH: "{{ prerequisites_homebrew_path }}"
+  register: prerequisites_homebrew_helix_info
+  changed_when: false
+  failed_when: false
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - helix
+    - homebrew
+
+- name: Remove stable Helix formula before installing HEAD
+  community.general.homebrew:
+    name: helix
+    state: absent
+    path: "{{ prerequisites_homebrew_prefix }}/bin"
+  environment:
+    HOMEBREW_NO_ASK: "1"
+    PATH: "{{ prerequisites_homebrew_path }}"
+  vars:
+    prerequisites_homebrew_helix_formula: >-
+      {{
+        (
+          prerequisites_homebrew_helix_info.stdout
+          | default('{"formulae":[]}', true)
+          | from_json
+        ).formulae
+        | default([])
+        | first
+        | default({})
+      }}
+    prerequisites_homebrew_helix_installed: >-
+      {{
+        prerequisites_homebrew_helix_formula.installed
+        | default([])
+        | first
+        | default({})
+      }}
+  when:
+    - common_is_macos
+    - prerequisites_homebrew_helix_info.rc | default(1) == 0
+    - prerequisites_homebrew_helix_installed | length > 0
+    - not prerequisites_homebrew_helix_installed.installed_as_head | default(false)
+  tags:
+    - bootstrap
+    - helix
+    - homebrew
+
+- name: Apply Homebrew bundle
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_homebrew_prefix }}/bin/brew"
+      - bundle
+      - install
+      - --jobs
+      - auto
+      - --force-cleanup
+      - --file
+      - "{{ dotfiles_repo_root }}/Brewfile"
+  args:
+    chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    HOMEBREW_NO_ASK: "1"
+    PATH: "{{ prerequisites_homebrew_path }}"
+  register: prerequisites_homebrew_bundle_install
+  changed_when: >-
+    prerequisites_homebrew_bundle_install.stdout is search('(^|\n)(==> )?(Installing|Upgrading|Uninstalling|Uninstalled|Untapping|Removing) ')
+    or prerequisites_homebrew_bundle_install.stderr is search('(^|\n)(==> )?(Installing|Upgrading|Uninstalling|Uninstalled|Untapping|Removing) ')
+  when: prerequisites_homebrew_enabled | default(false)
+  tags:
+    - bootstrap
+    - homebrew
+
+- name: Verify required Homebrew-provided commands are on PATH
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - command -v "$1"
+      - dotfiles-homebrew-command
+      - "{{ item }}"
+  environment:
+    PATH: "{{ prerequisites_homebrew_path }}"
+  changed_when: false
+  loop: "{{ prerequisites_homebrew_required_commands | default([]) }}"
+  when: prerequisites_homebrew_enabled | default(false)
+  tags:
+    - bootstrap
+    - homebrew

@@ -42,8 +42,8 @@ files_pid_file(tailscale_var_run_t)
 #
 
 allow tailscaled_t tailscaled_exec_t:file execute_no_trans;
-# Immutable live roots can keep /usr/bin/tailscaled labeled bin_t because
-# immutable /usr does not accept restorecon relabels. The systemd drop-in still
+# Bootc live roots can keep /usr/bin/tailscaled labeled bin_t because
+# /usr does not accept restorecon relabels. The systemd drop-in still
 # starts only tailscaled in this domain.
 allow tailscaled_t bin_t:file entrypoint;
 allow tailscaled_t self:process { setexec setpgid setsched transition };

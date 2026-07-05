@@ -1,12 +1,10 @@
+---
 all:
   hosts:
     localhost:
       ansible_connection: local
   children:
     local:
-      hosts:
-        localhost:
-    portable_linux:
       hosts:
         localhost:
     host_layer:

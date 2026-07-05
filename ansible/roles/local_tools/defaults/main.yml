@@ -1,29 +1,5 @@
 ---
 local_tools_go_tools:
-  - name: system-run-mcp
-    packages:
-      - ./cmd/system-run-mcp
-      - ./cmd/system-runner
-    bins:
-      - system-run-mcp
-      - system-runner
-    platforms:
-      - Darwin
-      - Linux
-  - name: http-fixture
-    packages:
-      - ./cmd/http-fixture
-    bins:
-      - http-fixture
-    platforms:
-      - Darwin
-  - name: lsp-diagnostic-filter
-    packages:
-      - ./cmd/lsp-diagnostic-filter
-    bins:
-      - lsp-diagnostic-filter
-    platforms:
-      - Darwin
   - name: zellij-theme-tools
     packages:
       - ./cmd/zellij-theme-run
@@ -31,27 +7,37 @@ local_tools_go_tools:
       - zellij-theme-run
     platforms:
       - Darwin
-  - name: chezmoi-support
-    packages:
-      - ./cmd/chezmoi-support
+      - Linux
+
+local_tools_script_tools:
+  - name: system-runner
+    source: ansible/files/scripts/local/system-runner.sh
     bins:
-      - chezmoi-support
+      - system-runner
     platforms:
       - Darwin
       - Linux
-  - name: nd-tools
-    packages:
-      - ./cmd/nd-tools
+  - name: hyper-window-tiling-build
+    source: ansible/files/scripts/local/hyper-window-tiling-build.sh
     bins:
-      - nd-tools
+      - hyper-window-tiling-build
     platforms:
       - Darwin
       - Linux
-      - Windows
-  - name: lenovo-con-mode
-    packages:
-      - ./cmd/lenovo-con-mode
+  - name: install-ghidra-mcp
+    source: ansible/files/scripts/apps/install-ghidra-mcp.sh
+    support_source: ansible/files/scripts/apps/ghidra-mcp
+    support_name: ghidra-mcp
     bins:
-      - lenovo-con-mode
+      - install-ghidra-mcp
     platforms:
+      - Darwin
+      - Linux
+
+local_tools_upstream_script_tools:
+  - name: yt-dlp-script
+    url: https://raw.githubusercontent.com/euvlok/pkgs/HEAD/pkgs/by-name/yt/yt-dlp-script/yt-dlp-script.sh
+    dest: "{{ dotfiles_bin_dir }}/yt-dlp-script"
+    platforms:
+      - Darwin
       - Linux

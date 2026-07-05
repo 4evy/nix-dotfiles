@@ -1,30 +1,28 @@
 ---
+- name: Inspect legacy-managed bootstrap symlinks
+  ansible.builtin.stat:
+    path: "{{ dotfiles_bin_dir }}/{{ item }}"
+    follow: false
+  loop:
+    - go
+    - gofmt
+  register: prerequisites_legacy_bootstrap_bins
+  tags:
+    - bootstrap
+    - migration
+
 - name: Remove stale legacy-managed bootstrap symlinks
-  ansible.builtin.shell: |
-    set -euo pipefail
-    removed=0
-    for bin in go gofmt scaf"fold"; do
-      path="{{ dotfiles_bin_dir }}/${bin}"
-      if [ "$bin" = scaf"fold" ] && [ -e "$path" ]; then
-        rm -f "$path"
-        removed=1
-      elif [ -L "$path" ]; then
-        target=$(readlink -f "$path")
-        case "$target" in
-          "{{ dotfiles_home_dir }}"/.local/share/*/tools/* | "{{ dotfiles_home_dir }}"/.local/share/*/cache/*)
-            rm -f "$path"
-            removed=1
-            ;;
-        esac
-      fi
-    done
-    if [ "$removed" -eq 1 ]; then
-      printf '%s\n' removed
-    fi
-  args:
-    executable: /bin/bash
-  changed_when: "'removed' in prerequisites_legacy_symlink_migration.stdout"
-  register: prerequisites_legacy_symlink_migration
+  ansible.builtin.file:
+    path: "{{ item.stat.path }}"
+    state: absent
+  loop: "{{ prerequisites_legacy_bootstrap_bins.results }}"
+  when:
+    - item.stat.islnk | default(false)
+    - >-
+      item.stat.lnk_source | default('') is match(
+        '^' ~ (dotfiles_home_dir | regex_escape)
+        ~ '/\\.local/share/[^/]+/(tools|cache)/'
+      )
   tags:
     - bootstrap
     - migration

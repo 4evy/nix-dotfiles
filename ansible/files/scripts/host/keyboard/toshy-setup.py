@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import builtins
 import os
 import re
@@ -17,9 +18,6 @@ from typing import TypeGuard, cast
 
 RunCallable = Callable[..., subprocess.CompletedProcess[str]]
 ORIGINAL_RUN = cast(RunCallable, subprocess.run)
-SYSTEM_RUNNER = Path(
-    os.environ.get("TOSHY_SYSTEM_RUNNER", str(Path.home() / ".local/bin/system-runner"))
-)
 SUDO_SHIM_DIR = os.environ.get("TOSHY_SUDO_SHIM_DIR")
 SUDO_NAMES = {"sudo", "sudo-rs"}
 SUDO_K_RE = re.compile(r"(^|[;&|]\s*)(?:/usr/bin/)?sudo(?:-rs)?\s+-k(?=\s*(?:[;&|]|$))")
@@ -64,14 +62,13 @@ def rewrite_sudo_argv(argv: list[str]) -> list[str] | None:
         return None
     if rest and rest[0] == "-n":
         rest = rest[1:]
-    return [SUDO, "-n", str(SYSTEM_RUNNER), "--", *rest]
+    return [SUDO, "-n", *rest]
 
 
 def rewrite_sudo_shell(command: str) -> str:
-    runner = shlex.quote(str(SYSTEM_RUNNER))
     sudo = shlex.quote(SUDO)
     command = SUDO_K_RE.sub(r"\1true", command)
-    command = SUDO_CMD_RE.sub(rf"\1{sudo} -n {runner} -- ", command)
+    command = SUDO_CMD_RE.sub(rf"\1{sudo} -n ", command)
     return command
 
 
@@ -143,20 +140,24 @@ def automated_input(prompt: object = "") -> str:
     return response
 
 
-def main() -> None:
-    if len(sys.argv) < 2:
-        raise SystemExit("usage: toshy-setup.py SETUP_TOSHY.py [ARGS...]")
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("setup_path", type=Path)
+    parser.add_argument("setup_args", nargs=argparse.REMAINDER)
+    return parser.parse_args()
 
-    setup_path = sys.argv[1]
-    setup_args = sys.argv[2:]
-    setup_dir = Path(setup_path).resolve().parent
+
+def main() -> None:
+    args = parse_args()
+    setup_path = args.setup_path.resolve()
+    setup_dir = setup_path.parent
 
     os.chdir(setup_dir)
     sys.path.insert(0, str(setup_dir))
     setattr(builtins, "input", automated_input)
     setattr(subprocess, "run", automated_run)
-    sys.argv = [setup_path, *setup_args]
-    _ = runpy.run_path(setup_path, run_name="__main__")
+    sys.argv = [str(setup_path), *args.setup_args]
+    _ = runpy.run_path(str(setup_path), run_name="__main__")
 
 
 if __name__ == "__main__":

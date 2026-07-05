@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+set -euo pipefail
+
+for _ in {1..30}; do
+	if "@TAILSCALE_BIN@" set --ssh=true; then
+		exit 0
+	fi
+	sleep 2
+done
+exit 1

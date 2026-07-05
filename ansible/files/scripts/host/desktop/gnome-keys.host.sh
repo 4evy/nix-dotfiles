@@ -1,12 +1,13 @@
+#!/usr/bin/env bash
 # shellcheck shell=bash
 
 schema_dir=${1:?schema dir is required}
 
-if ! command -v gsettings >/dev/null 2>&1; then
-  exit 0
+if ! gsettings_available; then
+	exit 0
 fi
 if [[ ! -d $schema_dir ]]; then
-  exit 0
+	exit 0
 fi
 
 GSETTINGS_SCHEMA_DIR=$schema_dir gsettings set org.gnome.shell.extensions.hyper-window-tiling move-up "['<Super><Control><Alt><Shift>w']"

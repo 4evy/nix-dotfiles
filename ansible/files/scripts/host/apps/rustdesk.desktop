@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=RustDesk
+GenericName=Remote Desktop
+Comment=Virtual and remote desktop access
+Exec=rustdesk %u
+Icon=rustdesk
+Terminal=false
+StartupNotify=true
+StartupWMClass=rustdesk
+Categories=Network;RemoteAccess;
+MimeType=x-scheme-handler/rustdesk;

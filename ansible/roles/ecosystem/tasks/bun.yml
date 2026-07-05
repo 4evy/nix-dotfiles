@@ -2,12 +2,19 @@
 - name: Install Bun global tools
   ansible.builtin.command:
     argv:
-      - "{{ dotfiles_home_dir }}/.cache/.bun/bin/bun"
+      - >-
+        {{
+          (prerequisites_homebrew_prefix | default('/opt/homebrew')) + '/bin/bun'
+          if common_is_macos
+          else dotfiles_home_dir + '/.cache/.bun/bin/bun'
+        }}
       - add
       - --global
       - "{{ item.package }}"
   args:
     creates: "{{ dotfiles_home_dir }}/.cache/.bun/bin/{{ item.bin }}"
+  environment:
+    BUN_INSTALL: "{{ dotfiles_home_dir }}/.cache/.bun"
   loop: "{{ ecosystem_bun_global_packages }}"
   tags:
     - ecosystem

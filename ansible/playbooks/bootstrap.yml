@@ -1,22 +1,12 @@
 ---
-- name: Bootstrap nix-dotfiles prerequisites
+- name: Bootstrap dotfiles prerequisites
   hosts: local
   gather_facts: true
   roles:
     - role: common
       tags:
-        - bootstrap
-        - bun
-        - chezmoi
+        - always
         - common
-        - go
-        - migration
-        - nix
-        - packages
-        - prerequisites
-        - rustup
-        - sops
-        - uv
     - role: prerequisites
       tags:
         - bootstrap

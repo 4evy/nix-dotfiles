@@ -2,7 +2,12 @@
 - name: Fetch latest Equilotl release metadata
   ansible.builtin.uri:
     url: https://api.github.com/repos/Equicord/Equilotl/releases/latest
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: dotfiles-ansible
     return_content: true
+    status_code: 200
+    timeout: 30
   register: applications_equilotl_release
 
 - name: Select Equilotl Linux CLI asset
@@ -15,91 +20,33 @@
         | first
       }}
 
+- name: Require Equilotl Linux CLI asset
+  ansible.builtin.assert:
+    that:
+      - applications_equilotl_linux_url is defined
+      - applications_equilotl_linux_url | default('') | length > 0
+    fail_msg: >-
+      Latest Equilotl release does not include the expected
+      EquilotlCli-linux asset.
+
 - name: Install Equilotl Linux CLI
   ansible.builtin.get_url:
     url: "{{ applications_equilotl_linux_url }}"
     dest: "{{ dotfiles_bin_dir }}/EquilotlCli-linux"
     mode: "0755"
 
+- name: Install Discord Equicord shared script library
+  ansible.builtin.copy:
+    src: "{{ dotfiles_ansible_scripts_dir }}/host/lib/"
+    dest: "{{ dotfiles_home_dir }}/.local/lib/dotfiles/host/lib/"
+    mode: "0644"
+    directory_mode: "0755"
+
 - name: Install Discord Equicord launcher
   ansible.builtin.copy:
+    src: "{{ dotfiles_ansible_scripts_dir }}/apps/discord-equicord.sh"
     dest: "{{ dotfiles_bin_dir }}/discord-equicord"
     mode: "0755"
-    content: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-
-      channel=stable
-      download_url=https://updates.discord.com/
-      config_home=${XDG_CONFIG_HOME:-"$HOME/.config"}
-      discord_dir="$config_home/discord"
-      discord_host="$discord_dir/Discord"
-      equilotl="{{ dotfiles_bin_dir }}/EquilotlCli-linux"
-
-      find_bootstrap() {
-        local candidate
-
-        for candidate in /usr/share/discord/updater_bootstrap /opt/discord/updater_bootstrap /opt/Discord/updater_bootstrap; do
-          if [[ -x $candidate ]]; then
-            printf '%s\n' "$candidate"
-            return 0
-          fi
-        done
-
-        return 1
-      }
-
-      patch_location() {
-        local location=${1:?location is required}
-
-        if [[ ! -x $equilotl ]]; then
-          return 0
-        fi
-
-        if [[ -f "$location/resources/_app.asar" ]]; then
-          return 0
-        fi
-
-        if [[ -f "$location/resources/app.asar" || -f "$location/resources/build_info.json" ]]; then
-          "$equilotl" --install --location "$location" || true
-        fi
-      }
-
-      patch_current_discord() {
-        local target
-
-        if [[ -e $discord_host ]]; then
-          target=$(readlink -f "$discord_host" 2>/dev/null || true)
-          if [[ -n $target ]]; then
-            patch_location "$(dirname "$target")"
-            return 0
-          fi
-        fi
-
-        while IFS= read -r location; do
-          patch_location "$location"
-          return 0
-        done < <(find "$discord_dir" -maxdepth 1 -type d -name 'app-*' -printf '%p\n' 2>/dev/null | sort -Vr)
-      }
-
-      if [[ ! -x $discord_host ]]; then
-        mkdir -p "$discord_dir"
-        bootstrap=$(find_bootstrap)
-
-        if [[ -t 1 ]]; then
-          zenity=--no-zenity
-        else
-          zenity=--zenity
-        fi
-
-        "$bootstrap" "$zenity" "$discord_dir" "$channel" "$download_url" >/dev/null
-      fi
-
-      patch_current_discord
-      "$discord_host" "$@"
-      status=$?
-      patch_current_discord
-      exit "$status"
 
 - name: Ensure local applications directory exists
   ansible.builtin.file:
@@ -130,80 +77,35 @@
     state: directory
     mode: "0755"
 
-- name: Render Equicord plugin settings from Nixcord config
+- name: Install generated Equicord plugin settings
   ansible.builtin.command:
     argv:
-      - bash
-      - "{{ dotfiles_repo_root }}/scripts/render-equicord-settings.sh"
-      - "{{ dotfiles_repo_root }}/modules/cross/nixcord/default.nix"
-      - "{{ dotfiles_home_dir }}/.config/Equicord/settings/settings.json"
-  register: applications_equicord_settings
-  changed_when: applications_equicord_settings.stdout == 'changed'
-
-- name: Locate Discord app resources for Equicord
-  ansible.builtin.shell: |
-    set -euo pipefail
-
-    user_roots=(
-      "${HOME}/.config/discord"
-      "${HOME}/.config/Discord"
-    )
-
-    for root in "${user_roots[@]}"; do
-      while IFS= read -r dir; do
-        if [[ -f "$dir/resources/app.asar" || -f "$dir/resources/build_info.json" ]]; then
-          printf '%s\n' "$dir"
-          exit 0
-        fi
-      done < <(find "$root" -maxdepth 1 -type d -name 'app-*' -printf '%p\n' 2>/dev/null | sort -Vr)
-    done
-
-    system_candidates=(
-      /usr/share/discord
-      /usr/lib64/discord
-      /usr/lib/discord
-      /opt/Discord
-    )
-
-    for dir in "${system_candidates[@]}"; do
-      if [[ -f "$dir/resources/app.asar" || -f "$dir/resources/build_info.json" ]]; then
-        printf '%s\n' "$dir"
-        exit 0
-      fi
-    done
-
-    exit 1
+      - nix
+      - eval
+      - --json
+      - .#lib.equicordSettingsJson
   args:
-    executable: /bin/bash
-  environment:
-    HOME: "{{ dotfiles_home_dir }}"
-  register: applications_discord_equicord_location
+    chdir: "{{ dotfiles_repo_root }}"
+  register: applications_equicord_settings
   changed_when: false
-  failed_when: false
 
-- name: Report missing Discord app resources for Equicord
-  ansible.builtin.debug:
-    msg: "Discord app resources were not found; launch Discord once, then rerun the equicord tag."
-  when: applications_discord_equicord_location.rc != 0
+- name: Write generated Equicord plugin settings
+  ansible.builtin.copy:
+    content: "{{ applications_equicord_settings.stdout | from_json | to_nice_json }}\n"
+    dest: "{{ dotfiles_home_dir }}/.config/Equicord/settings/settings.json"
+    mode: "0644"
 
-- name: Check whether Discord is already patched with Equicord
-  ansible.builtin.stat:
-    path: "{{ applications_discord_equicord_location.stdout }}/resources/_app.asar"
-  register: applications_discord_equicord_patch
-  when: applications_discord_equicord_location.rc == 0
+- name: Install Equicord QuickCSS
+  ansible.builtin.copy:
+    src: "{{ dotfiles_ansible_dir }}/files/apps/equicord/quickCss.css"
+    dest: "{{ dotfiles_home_dir }}/.config/Equicord/settings/quickCss.css"
+    mode: "0644"
 
-- name: Patch Discord with Equicord
+- name: Repair Discord with Equicord launcher
   ansible.builtin.command:
     argv:
-      - "{{ dotfiles_bin_dir }}/EquilotlCli-linux"
-      - --install
-      - --location
-      - "{{ applications_discord_equicord_location.stdout }}"
-  become: "{{ not applications_discord_equicord_location.stdout.startswith(dotfiles_home_dir) }}"
+      - "{{ dotfiles_bin_dir }}/discord-equicord"
+      - --repair-only
   environment:
     HOME: "{{ dotfiles_home_dir }}"
-    SUDO_USER: "{{ ansible_facts.user_id | default(lookup('env', 'USER')) }}"
-  changed_when: true
-  when:
-    - applications_discord_equicord_location.rc == 0
-    - not (applications_discord_equicord_patch.stat.exists | default(false))
+  changed_when: false

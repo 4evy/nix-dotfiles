@@ -1,22 +1,75 @@
 ---
-- name: Install RustDesk on macOS
+- name: Configure RustDesk on macOS
   ansible.builtin.command:
     argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/apps/install-rustdesk-macos.sh"
-      - "{{ dotfiles_cache_dir }}/rustdesk"
+      - "{{ prerequisites_modern_bash | default('bash') }}"
+      - "{{ dotfiles_ansible_scripts_dir }}/apps/configure-rustdesk-macos.sh"
       - "{{ dotfiles_bin_dir }}"
-      - "{{ 'aarch64' if ansible_facts.architecture == 'arm64' else 'x86_64' }}"
   args:
     chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
   changed_when: true
   tags:
     - rustdesk
 
-- name: Install Helium on macOS
+- name: Ensure Equicord settings directory exists on macOS
+  ansible.builtin.file:
+    path: "{{ dotfiles_home_dir }}/Library/Application Support/Equicord/settings"
+    state: directory
+    mode: "0755"
+  tags:
+    - discord
+    - equicord
+
+- name: Install generated Equicord plugin settings on macOS
   ansible.builtin.command:
     argv:
-      - bash
+      - nix
+      - eval
+      - --json
+      - .#lib.equicordSettingsJson
+  args:
+    chdir: "{{ dotfiles_repo_root }}"
+  register: applications_equicord_settings_macos
+  changed_when: false
+  tags:
+    - discord
+    - equicord
+
+- name: Write generated Equicord plugin settings on macOS
+  ansible.builtin.copy:
+    content: "{{ applications_equicord_settings_macos.stdout | from_json | to_nice_json }}\n"
+    dest: "{{ dotfiles_home_dir }}/Library/Application Support/Equicord/settings/settings.json"
+    mode: "0644"
+  tags:
+    - discord
+    - equicord
+
+- name: Install Equicord QuickCSS on macOS
+  ansible.builtin.copy:
+    src: "{{ dotfiles_ansible_dir }}/files/apps/equicord/quickCss.css"
+    dest: "{{ dotfiles_home_dir }}/Library/Application Support/Equicord/settings/quickCss.css"
+    mode: "0644"
+  tags:
+    - discord
+    - equicord
+
+- name: Install Helium Homebrew cask on macOS
+  community.general.homebrew_cask:
+    name: helium-browser
+    state: present
+    path: "{{ prerequisites_homebrew_prefix | default('/opt/homebrew') }}/bin:{{ dotfiles_path }}"
+  environment:
+    HOMEBREW_NO_ASK: "1"
+    PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
+  tags:
+    - helium
+
+- name: Configure Helium on macOS
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_modern_bash | default('bash') }}"
       - "{{ dotfiles_ansible_scripts_dir }}/apps/install-helium-macos.sh"
       - "{{ dotfiles_cache_dir }}/helium-browser"
       - "{{ dotfiles_bin_dir }}"
@@ -29,29 +82,126 @@
         --set-color-scheme=dark --set-color-variant=tonal_spot
   args:
     chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
   changed_when: true
   tags:
     - helium
 
-- name: Install Raycast Beta on macOS
-  ansible.builtin.shell: |
-    set -euo pipefail
-    root="{{ dotfiles_cache_dir }}/raycast-beta"
-    dmg="${root}/Raycast_Beta.dmg"
-    mount_dir="${root}/mount"
-    app_dst="/Applications/Raycast Beta.app"
-    url=$(curl -fsSL --retry 3 'https://www.raycast.com/new' | sed -n 's|.*href="\(https://x-r2\.raycast-releases\.com/[^"]*\.dmg\)".*|\1|p' | head -n 1)
-    test -n "$url"
-    mkdir -p "$root"
-    curl -fsSL --retry 3 -o "$dmg" "$url"
-    rm -rf "$mount_dir"
-    mkdir -p "$mount_dir"
-    hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount_dir"
-    trap 'hdiutil detach "$mount_dir" >/dev/null 2>&1 || true' EXIT
-    rm -rf "$app_dst"
-    ditto "$mount_dir/Raycast Beta.app" "$app_dst"
-  args:
-    executable: /bin/bash
-    creates: /Applications/Raycast Beta.app
+- name: Set Raycast Beta install paths
+  ansible.builtin.set_fact:
+    applications_raycast_beta_root: "{{ dotfiles_cache_dir }}/raycast-beta"
+    applications_raycast_beta_dmg: "{{ dotfiles_cache_dir }}/raycast-beta/Raycast_Beta.dmg"
+    applications_raycast_beta_mount: "{{ dotfiles_cache_dir }}/raycast-beta/mount"
+    applications_raycast_beta_app: /Applications/Raycast Beta.app
   tags:
     - raycast
+
+- name: Check Raycast Beta app
+  ansible.builtin.stat:
+    path: "{{ applications_raycast_beta_app }}"
+  register: applications_raycast_beta_stat
+  tags:
+    - raycast
+
+- name: Fetch Raycast Beta release page
+  ansible.builtin.uri:
+    url: https://www.raycast.com/new
+    return_content: true
+    status_code: 200
+    timeout: 30
+  register: applications_raycast_beta_page
+  when: not applications_raycast_beta_stat.stat.exists
+  tags:
+    - raycast
+
+- name: Select Raycast Beta DMG URL
+  ansible.builtin.set_fact:
+    applications_raycast_beta_url: >-
+      {{
+        applications_raycast_beta_page.content
+        | regex_findall('https://x-r2\\.raycast-releases\\.com/[^"]+\\.dmg')
+        | first
+        | default('')
+      }}
+  when: not applications_raycast_beta_stat.stat.exists
+  tags:
+    - raycast
+
+- name: Require Raycast Beta DMG URL
+  ansible.builtin.assert:
+    that:
+      - applications_raycast_beta_url is defined
+      - applications_raycast_beta_url | length > 0
+    fail_msg: Raycast Beta release page did not include a DMG URL.
+  when: not applications_raycast_beta_stat.stat.exists
+  tags:
+    - raycast
+
+- name: Ensure Raycast Beta cache directory exists
+  ansible.builtin.file:
+    path: "{{ applications_raycast_beta_root }}"
+    state: directory
+    mode: "0755"
+  when: not applications_raycast_beta_stat.stat.exists
+  tags:
+    - raycast
+
+- name: Download Raycast Beta DMG
+  ansible.builtin.get_url:
+    url: "{{ applications_raycast_beta_url }}"
+    dest: "{{ applications_raycast_beta_dmg }}"
+    mode: "0644"
+  when: not applications_raycast_beta_stat.stat.exists
+  tags:
+    - raycast
+
+- name: Install Raycast Beta from DMG
+  when: not applications_raycast_beta_stat.stat.exists
+  tags:
+    - raycast
+  block:
+    - name: Reset Raycast Beta mount directory
+      ansible.builtin.file:
+        path: "{{ applications_raycast_beta_mount }}"
+        state: absent
+
+    - name: Create Raycast Beta mount directory
+      ansible.builtin.file:
+        path: "{{ applications_raycast_beta_mount }}"
+        state: directory
+        mode: "0755"
+
+    - name: Mount Raycast Beta DMG
+      ansible.builtin.command:
+        argv:
+          - hdiutil
+          - attach
+          - "{{ applications_raycast_beta_dmg }}"
+          - -nobrowse
+          - -readonly
+          - -mountpoint
+          - "{{ applications_raycast_beta_mount }}"
+      changed_when: true
+
+    - name: Remove old Raycast Beta app
+      ansible.builtin.file:
+        path: "{{ applications_raycast_beta_app }}"
+        state: absent
+
+    - name: Copy Raycast Beta app
+      ansible.builtin.command:
+        argv:
+          - ditto
+          - "{{ applications_raycast_beta_mount }}/Raycast Beta.app"
+          - "{{ applications_raycast_beta_app }}"
+      changed_when: true
+  always:
+    - name: Detach Raycast Beta DMG
+      ansible.builtin.command:
+        argv:
+          - hdiutil
+          - detach
+          - "{{ applications_raycast_beta_mount }}"
+      changed_when: false
+      failed_when: false

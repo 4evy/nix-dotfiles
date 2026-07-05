@@ -1,0 +1,7 @@
+[Unit]
+Description=Refresh Toshy after Kanata virtual keyboard changes
+Documentation=https://github.com/RedBearAK/Toshy https://github.com/jtroo/kanata
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'systemctl --user is-active --quiet toshy-config.service && systemctl --user restart toshy-config.service || true'

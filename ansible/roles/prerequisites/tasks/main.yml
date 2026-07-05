@@ -1,32 +1,53 @@
 ---
-- name: Install bootstrap packages
+- name: Install Linux bootstrap packages before Homebrew
   ansible.builtin.import_tasks: packages.yml
+  when: common_is_linux
   tags:
     - bootstrap
     - packages
 
-- name: Install upstream bootstrap tools
-  ansible.builtin.import_tasks: upstream-tools.yml
+- name: Install Homebrew and modern Bash first
+  ansible.builtin.import_tasks: homebrew.yml
+  when: common_system in ['Darwin', 'Linux']
   tags:
     - bootstrap
+    - bash
+    - homebrew
 
-- name: Configure Nix bootstrap
-  ansible.builtin.import_tasks: nix.yml
+- name: Apply Homebrew bundle
+  ansible.builtin.import_tasks: homebrew-bundle.yml
+  when: prerequisites_homebrew_enabled | default(false)
   tags:
     - bootstrap
-    - nix
+    - homebrew
+
+- name: Install system-runner early
+  ansible.builtin.import_tasks: system-runner.yml
+  when: common_system in ['Darwin', 'Linux']
+  tags:
+    - bootstrap
+    - scripts
+    - system-runner
+
+- name: Configure Homebrew-backed macOS system settings
+  ansible.builtin.import_tasks: macos-system.yml
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - macos
+
+- name: Install non-Linux bootstrap packages
+  ansible.builtin.import_tasks: packages.yml
+  when: not common_is_linux
+  tags:
+    - bootstrap
+    - packages
 
 - name: Run bootstrap migrations
   ansible.builtin.import_tasks: migrations.yml
   tags:
     - bootstrap
     - migration
-
-- name: Install Go bootstrap
-  ansible.builtin.import_tasks: go.yml
-  tags:
-    - bootstrap
-    - go
 
 - name: Install Rust bootstrap
   ansible.builtin.import_tasks: rustup.yml

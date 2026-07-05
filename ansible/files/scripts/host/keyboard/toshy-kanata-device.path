@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch Kanata virtual keyboard for Toshy
+Documentation=https://github.com/RedBearAK/Toshy https://github.com/jtroo/kanata
+
+[Path]
+PathChanged=/run/kanata-main
+Unit=toshy-kanata-device.service
+
+[Install]
+WantedBy=default.target

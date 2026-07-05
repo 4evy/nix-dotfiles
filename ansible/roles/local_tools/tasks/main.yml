@@ -5,6 +5,19 @@
     - local
     - go
 
+- name: Install repo-local script commands
+  ansible.builtin.import_tasks: scripts.yml
+  tags:
+    - local
+    - scripts
+
+- name: Install upstream script commands
+  ansible.builtin.import_tasks: upstream-scripts.yml
+  tags:
+    - local
+    - scripts
+    - upstream
+
 - name: Verify repo-local commands
   ansible.builtin.import_tasks: verify.yml
   tags:

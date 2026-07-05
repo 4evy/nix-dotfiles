@@ -1,0 +1,85 @@
+---
+- name: Configure macOS defaults
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_modern_bash }}"
+      - "{{ dotfiles_ansible_scripts_dir }}/macos/defaults.sh"
+  args:
+    chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    PATH: "{{ prerequisites_homebrew_path }}"
+  changed_when: true
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - macos
+
+- name: Configure macOS login shell
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_modern_bash }}"
+      - "{{ dotfiles_ansible_scripts_dir }}/macos/shell.sh"
+      - "{{ ansible_facts.get('user_id', ansible_facts.get('ansible_user_id', lookup('env', 'USER'))) }}"
+  args:
+    chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    PATH: "{{ prerequisites_homebrew_path }}"
+  become: true
+  changed_when: true
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - macos
+
+- name: Configure Tailscale SSH launch daemon on macOS
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_modern_bash }}"
+      - "{{ dotfiles_ansible_scripts_dir }}/macos/tailscale-ssh.sh"
+  args:
+    chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    PATH: "{{ prerequisites_homebrew_path }}"
+  become: true
+  changed_when: true
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - macos
+    - tailscale
+
+- name: Configure Karabiner VirtualHID driver on macOS
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_modern_bash }}"
+      - "{{ dotfiles_ansible_scripts_dir }}/macos/karabiner-vhid.sh"
+  args:
+    chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    PATH: "{{ prerequisites_homebrew_path }}"
+  become: true
+  changed_when: true
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - kanata
+    - macos
+
+- name: Configure Kanata launch daemons on macOS
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_modern_bash }}"
+      - "{{ dotfiles_ansible_scripts_dir }}/macos/kanata.sh"
+      - "{{ dotfiles_repo_root }}/dotfiles/dot_config/kanata/kanata-macos.kbd"
+      - "{{ dotfiles_repo_root }}/dotfiles/dot_config/kanata/kanata-macos-pebble.kbd"
+  args:
+    chdir: "{{ dotfiles_repo_root }}"
+  environment:
+    PATH: "{{ prerequisites_homebrew_path }}"
+  become: true
+  changed_when: true
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - kanata
+    - macos

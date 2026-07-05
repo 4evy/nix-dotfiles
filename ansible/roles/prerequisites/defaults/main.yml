@@ -1,40 +1,48 @@
 ---
+prerequisites_homebrew_installer_url: https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh
+prerequisites_rustup_installer_url: https://sh.rustup.rs
+
+prerequisites_homebrew_required_commands:
+  - btop
+  - zellij
+
 prerequisites_bootstrap_packages:
   apt:
+    - bubblewrap
+    - curl
     - distrobox
+    - file
     - git
-    - git-lfs
     - podman
     - podman-compose
-    - rustup
-    - yamllint
+    - procps
   apk:
+    - bubblewrap
+    - curl
     - distrobox
+    - file
     - git
-    - git-lfs
-    - go
     - podman
     - podman-compose
-    - rustup
-    - yamllint
+    - procps-ng
   dnf:
+    - bubblewrap
+    - curl
     - distrobox
+    - file
     - git
-    - git-lfs
-    - golang
     - podman
     - podman-compose
-    - rustup
-    - yamllint
+    - procps-ng
   pacman:
+    - bubblewrap
+    - curl
     - distrobox
+    - file
     - git
-    - git-lfs
-    - go
     - podman
     - podman-compose
-    - rustup
-    - yamllint
+    - procps-ng
 
 prerequisites_build_toolchain_packages:
   apt:

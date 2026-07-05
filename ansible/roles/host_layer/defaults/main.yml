@@ -1,0 +1,58 @@
+---
+host_layer_scripts:
+  - name: Tailscale on Bluefin
+    path: host/apps/tailscale-bluefin.sh
+    tags: [host, scripts, tailscale]
+  - name: RustDesk Tailscale integration
+    path: host/apps/rustdesk-tailscale.sh
+    tags: [host, scripts, rustdesk]
+  - name: hyper-window-tiling
+    path: host/desktop/hyper-tiling.sh
+    tags: [host, scripts, hyper-window-tiling]
+  - name: Sushi preview
+    path: host/desktop/sushi-preview.sh
+    tags: [host, scripts, sushi-preview]
+  - name: Flatpak NVIDIA GL runtime
+    path: host/desktop/flatpak-nvidia.sh
+    tags: [host, scripts, flatpak-nvidia]
+  - name: Flatpak maintenance
+    path: host/desktop/flatpak-maintenance.sh
+    changed: false
+    tags: [host, scripts, flatpak-maintenance]
+  - name: Telegram Flatpak
+    path: host/desktop/telegram-flatpak.sh
+    tags: [host, scripts, telegram-flatpak]
+  - name: emoji shortcut
+    path: host/desktop/emoji-shortcut.sh
+    tags: [host, scripts, emoji-shortcut]
+  - name: slow boot services
+    path: host/desktop/slow-boot-services.sh
+    tags: [host, scripts, slow-boot-services]
+  - name: KMSCON virtual console
+    path: host/desktop/kmscon.sh
+    tags: [host, scripts, kmscon]
+  - name: Kanata
+    path: host/keyboard/kanata.sh
+    tags: [host, scripts, kanata]
+  - name: Toshy GNOME context integration
+    path: host/keyboard/toshy-gnome-context.sh
+    tags: [host, scripts, toshy-gnome-context]
+  - name: Toshy Kanata chain
+    path: host/keyboard/toshy-kanata-chain.sh
+    tags: [host, scripts, toshy]
+  - name: Toshy Kanata chain verification
+    path: host/keyboard/toshy-kanata-check.sh
+    changed: false
+    tags: [host, scripts, toshy, kanata]
+
+host_layer_font_scripts:
+  - name: Install JetBrainsMono Nerd Font
+    path: host/fonts/jetbrains-nerd-font.sh
+    tags: [host, fonts, jetbrains-nerd-font]
+  - name: Configure host monospace font
+    path: host/fonts/monospace-settings.sh
+    tags: [host, fonts]
+  - name: Refresh host font cache
+    path: host/fonts/cache-refresh.sh
+    changed: false
+    tags: [host, fonts, font-cache]

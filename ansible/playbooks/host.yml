@@ -1,27 +1,12 @@
 ---
-- name: Install nix-dotfiles host-layer tools
+- name: Install dotfiles host-layer tools
   hosts: host_layer
   gather_facts: true
   roles:
     - role: common
       tags:
+        - always
         - common
-        - emoji-shortcut
-        - font-cache
-        - fonts
-        - host
-        - hyper-window-tiling
-        - kanata
-        - logitech-hidpp-battery
-        - paid-fonts
-        - rustdesk
-        - scripts
-        - slow-boot-services
-        - steelseries-arctis-battery
-        - sushi-preview
-        - tailscale
-        - toshy
-        - toshy-gnome-context
     - role: host_layer
       tags:
         - host
