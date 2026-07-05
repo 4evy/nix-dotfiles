@@ -1,4 +1,4 @@
-name: Spectrum
+name: Spectrum Image
 
 on:
   pull_request:
@@ -6,12 +6,14 @@ on:
       - master
     paths:
       - .github/workflows/spectrum.yaml
+      - .dockerignore
       - spectrum/**
   push:
     branches:
       - master
     paths:
       - .github/workflows/spectrum.yaml
+      - .dockerignore
       - spectrum/**
   schedule:
     - cron: "42 4 * * *"
@@ -25,15 +27,20 @@ permissions:
   contents: read # needed to checkout repository contents
 
 env:
-  IMAGE_NAME: nix-dotfiles-bluefin
+  BLUEFIN_BASE_IMAGE: ghcr.io/ublue-os/bluefin-nvidia-open:stable@sha256:82abcda61cd79547f8242b43c819ab84d3688e14f13bde74279b708a26a733ac
+  BLUEFIN_BASE_IMAGE_NAME: bluefin-nvidia-open
+  BLUEFIN_BASE_IMAGE_TAG: stable
+  IMAGE_NAME: spectrum
 
 jobs:
   build:
-    name: Build Image
+    name: Build Bluefin Image
     runs-on: ubuntu-24.04
     permissions:
       contents: read # needed to checkout repository contents
       packages: write # needed to push images to GitHub Container Registry
+      id-token: write # needed for keyless cosign signing
+      attestations: write # needed to publish GitHub provenance attestations
     steps:
       - name: Checkout Repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -54,36 +61,88 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y podman skopeo
 
-      - name: Prepare Image Tags
-        id: tags
+      - name: Prepare Image Metadata
+        id: image
         env:
           IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
         run: |
           set -euo pipefail
           image_registry="${IMAGE_REGISTRY,,}"
           image_name="${IMAGE_NAME,,}"
+          image_vendor="${GITHUB_REPOSITORY_OWNER,,}"
+          revision="$(git rev-parse HEAD)"
           short_sha="$(git rev-parse --short HEAD)"
           date_tag="$(date -u +%Y%m%d)"
+          created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          version="${date_tag}-${short_sha}"
 
           {
             echo "image_ref=${image_registry}/${image_name}"
+            echo "image_vendor=${image_vendor}"
             echo "local_ref=${image_name}:latest"
+            echo "created=${created}"
+            echo "revision=${revision}"
+            echo "version=${version}"
             echo "tags<<EOF"
             echo "latest"
             echo "${date_tag}"
-            echo "${date_tag}-${short_sha}"
+            echo "${version}"
             echo "EOF"
           } >>"$GITHUB_OUTPUT"
 
-      - name: Build Image
+      - name: Build Bluefin Image
         env:
-          LOCAL_REF: "${{ steps.tags.outputs.local_ref }}"
+          BLUEFIN_BASE_IMAGE: ${{ env.BLUEFIN_BASE_IMAGE }}
+          BLUEFIN_BASE_IMAGE_NAME: ${{ env.BLUEFIN_BASE_IMAGE_NAME }}
+          BLUEFIN_BASE_IMAGE_TAG: ${{ env.BLUEFIN_BASE_IMAGE_TAG }}
+          CREATED: "${{ steps.image.outputs.created }}"
+          GITHUB_TOKEN: ${{ github.token }}
+          IMAGE_REF: "${{ steps.image.outputs.image_ref }}"
+          IMAGE_VENDOR: "${{ steps.image.outputs.image_vendor }}"
+          LOCAL_REF: "${{ steps.image.outputs.local_ref }}"
+          REVISION: "${{ steps.image.outputs.revision }}"
+          VERSION: "${{ steps.image.outputs.version }}"
         run: |
+          github_token_file=$(mktemp)
+          trap 'rm -f "${github_token_file}"' EXIT
+          printf '%s' "${GITHUB_TOKEN}" >"${github_token_file}"
+          chmod 600 "${github_token_file}"
+
           sudo podman build \
             --pull=newer \
+            --secret "id=github_token,src=${github_token_file}" \
             --tag "${LOCAL_REF}" \
+            --build-arg "BLUEFIN_BASE_IMAGE=${BLUEFIN_BASE_IMAGE}" \
+            --build-arg "BLUEFIN_BASE_IMAGE_NAME=${BLUEFIN_BASE_IMAGE_NAME}" \
+            --build-arg "BLUEFIN_BASE_IMAGE_TAG=${BLUEFIN_BASE_IMAGE_TAG}" \
+            --build-arg "IMAGE_NAME=${IMAGE_NAME,,}" \
+            --build-arg "IMAGE_VENDOR=${IMAGE_VENDOR}" \
+            --build-arg "IMAGE_TAG=latest" \
+            --build-arg "IMAGE_REF=ostree-image:docker://${IMAGE_REF}" \
+            --build-arg "IMAGE_CREATED=${CREATED}" \
+            --build-arg "IMAGE_REVISION=${REVISION}" \
+            --build-arg "IMAGE_VERSION=${VERSION}" \
             --file spectrum/Containerfile \
             .
+
+      - name: Report Boot Artifacts
+        env:
+          LOCAL_REF: "${{ steps.image.outputs.local_ref }}"
+        run: |
+          sudo podman run \
+            --rm \
+            --entrypoint bash \
+            --volume "$PWD:/workspace:ro" \
+            "${LOCAL_REF}" \
+            -ceu '
+              mkdir -p /tmp/spectrum-workspace/spectrum
+              cp /workspace/pyproject.toml /workspace/uv.lock /tmp/spectrum-workspace/
+              cp -a /workspace/spectrum/scripts /tmp/spectrum-workspace/spectrum/
+              UV_PROJECT_ENVIRONMENT=/tmp/spectrum-boot-report-venv \
+                uv --cache-dir /tmp/spectrum-uv-cache \
+                  --directory /tmp/spectrum-workspace \
+                  run --locked python /tmp/spectrum-workspace/spectrum/scripts/boot_artifacts.py
+            '
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
@@ -97,15 +156,48 @@ jobs:
                 --password-stdin
 
       - name: Push Image
+        id: push
         if: github.event_name != 'pull_request'
         env:
-          IMAGE_REF: "${{ steps.tags.outputs.image_ref }}"
-          LOCAL_REF: "${{ steps.tags.outputs.local_ref }}"
-          TAGS: "${{ steps.tags.outputs.tags }}"
+          IMAGE_REF: "${{ steps.image.outputs.image_ref }}"
+          LOCAL_REF: "${{ steps.image.outputs.local_ref }}"
+          TAGS: "${{ steps.image.outputs.tags }}"
         run: |
           set -euo pipefail
+          digest_file=$(mktemp)
+          trap 'rm -f "$digest_file"' EXIT
+
+          pushed_default=false
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             sudo podman tag "${LOCAL_REF}" "${IMAGE_REF}:${tag}"
-            sudo podman push "${IMAGE_REF}:${tag}"
+            if [ "$pushed_default" = false ]; then
+              sudo podman push --digestfile "$digest_file" "${IMAGE_REF}:${tag}"
+              pushed_default=true
+            else
+              sudo podman push "${IMAGE_REF}:${tag}"
+            fi
           done <<<"${TAGS}"
+
+          digest=$(cat "$digest_file")
+          echo "digest=${digest}" >>"$GITHUB_OUTPUT"
+
+      - name: Install Cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign Image
+        if: github.event_name != 'pull_request'
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE_REF: "${{ steps.image.outputs.image_ref }}"
+        run: |
+          cosign sign --yes "${IMAGE_REF}@${DIGEST}"
+
+      - name: Attest Image
+        if: github.event_name != 'pull_request'
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ steps.image.outputs.image_ref }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

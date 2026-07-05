@@ -1,0 +1,81 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "gitAuthor": "4evy <git@ps1.sh>",
+  "dependencyDashboard": false,
+  "configMigration": false,
+  "automerge": true,
+  "automergeType": "branch",
+  "ignoreTests": true,
+  "platformAutomerge": false,
+  "prCreation": "approval",
+  "rebaseWhen": "auto",
+  "branchConcurrentLimit": 1,
+  "prConcurrentLimit": 0,
+  "prHourlyLimit": 0,
+  "vulnerabilityAlerts": {
+    "enabled": false
+  },
+  "pep621": {
+    "enabled": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the pinned Spectrum Bluefin base image in the Containerfile ARG",
+      "managerFilePatterns": ["/^spectrum/Containerfile$/"],
+      "matchStrings": [
+        "ARG BLUEFIN_BASE_IMAGE=(?<packageName>[^\\s:@]+(?:/[^\\s:@]+)+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the pinned Spectrum Bluefin base image in defaults and workflows",
+      "managerFilePatterns": [
+        "/^Justfile$/",
+        "/^\\.github/workflows/spectrum\\.yaml$/"
+      ],
+      "matchStrings": [
+        "base_image := env\\(\"SPECTRUM_BLUEFIN_BASE_IMAGE\", \"(?<packageName>[^\\s:@]+(?:/[^\\s:@]+)+):(?<currentValue>[^\\s@\"]+)@(?<currentDigest>sha256:[a-f0-9]+)\"\\)",
+        "BLUEFIN_BASE_IMAGE: (?<packageName>[^\\s:@]+(?:/[^\\s:@]+)+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Track pinned tool versions in workflow environment variables",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\n\\s+\\w+: \"(?<currentValue>[^\"]+)\""
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Keep pyproject.toml and uv.lock Python updates together.",
+      "matchManagers": ["pep621"],
+      "groupName": "python dependencies",
+      "automerge": true,
+      "automergeType": "branch"
+    },
+    {
+      "description": "Automerge digest-only updates after checks pass",
+      "matchUpdateTypes": ["digest", "pin", "pinDigest"],
+      "automerge": true,
+      "automergeType": "branch"
+    },
+    {
+      "description": "Keep the Spectrum Bluefin base image on the selected stream",
+      "matchDepNames": ["ghcr.io/ublue-os/bluefin-nvidia-open"],
+      "matchUpdateTypes": ["digest", "pin", "pinDigest"],
+      "schedule": ["at any time"]
+    }
+  ]
+}

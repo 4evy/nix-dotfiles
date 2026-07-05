@@ -1,0 +1,70 @@
+name: Renovate
+
+on:
+  schedule:
+    - cron: "37 */6 * * *"
+  push:
+    branches:
+      - master
+    paths:
+      - .github/renovate.json
+      - .github/workflows/renovate.yaml
+      - .github/workflows/validate-renovate.yaml
+  workflow_dispatch: null
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  renovate:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Check Renovate Token
+        id: token
+        env:
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+        run: |
+          if [ -n "${RENOVATE_TOKEN}" ]; then
+            echo "configured=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "RENOVATE_TOKEN is not configured; skipping Renovate."
+            echo "configured=false" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Node
+        if: steps.token.outputs.configured == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24.11.0"
+          cache: npm
+
+      - name: Install Renovate
+        if: steps.token.outputs.configured == 'true'
+        run: npm ci
+
+      - name: Run Renovate
+        if: steps.token.outputs.configured == 'true'
+        run: |
+          for pass in 1 2 3 4 5 6; do
+            echo "Renovate pass ${pass}"
+            npm exec -- renovate
+          done
+        env:
+          LOG_LEVEL: info
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+          RENOVATE_GIT_AUTHOR: "4evy <git@ps1.sh>"
+          RENOVATE_GIT_PRIVATE_KEY: ${{ secrets.RENOVATE_GIT_PRIVATE_KEY }}
+          RENOVATE_ONBOARDING: "false"
+          RENOVATE_REPOSITORIES: '["${{ github.repository }}"]'

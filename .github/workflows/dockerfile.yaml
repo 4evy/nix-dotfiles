@@ -1,0 +1,86 @@
+name: Dockerfile Smoke
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/dockerfile.yaml
+      - .ansible-lint
+      - .dockerignore
+      - .yamllint
+      - Dockerfile
+      - ansible.cfg
+      - ansible/**
+      - cmd/**
+      - compose.yaml
+      - containers/**
+      - dotfiles/**
+      - go.mod
+      - go.sum
+      - internal/**
+      - packages/scripts/**
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/dockerfile.yaml
+      - .ansible-lint
+      - .dockerignore
+      - .yamllint
+      - Dockerfile
+      - ansible.cfg
+      - ansible/**
+      - cmd/**
+      - compose.yaml
+      - containers/**
+      - dotfiles/**
+      - go.mod
+      - go.sum
+      - internal/**
+      - packages/scripts/**
+  workflow_dispatch: null
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read # needed to checkout repository contents
+
+jobs:
+  smoke:
+    name: Build Smoke Image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read # needed to checkout repository contents
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+
+      - name: Build Image
+        run: |
+          sudo podman build \
+            --pull=newer \
+            --platform linux/amd64 \
+            --build-arg TARGETPLATFORM=linux/amd64 \
+            --target dotfiles-test \
+            --tag dotfiles:fedora-test \
+            .
+
+      - name: Validate Image
+        run: |
+          sudo podman run --rm dotfiles:fedora-test sh -eu -c '
+            ! command -v starship
+            ! command -v zellij
+            ansible-playbook --version >/dev/null
+            ansible-lint --version >/dev/null
+            yamllint --version >/dev/null
+          '
