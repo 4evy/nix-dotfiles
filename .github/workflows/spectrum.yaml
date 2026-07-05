@@ -164,11 +164,9 @@ jobs:
           TAGS: "${{ steps.image.outputs.tags }}"
         run: |
           set -euo pipefail
-          digest_file=$(mktemp)
-          # sudo podman writes this digest file as root; mktemp creates it as the
-          # runner user with restrictive permissions.
-          chmod 666 "$digest_file"
-          trap 'rm -f "$digest_file"' EXIT
+          # sudo podman writes the digest file, so create and clean it as root too.
+          digest_file=$(sudo mktemp)
+          trap 'sudo rm -f "$digest_file"' EXIT
 
           pushed_default=false
           while IFS= read -r tag; do
@@ -182,7 +180,7 @@ jobs:
             fi
           done <<<"${TAGS}"
 
-          digest=$(cat "$digest_file")
+          digest=$(sudo cat "$digest_file")
           echo "digest=${digest}" >>"$GITHUB_OUTPUT"
 
       - name: Install Cosign
