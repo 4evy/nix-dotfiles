@@ -1,0 +1,62 @@
+{{- $ctp := include ".chezmoitemplates/catppuccin_palette.json" | fromJson -}}
+{{- $p := index $ctp "frappe" -}}
+add_newline = true
+command_timeout = 5000
+format = "$directory$line_break$sudo$character$command_timeout"
+palette = "catppuccin_frappe"
+right_format = "$cmd_duration$time"
+
+[character]
+error_symbol = "[💔 ❯](bold red)"
+success_symbol = "[💖 ❯](bold pink)"
+
+[cmd_duration]
+format = "[took $duration]($style) "
+min_time = 2000
+style = "overlay1"
+
+[directory]
+fish_style_pwd_dir_length = 1
+format = "[🫧 $path]($style) "
+style = "bold pink"
+truncate_to_repo = false
+truncation_symbol = "../"
+
+[palettes.catppuccin_frappe]
+base = "{{ index $p "base" }}"
+blue = "{{ index $p "blue" }}"
+crust = "{{ index $p "crust" }}"
+flamingo = "{{ index $p "flamingo" }}"
+green = "{{ index $p "green" }}"
+lavender = "{{ index $p "lavender" }}"
+mantle = "{{ index $p "mantle" }}"
+maroon = "{{ index $p "maroon" }}"
+mauve = "{{ index $p "mauve" }}"
+overlay0 = "{{ index $p "overlay0" }}"
+overlay1 = "{{ index $p "overlay1" }}"
+overlay2 = "{{ index $p "overlay2" }}"
+peach = "{{ index $p "peach" }}"
+pink = "{{ index $p "pink" }}"
+red = "{{ index $p "red" }}"
+rosewater = "{{ index $p "rosewater" }}"
+sapphire = "{{ index $p "sapphire" }}"
+sky = "{{ index $p "sky" }}"
+subtext0 = "{{ index $p "subtext0" }}"
+subtext1 = "{{ index $p "subtext1" }}"
+surface0 = "{{ index $p "surface0" }}"
+surface1 = "{{ index $p "surface1" }}"
+surface2 = "{{ index $p "surface2" }}"
+teal = "{{ index $p "teal" }}"
+text = "{{ index $p "text" }}"
+yellow = "{{ index $p "yellow" }}"
+
+[sudo]
+disabled = false
+style = "bold pink"
+symbol = "# "
+
+[time]
+disabled = false
+format = "[at $time]($style)"
+style = "overlay1"
+time_format = "%H:%M:%S"

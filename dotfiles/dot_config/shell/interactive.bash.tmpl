@@ -1,0 +1,24 @@
+# bash adapter / Readline splice
+#     shared command bus
+#             │
+#             ▼
+#     complete python python3 pip pip3
+#      .+"+.+"+.+"+.+"+.+"+."+."+.".
+#     (  Bash keeps the path menu  )
+#      "+.+"+.+"+.+"+.+"+.+".+".+"."
+# shellcheck disable=SC2154
+
+# Pull in the shared command bus
+
+if [[ -r "$HOME/.config/shell/interactive.common.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "$HOME/.config/shell/interactive.common.sh"
+fi
+
+# Finish with Bash completion wiring for Python and pip
+
+if declare -F _fzf_path_completion >/dev/null 2>&1; then
+	complete -o bashdefault -o default -F _fzf_path_completion python python3 pip pip3
+else
+	complete -o bashdefault -o default -f python python3 pip pip3
+fi

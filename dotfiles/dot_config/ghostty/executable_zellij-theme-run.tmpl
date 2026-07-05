@@ -1,66 +1,66 @@
 #!/usr/bin/env bash
+# shellcheck shell=bash
 # Stable Ghostty entrypoint. GUI-launched Ghostty doesn't reliably inherit the
-# interactive shell PATH, and managed tool wrappers can be absent briefly during
-# Ansible/Nix reinstall.
+# interactive shell PATH.
 set -euo pipefail
 
 readonly HOME_DIR={{ .chezmoi.homeDir | quote }}
-PATH="/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/share/nix-dotfiles/immutable/profile/bin:${HOME_DIR}/.local/share/nix-dotfiles/immutable/bin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin:${HOME_DIR}/.nix-profile/bin"
+{{- if eq .chezmoi.os "darwin" }}
+PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin"
+{{- else }}
+PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/run/wrappers/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin"
+{{- end }}
 export PATH
 
-is_immutable_wrapper() {
-  local candidate="$1"
-  local marker="# nix-dotfiles: immutable-wrapper"
-  local legacy_marker="# nix-dotfiles: ublue-wrapper"
-  [[ -f "${candidate}" ]] \
-    && { grep -Fqx "${marker}" "${candidate}" 2>/dev/null \
-      || grep -Fqx "${legacy_marker}" "${candidate}" 2>/dev/null; }
-}
-
 launch_zellij() {
-  local zellij_bin="$1"
-  exec "${zellij_bin}" options \
-    --default-layout compact \
-    --attach-to-session false \
-    --mirror-session false \
-    --on-force-close quit
+	local zellij_bin="$1"
+	exec "${zellij_bin}" options \
+		--default-layout compact \
+		--attach-to-session false \
+		--mirror-session false \
+		--on-force-close quit
 }
 
 main() {
-  if [[ -z "${SSH_CONNECTION:-}" && -S "${HOME_DIR}/.1password/agent.sock" ]]; then
-    export SSH_AUTH_SOCK="${HOME_DIR}/.1password/agent.sock"
-  fi
+	{{- if eq .chezmoi.os "darwin" }}
+	local one_password_agent="${HOME_DIR}/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+	{{- else }}
+	local one_password_agent="${HOME_DIR}/.1password/agent.sock"
+	{{- end }}
+	if [[ -z "${SSH_CONNECTION:-}" && -S "${one_password_agent}" ]]; then
+		export SSH_AUTH_SOCK="${one_password_agent}"
+	fi
 
-  local zellij_bin=''
-  if zellij_bin="$(command -v zellij 2>/dev/null)"; then
-    local shell
-    for shell in /usr/bin/zsh /bin/zsh "${HOME_DIR}/.nix-profile/bin/zsh"; do
-      if [[ -x "${shell}" ]] && ! is_immutable_wrapper "${shell}"; then
-        export SHELL="${shell}"
-        break
-      fi
-    done
+	local zellij_bin=''
+	if zellij_bin="$(command -v zellij 2>/dev/null)"; then
+		local shell
+		for shell in {{ if eq .chezmoi.os "darwin" }}/opt/homebrew/bin/zsh {{ else }}/home/linuxbrew/.linuxbrew/bin/zsh {{ end }}/usr/bin/zsh /bin/zsh; do
+			if [[ -x "${shell}" ]]; then
+				export SHELL="${shell}"
+				break
+			fi
+		done
 
-    if [[ -x "${HOME_DIR}/.local/bin/zellij-theme-run" ]]; then
-      exec "${HOME_DIR}/.local/bin/zellij-theme-run" zellij
-    fi
+		if [[ -x "${HOME_DIR}/.local/bin/zellij-theme-run" ]]; then
+			exec "${HOME_DIR}/.local/bin/zellij-theme-run" zellij
+		fi
 
-    if command -v zellij-theme-run >/dev/null 2>&1; then
-      exec zellij-theme-run zellij
-    fi
+		if command -v zellij-theme-run >/dev/null 2>&1; then
+			exec zellij-theme-run zellij
+		fi
 
-    launch_zellij "${zellij_bin}"
-  fi
+		launch_zellij "${zellij_bin}"
+	fi
 
-  local shell
-  for shell in /usr/bin/zsh /bin/zsh "${HOME_DIR}/.nix-profile/bin/zsh"; do
-    if [[ -x "${shell}" ]] && ! is_immutable_wrapper "${shell}"; then
-      export SHELL="${shell}"
-      exec "${shell}" -l
-    fi
-  done
+	local shell
+	for shell in {{ if eq .chezmoi.os "darwin" }}/opt/homebrew/bin/zsh {{ else }}/home/linuxbrew/.linuxbrew/bin/zsh {{ end }}/usr/bin/zsh /bin/zsh; do
+		if [[ -x "${shell}" ]]; then
+			export SHELL="${shell}"
+			exec "${shell}" -l
+		fi
+	done
 
-  exec "${SHELL:-/bin/bash}" -l
+	exec "${SHELL:-/bin/bash}" -l
 }
 
 main "$@"

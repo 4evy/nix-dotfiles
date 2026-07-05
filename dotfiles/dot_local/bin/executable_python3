@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
+# shellcheck shell=sh
 export UV_PYTHON_PREFERENCE="${UV_PYTHON_PREFERENCE:-only-managed}"
 exec uv run python3 "$@"

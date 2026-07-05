@@ -1,48 +1,28 @@
+{{- $onePasswordAgent := "%d/.1password/agent.sock" -}}
+{{- if eq .chezmoi.os "darwin" -}}
+{{- $onePasswordAgent = "%d/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock" -}}
+{{- end }}
 Host github github.com
   Hostname ssh.github.com
   Port 443
   User git
   ForwardAgent no
+  UserKnownHostsFile ~/.ssh/known_hosts ~/.ssh/known_hosts.d/github
 
 Host codeberg.org
   Hostname codeberg.org
   Port 22
   User git
   ForwardAgent no
+  UserKnownHostsFile ~/.ssh/known_hosts ~/.ssh/known_hosts.d/codeberg
 
 Host ublue
   HostName ublue
   ForwardAgent yes
-{{ if eq .chezmoi.os "darwin" -}}
-  IdentityAgent "%d/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
-{{ else -}}
-  IdentityAgent "%d/.1password/agent.sock"
-{{ end }}
 
-Host lenovo-legion lenovo-legion-windows lenovo-legion-windows-raw
-  ForwardAgent yes
+Match host * exec "test -z \"$SSH_CONNECTION\" && test -z \"$SSH_AUTH_SOCK\""
+  IdentityAgent "{{ $onePasswordAgent }}"
 
-Host lenovo-legion
-  HostName lenovo-legion
-  User nyx
-
-Host lenovo-legion-windows
-  HostName lenovo-legion-windows
-  User admin
-  RequestTTY no
-  RemoteCommand powershell.exe -NoLogo -NoProfile -NoExit
-
-Host lenovo-legion-windows-raw
-  HostName lenovo-legion-windows
-  User admin
-
-{{ if eq .chezmoi.os "darwin" -}}
-Match host * exec "test -z \"$SSH_TTY\" && test -z \"$SSH_AUTH_SOCK\""
-  IdentityAgent "%d/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
-{{ else -}}
-Match host * exec "test -z \"$SSH_TTY\" && test -z \"$SSH_AUTH_SOCK\""
-  IdentityAgent "%d/.1password/agent.sock"
-{{ end }}
 Host *
   AddKeysToAgent no
   ForwardAgent no

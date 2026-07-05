@@ -1,0 +1,31 @@
+# ░▀▀█░█▀█░█░█░▀█▀░█▀▄░█▀▀
+# ░▄▀░░█░█░▄▀▄░░█░░█░█░█▀▀
+# ░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀▀░░▀▀▀
+# zoxide / Bash last-mile cd
+#     cwd history  …/work ─┬─ z  → jump
+#                          └─ zi → choose
+# cached init must contain the cd wrapper; otherwise build it live
+
+_zoxide_bin="$(_dotfiles_command_path zoxide 2>/dev/null || true)"
+if [[ -n "$_zoxide_bin" ]]; then
+	if [[ -r "$HOME/.cache/zoxide/init.bash" ]] &&
+		grep -Fq 'function cd()' "$HOME/.cache/zoxide/init.bash"; then
+		# shellcheck source=/dev/null
+		source "$HOME/.cache/zoxide/init.bash"
+	else
+		eval "$("$_zoxide_bin" init bash --cmd cd)"
+	fi
+
+	if declare -F __zoxide_z >/dev/null 2>&1; then
+		z() {
+			__zoxide_z "$@"
+		}
+	fi
+
+	if declare -F __zoxide_zi >/dev/null 2>&1; then
+		zi() {
+			__zoxide_zi "$@"
+		}
+	fi
+fi
+unset _zoxide_bin

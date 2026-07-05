@@ -1,0 +1,69 @@
+# ░█▀▀░█▀█░█░█
+# ░█▀▀░█░█░▀▄▀
+# ░▀▀▀░▀░▀░░▀░
+# shared env / export bus
+# HOMEBREW_PREFIX ─┬─ MANPATH / INFOPATH
+# SSH_AUTH_SOCK ───┤
+# tool defaults ───┘
+# ⠄⠂⠁ one export booth, two shells, zero startup chatter
+
+# pass 01 / Homebrew address book
+#   find the prefix once; everybody else reads HOMEBREW_PREFIX
+
+_dotfiles_homebrew_prefix=
+{{- if eq .chezmoi.os "linux" }}
+if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+	_dotfiles_homebrew_prefix=/home/linuxbrew/.linuxbrew
+elif [[ -d "$HOME/.linuxbrew" ]]; then
+	_dotfiles_homebrew_prefix="$HOME/.linuxbrew"
+fi
+{{- else if eq .chezmoi.os "darwin" }}
+{{- if eq .chezmoi.arch "arm64" }}
+if [[ -d /opt/homebrew ]]; then
+	_dotfiles_homebrew_prefix=/opt/homebrew
+elif [[ -d /usr/local/Homebrew ]]; then
+	_dotfiles_homebrew_prefix=/usr/local
+fi
+{{- else }}
+if [[ -d /usr/local/Homebrew ]]; then
+	_dotfiles_homebrew_prefix=/usr/local
+elif [[ -d /opt/homebrew ]]; then
+	_dotfiles_homebrew_prefix=/opt/homebrew
+fi
+{{- end }}
+{{- end }}
+
+if [[ -n "$_dotfiles_homebrew_prefix" ]]; then
+	export HOMEBREW_PREFIX="$_dotfiles_homebrew_prefix"
+	export HOMEBREW_CELLAR="$HOMEBREW_PREFIX/Cellar"
+
+	if [[ "$HOMEBREW_PREFIX" == /opt/homebrew ]]; then
+		export HOMEBREW_REPOSITORY="$HOMEBREW_PREFIX"
+	else
+		export HOMEBREW_REPOSITORY="$HOMEBREW_PREFIX/Homebrew"
+	fi
+
+	[[ -z "${MANPATH-}" ]] || export MANPATH=":${MANPATH#:}"
+	export INFOPATH="$HOMEBREW_PREFIX/share/info:${INFOPATH:-}"
+fi
+unset _dotfiles_homebrew_prefix
+
+# pass 02 / SSH agent handoff
+#   local shells use 1Password; remote sessions keep sshd's forwarded agent
+
+{{- if eq .chezmoi.os "darwin" }}
+_dotfiles_ssh_auth_sock="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+{{- else }}
+_dotfiles_ssh_auth_sock="$HOME/.1password/agent.sock"
+{{- end }}
+if [[ -z "${SSH_CONNECTION:-}" ]]; then
+	export SSH_AUTH_SOCK="$_dotfiles_ssh_auth_sock"
+fi
+unset _dotfiles_ssh_auth_sock
+
+# pass 03 / shared defaults
+#   stable knobs for scripts and interactive shells
+
+export BASH_ENV="${BASH_ENV:-$HOME/.bashenv}"
+export UV_PYTHON_PREFERENCE="${UV_PYTHON_PREFERENCE:-only-managed}"
+export GLAMOUR_STYLE="${GLAMOUR_STYLE:-$HOME/.config/glamour/styles/catppuccin-frappe-pink.json}"

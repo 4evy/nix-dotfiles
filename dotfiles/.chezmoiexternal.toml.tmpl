@@ -1,27 +1,10 @@
 {{- if ne .chezmoi.os "windows" -}}
-{{- $nushellConfigPaths := list ".config/nushell" -}}
 {{- $yaziConfigPath := "" -}}
-{{- $fontsPath := "" -}}
 {{- if eq .chezmoi.os "darwin" -}}
-{{-   $nushellConfigPaths = list ".config/nushell" "Library/Application Support/nushell" -}}
 {{-   $yaziConfigPath = ".config/yazi" -}}
-{{-   $fontsPath = "Library/Fonts" -}}
 {{- else -}}
 {{-   $yaziConfigPath = ".config/yazi" -}}
-{{-   $fontsPath = ".local/share/fonts" -}}
 {{- end -}}
-
-# ----- Nushell -----
-
-{{- $nushellTools := list "bat" "cargo" "claude" "curl" "gh" "git" "jj" "man" "nix" "op" "rg" "ssh" "uv" "vscode" "zellij" "zoxide" -}}
-{{- range $configPath := $nushellConfigPaths }}
-{{- range $tool := $nushellTools }}
-["{{ $configPath }}/completions/{{ $tool }}-completions.nu"]
-type = "file"
-url = "https://raw.githubusercontent.com/nushell/nu_scripts/main/custom-completions/{{ $tool }}/{{ $tool }}-completions.nu"
-refreshPeriod = "168h"
-{{ end }}
-{{ end }}
 
 # ----- Oh-My-Zsh -----
 
@@ -83,18 +66,16 @@ args = ["--depth=1"]
 [".fzf-tab-completion".pull]
 args = ["--ff-only"]
 
-# ----- Paid Fonts (private repo, auth via SSH/1Password) -----
+# ----- Vim -----
 
-{{- if eq (env "NIX_DOTFILES_PAID_FONTS") "1" }}
-["{{ $fontsPath }}/paid-fonts"]
+[".vim/pack/vendor/start/catppuccin"]
 type = "git-repo"
-url = "git@github.com:FlameFlag/paid-fonts.git"
+url = "https://github.com/catppuccin/vim.git"
 refreshPeriod = "168h"
-[{{ printf "%s/paid-fonts" $fontsPath | printf "%q" }}.clone]
+[".vim/pack/vendor/start/catppuccin".clone]
 args = ["--depth=1"]
-[{{ printf "%s/paid-fonts" $fontsPath | printf "%q" }}.pull]
+[".vim/pack/vendor/start/catppuccin".pull]
 args = ["--ff-only"]
-{{- end }}
 
 # ----- Yazi -----
 
@@ -110,6 +91,7 @@ refreshPeriod = "168h"
 
 [".local/share/zellij/plugins/zjstatus.wasm"]
 type = "file"
-url = "https://github.com/dj95/zjstatus/releases/download/v0.23.0/zjstatus.wasm"
+url = "https://github.com/dj95/zjstatus/releases/latest/download/zjstatus.wasm"
+refreshPeriod = "168h"
 
-{{- end -}}
+{{- end }}

@@ -1,0 +1,55 @@
+# ░█▀▀░█░█░█▀█░▀█▀░█▀█░█░█
+# ░▀▀█░░█░░█░█░░█░░█▀█░▄▀▄
+# ░▀▀▀░░▀░░▀░▀░░▀░░▀░▀░▀░▀
+# zsh syntax palette / Catppuccin signal inks
+# loaded before OMZ because the plugin reads the map while waking up
+
+{{- $ctpZshSyntax := include ".chezmoitemplates/catppuccin_palette.json" | fromJson }}
+{{- $zshSyntax := index $ctpZshSyntax "frappe" }}
+ZSH_HIGHLIGHT_HIGHLIGHTERS=(main)
+typeset -gA ZSH_HIGHLIGHT_STYLES
+ZSH_HIGHLIGHT_STYLES[comment]='fg={{ index $zshSyntax "surface2" }}'
+ZSH_HIGHLIGHT_STYLES[alias]='fg={{ index $zshSyntax "green" }}'
+ZSH_HIGHLIGHT_STYLES[suffix-alias]='fg={{ index $zshSyntax "green" }}'
+ZSH_HIGHLIGHT_STYLES[global-alias]='fg={{ index $zshSyntax "green" }}'
+ZSH_HIGHLIGHT_STYLES[function]='fg={{ index $zshSyntax "green" }}'
+ZSH_HIGHLIGHT_STYLES[command]='fg={{ index $zshSyntax "green" }}'
+ZSH_HIGHLIGHT_STYLES[precommand]='fg={{ index $zshSyntax "green" }},italic'
+ZSH_HIGHLIGHT_STYLES[autodirectory]='fg={{ index $zshSyntax "peach" }},italic'
+ZSH_HIGHLIGHT_STYLES[single-hyphen-option]='fg={{ index $zshSyntax "peach" }}'
+ZSH_HIGHLIGHT_STYLES[double-hyphen-option]='fg={{ index $zshSyntax "peach" }}'
+ZSH_HIGHLIGHT_STYLES[back-quoted-argument]='fg={{ index $zshSyntax "mauve" }}'
+ZSH_HIGHLIGHT_STYLES[builtin]='fg={{ index $zshSyntax "green" }}'
+ZSH_HIGHLIGHT_STYLES[reserved-word]='fg={{ index $zshSyntax "green" }}'
+ZSH_HIGHLIGHT_STYLES[hashed-command]='fg={{ index $zshSyntax "green" }}'
+ZSH_HIGHLIGHT_STYLES[commandseparator]='fg={{ index $zshSyntax "red" }}'
+ZSH_HIGHLIGHT_STYLES[command-substitution-delimiter]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[command-substitution-delimiter-unquoted]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[process-substitution-delimiter]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[back-quoted-argument-delimiter]='fg={{ index $zshSyntax "red" }}'
+ZSH_HIGHLIGHT_STYLES[back-double-quoted-argument]='fg={{ index $zshSyntax "red" }}'
+ZSH_HIGHLIGHT_STYLES[back-dollar-quoted-argument]='fg={{ index $zshSyntax "red" }}'
+ZSH_HIGHLIGHT_STYLES[command-substitution-quoted]='fg={{ index $zshSyntax "yellow" }}'
+ZSH_HIGHLIGHT_STYLES[command-substitution-delimiter-quoted]='fg={{ index $zshSyntax "yellow" }}'
+ZSH_HIGHLIGHT_STYLES[single-quoted-argument]='fg={{ index $zshSyntax "yellow" }}'
+ZSH_HIGHLIGHT_STYLES[single-quoted-argument-unclosed]='fg={{ index $zshSyntax "maroon" }}'
+ZSH_HIGHLIGHT_STYLES[double-quoted-argument]='fg={{ index $zshSyntax "yellow" }}'
+ZSH_HIGHLIGHT_STYLES[double-quoted-argument-unclosed]='fg={{ index $zshSyntax "maroon" }}'
+ZSH_HIGHLIGHT_STYLES[rc-quote]='fg={{ index $zshSyntax "yellow" }}'
+ZSH_HIGHLIGHT_STYLES[dollar-quoted-argument]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[dollar-quoted-argument-unclosed]='fg={{ index $zshSyntax "maroon" }}'
+ZSH_HIGHLIGHT_STYLES[dollar-double-quoted-argument]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[assign]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[named-fd]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[numeric-fd]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[unknown-token]='fg={{ index $zshSyntax "maroon" }}'
+ZSH_HIGHLIGHT_STYLES[path]='fg={{ index $zshSyntax "text" }},underline'
+ZSH_HIGHLIGHT_STYLES[path_pathseparator]='fg={{ index $zshSyntax "red" }},underline'
+ZSH_HIGHLIGHT_STYLES[path_prefix]='fg={{ index $zshSyntax "text" }},underline'
+ZSH_HIGHLIGHT_STYLES[path_prefix_pathseparator]='fg={{ index $zshSyntax "red" }},underline'
+ZSH_HIGHLIGHT_STYLES[globbing]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[history-expansion]='fg={{ index $zshSyntax "mauve" }}'
+ZSH_HIGHLIGHT_STYLES[back-quoted-argument-unclosed]='fg={{ index $zshSyntax "maroon" }}'
+ZSH_HIGHLIGHT_STYLES[redirection]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[arg0]='fg={{ index $zshSyntax "text" }}'
+ZSH_HIGHLIGHT_STYLES[default]='fg={{ index $zshSyntax "text" }}'

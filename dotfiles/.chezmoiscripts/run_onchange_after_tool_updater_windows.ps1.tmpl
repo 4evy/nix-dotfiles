@@ -1,8 +1,0 @@
-{{- if eq .chezmoi.os "windows" -}}
-$ErrorActionPreference = "Stop"
-
-$installer = Join-Path $HOME ".local\bin\nix-dotfiles-install-tool-updater.ps1"
-if (Test-Path -LiteralPath $installer) {
-    & $installer
-}
-{{- end -}}

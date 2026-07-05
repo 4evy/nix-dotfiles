@@ -1,3 +1,29 @@
-#!/usr/bin/env sh
-# vscode-extensions.toml hash: {{ include "dot_config/Code/User/vscode-extensions.toml" | sha256sum }}
-exec chezmoi-support install-vs-extensions "$@"
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# vscode-extensions.txt hash: {{ include "dot_config/Code/User/vscode-extensions.txt" | sha256sum }}
+set -euo pipefail
+
+if ! command -v code >/dev/null 2>&1; then
+	exit 0
+fi
+
+home_dir=${CHEZMOI_HOME_DIR:-${HOME:?HOME is required}}
+source_dir=${CHEZMOI_SOURCE_DIR:-"$home_dir/nix-dotfiles/dotfiles"}
+extensions_file=$source_dir/dot_config/Code/User/vscode-extensions.txt
+
+if [[ ! -f $extensions_file ]]; then
+	exit 0
+fi
+
+installed=$(mktemp)
+trap 'rm -f "$installed"' EXIT
+code --list-extensions >"$installed"
+
+sed -e 's/#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$extensions_file" |
+	while IFS= read -r extension; do
+		[[ -n $extension ]] || continue
+		if grep -Fxiq -- "$extension" "$installed"; then
+			continue
+		fi
+		code --install-extension "$extension" --force
+	done

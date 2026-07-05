@@ -1,0 +1,11 @@
+{{- $ctp := include ".chezmoitemplates/catppuccin_palette.json" | fromJson -}}
+{{- $latte := index $ctp "latte" -}}
+{
+  "accentColor": "{{ index $latte "pink" }}",
+  "direction": "ltr",
+  "locale": "en-US",
+  "strings": {
+    "usingComputer": "Codex is using your computer",
+    "escToCancel": "Esc to cancel"
+  }
+}

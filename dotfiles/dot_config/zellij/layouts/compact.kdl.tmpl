@@ -1,9 +1,11 @@
+{{- $ctp := include ".chezmoitemplates/catppuccin_palette.json" | fromJson -}}
+{{- $p := index $ctp "frappe" -}}
 layout {
     default_tab_template {
         children
         pane size=1 borderless=true {
             plugin location="zjstatus" {
-                format_left   "{mode} #[fg=#f4b8e4,bold]{session}"
+                format_left   "{mode} #[fg={{ index $p "pink" }},bold]{session}"
                 format_center "{tabs}"
                 format_right  "{datetime}"
                 format_space  ""
@@ -11,24 +13,24 @@ layout {
                 border_enabled "false"
                 hide_frame_for_single_pane "false"
 
-                mode_normal       "#[bg=#8caaee,fg=#303446,bold] NORMAL "
-                mode_locked       "#[bg=#e5c890,fg=#303446,bold] LOCKED "
-                mode_tab          "#[bg=#a6d189,fg=#303446,bold] TAB "
-                mode_pane         "#[bg=#8caaee,fg=#303446,bold] PANE "
-                mode_resize       "#[bg=#f4b8e4,fg=#303446,bold] RESIZE "
-                mode_session      "#[bg=#e78284,fg=#303446,bold] SESSION "
-                mode_scroll       "#[bg=#a6d189,fg=#303446,bold] SCROLL "
-                mode_search       "#[bg=#8caaee,fg=#303446,bold] SEARCH "
-                mode_move         "#[bg=#e5c890,fg=#303446,bold] MOVE "
-                mode_rename_tab   "#[bg=#a6d189,fg=#303446,bold] RENAME TAB "
-                mode_rename_pane  "#[bg=#8caaee,fg=#303446,bold] RENAME PANE "
-                mode_enter_search "#[bg=#8caaee,fg=#303446,bold] SEARCH "
+                mode_normal       "#[bg={{ index $p "blue" }},fg={{ index $p "base" }},bold] NORMAL "
+                mode_locked       "#[bg={{ index $p "yellow" }},fg={{ index $p "base" }},bold] LOCKED "
+                mode_tab          "#[bg={{ index $p "green" }},fg={{ index $p "base" }},bold] TAB "
+                mode_pane         "#[bg={{ index $p "blue" }},fg={{ index $p "base" }},bold] PANE "
+                mode_resize       "#[bg={{ index $p "pink" }},fg={{ index $p "base" }},bold] RESIZE "
+                mode_session      "#[bg={{ index $p "red" }},fg={{ index $p "base" }},bold] SESSION "
+                mode_scroll       "#[bg={{ index $p "green" }},fg={{ index $p "base" }},bold] SCROLL "
+                mode_search       "#[bg={{ index $p "blue" }},fg={{ index $p "base" }},bold] SEARCH "
+                mode_move         "#[bg={{ index $p "yellow" }},fg={{ index $p "base" }},bold] MOVE "
+                mode_rename_tab   "#[bg={{ index $p "green" }},fg={{ index $p "base" }},bold] RENAME TAB "
+                mode_rename_pane  "#[bg={{ index $p "blue" }},fg={{ index $p "base" }},bold] RENAME PANE "
+                mode_enter_search "#[bg={{ index $p "blue" }},fg={{ index $p "base" }},bold] SEARCH "
 
-                tab_normal    "#[fg=#737994] {name} "
-                tab_active    "#[fg=#c6d0f5,bold] {name} "
-                tab_separator "#[fg=#414559] | "
+                tab_normal    "#[fg={{ index $p "overlay0" }}] {name} "
+                tab_active    "#[fg={{ index $p "text" }},bold] {name} "
+                tab_separator "#[fg={{ index $p "surface0" }}] | "
 
-                datetime "#[fg=#737994] {format} "
+                datetime "#[fg={{ index $p "overlay0" }}] {format} "
                 datetime_format "%Y-%m-%d %H:%M:%S"
                 datetime_timezone "Europe/Sofia"
             }

@@ -1,53 +1,117 @@
-# Keep user-local tools visible in non-interactive bash.
-_enable_bash_shopt() {
-  local opt
+# ░█▀▄░█▀█░█▀▀░█░█░█▀▀░█▀█░█░█
+# ░█▀▄░█▀█░▀▀█░█▀█░█▀▀░█░█░▀▄▀
+# ░▀▀░░▀░▀░▀▀▀░▀░▀░▀▀▀░▀░▀░░▀░
+# bashenv / quiet floor, loud sign
+#  / ~~~~~~~~~~~~~~~~~~~~~~~~~~~ \
+# |  /~~\                   /~~\  |
+# |\ \   | PATH first      |   / /|
+# | \   /| shared env      |\   / |
+# |  ~~  | no prompt noise |  ~~  |
+#  \     |~~~~~~~~~~~~~~~~~|     /
+#   \   /                   \   /
+#    ~~~                     ~~~
 
-  for opt; do
-    shopt -s "$opt" 2>/dev/null || true
-  done
+# PATH deck
+#   favorite tools cut the line; inherited PATH keeps its order after that
+
+_dotfiles_path_prepend_once() {
+	local -a current_path=() new_path=()
+	local dir
+
+	_dotfiles_path_append_once() {
+		local candidate existing
+		for candidate; do
+			[[ -n "$candidate" ]] || continue
+			for existing in "${new_path[@]}"; do
+				[[ "$existing" == "$candidate" ]] && continue 2
+			done
+			new_path+=("$candidate")
+		done
+	}
+
+	_dotfiles_path_append_once "$@"
+
+	local IFS=:
+	read -r -a current_path <<<"${PATH:-}"
+	for dir in "${current_path[@]}"; do
+		_dotfiles_path_append_once "$dir"
+	done
+
+	PATH="${new_path[*]}"
+	unset -f _dotfiles_path_append_once
 }
 
-_enable_bash_shopt array_expand_once globskipdots
+_dotfiles_path_entries=(
+	"$HOME/.pi/agent/bin"
+	"$HOME/.local/share/dotfiles/helix-tip/bin"
+	{{- if eq .chezmoi.os "linux" }}
+	/home/linuxbrew/.linuxbrew/bin
+	/home/linuxbrew/.linuxbrew/sbin
+	{{- else if eq .chezmoi.os "darwin" }}
+	{{- if eq .chezmoi.arch "arm64" }}
+	/opt/homebrew/opt/coreutils/libexec/gnubin
+	/opt/homebrew/opt/findutils/libexec/gnubin
+	/opt/homebrew/opt/gnu-sed/libexec/gnubin
+	/opt/homebrew/opt/grep/libexec/gnubin
+	/opt/homebrew/opt/gawk/libexec/gnubin
+	/opt/homebrew/opt/gnu-tar/libexec/gnubin
+	/opt/homebrew/opt/gnu-which/libexec/gnubin
+	/opt/homebrew/opt/diffutils/libexec/gnubin
+	/opt/homebrew/opt/make/libexec/gnubin
+	/opt/homebrew/opt/gnu-getopt/bin
+	/opt/homebrew/bin
+	/opt/homebrew/sbin
+	{{- else }}
+	/usr/local/opt/coreutils/libexec/gnubin
+	/usr/local/opt/findutils/libexec/gnubin
+	/usr/local/opt/gnu-sed/libexec/gnubin
+	/usr/local/opt/grep/libexec/gnubin
+	/usr/local/opt/gawk/libexec/gnubin
+	/usr/local/opt/gnu-tar/libexec/gnubin
+	/usr/local/opt/gnu-which/libexec/gnubin
+	/usr/local/opt/diffutils/libexec/gnubin
+	/usr/local/opt/make/libexec/gnubin
+	/usr/local/opt/gnu-getopt/bin
+	/usr/local/bin
+	/usr/local/sbin
+	{{- end }}
+	{{- end }}
+	"$HOME/.local/bin"
+	"$HOME/.bun/bin"
+	"$HOME/.bun/install/global/node_modules/.bin"
+	"$HOME/.cache/.bun/bin"
+	"$HOME/.npm/bin"
+	"$HOME/.cargo/bin"
+	"$HOME/.go/bin"
+	"$HOME/.yarn/bin"
+	{{- if eq .chezmoi.os "linux" }}
+	/usr/local/bin
+	/usr/bin
+	/bin
+	/usr/sbin
+	/sbin
+	{{- else if and (eq .chezmoi.os "darwin") (eq .chezmoi.arch "arm64") }}
+	/usr/local/bin
+	/usr/local/sbin
+	{{- end }}
+)
+_dotfiles_path_prepend_once "${_dotfiles_path_entries[@]}"
+unset _dotfiles_path_entries
 
-_path_prepend_once() {
-  local dir new_path="" filtered_path="" old_ifs path_value="${PATH:-}"
-
-  for dir; do
-    [[ -n "$dir" && ":$new_path:" != *":$dir:"* ]] && new_path="${new_path:+$new_path:}$dir"
-  done
-
-  old_ifs=$IFS
-  IFS=:
-  for dir in $path_value; do
-    [[ -n "$dir" && ":$new_path:$filtered_path:" != *":$dir:"* ]] && filtered_path="${filtered_path:+$filtered_path:}$dir"
-  done
-  IFS=$old_ifs
-
-  PATH="$new_path${new_path:+${filtered_path:+:}}$filtered_path"
-}
-
-_path_prepend_once \
-  "$HOME/.pi/agent/bin" \
-  "$HOME/.bun/bin" \
-  "$HOME/.bun/install/global/node_modules/.bin" \
-  "$HOME/.cache/.bun/bin" \
-  "$HOME/.npm/bin" \
-  "$HOME/.local/share/nix-dotfiles/immutable/profile/bin" \
-  "$HOME/.local/bin" \
-  "$HOME/.local/share/nix-dotfiles/immutable/bin" \
-  "$HOME/.cargo/bin" \
-  "$HOME/.go/bin" \
-  "$HOME/.yarn/bin"
-
-{{- if eq .chezmoi.os "linux" }}
-_path_prepend_once /usr/local/bin /usr/bin /bin /usr/sbin /sbin
-{{- end }}
+# NixOS wrappers
+#   wrapper binaries need front-row seats on NixOS
 
 if [[ -d /run/wrappers/bin ]]; then
-  _path_prepend_once /run/wrappers/bin
+	_dotfiles_path_prepend_once /run/wrappers/bin
 fi
 
-unset -f _enable_bash_shopt _path_prepend_once
+unset -f _dotfiles_path_prepend_once
 export PATH
 
-export UV_PYTHON_PREFERENCE="${UV_PYTHON_PREFERENCE:-only-managed}"
+# Shared env handoff
+#   Homebrew, SSH agent, and shared defaults live next door
+
+if [[ -r "$HOME/.config/shell/environment.sh" ]]; then
+	# shellcheck source=/dev/null
+	source "$HOME/.config/shell/environment.sh"
+fi

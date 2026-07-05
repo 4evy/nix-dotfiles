@@ -1,5 +1,5 @@
 [user]
-    name = FlameFlag
+    name = 4evy
     email = git@ps1.sh
     signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPsZFHUhLSPiz0EF1Q59jzu7IS7qdn3MSEImztN4KgmN
 
@@ -22,6 +22,18 @@
 
 [core]
     excludesfile = "{{ .chezmoi.homeDir }}/.gitignore_global"
+    pager = delta
+
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    features = catppuccin-frappe-pink
+    navigate = true
+    line-numbers = true
+
+[include]
+    path = "{{ .chezmoi.homeDir }}/.config/git/catppuccin-delta.gitconfig"
 
 [filter "lfs"]
     clean = git-lfs clean -- %f

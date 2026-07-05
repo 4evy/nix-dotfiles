@@ -1,4 +1,4 @@
 {{- if eq .chezmoi.os "darwin" -}}
 #!/usr/bin/env sh
-exec chezmoi-support raycast-beta-patch "$@"
-{{- end -}}
+exec "{{ joinPath .chezmoi.homeDir ".local/bin/raycast-beta-patch" }}" "$@"
+{{- end }}

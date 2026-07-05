@@ -30,14 +30,6 @@ plugins {
     }
 }
 
-load_plugins {
-    autolock location="https://github.com/fresh2dev/zellij-autolock/releases/latest/download/zellij-autolock.wasm" {
-        triggers "nvim|vim|hx|git|fzf|zoxide|atuin"
-        watch_triggers "lazygit|gitui|yazi|lf"
-        watch_interval "1.0"
-    }
-}
-
 keybinds clear-defaults=true {
     normal {
         unbind "Ctrl p"

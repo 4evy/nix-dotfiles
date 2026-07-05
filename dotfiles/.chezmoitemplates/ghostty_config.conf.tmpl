@@ -1,20 +1,25 @@
 theme = light:catppuccin-latte-pink.conf,dark:catppuccin-frappe-pink.conf
 adjust-underline-position = 4
-clipboard-paste-protection = false
-command = {{ .chezmoi.homeDir }}/.config/ghostty/zellij-theme-run
+clipboard-paste-protection = true
+command = direct:{{ .chezmoi.homeDir }}/.config/ghostty/zellij-theme-run
 confirm-close-surface = false
 cursor-style = bar
 cursor-style-blink = false
-font-family = TX02 Nerd Font
+font-family = JetBrainsMono Nerd Font Mono
 font-size = 14
-mouse-scroll-multiplier = 3
+mouse-scroll-multiplier = precision:1,discrete:3
 quit-after-last-window-closed = true
 scrollback-limit = 100000000
 window-padding-x = 8
 window-padding-y = 4
 window-padding-balance = true
+window-padding-color = extend
 shell-integration-features = no-cursor
 mouse-hide-while-typing = true
+
+{{- if eq .chezmoi.os "linux" }}
+window-theme = ghostty
+{{- end }}
 
 {{- if eq .chezmoi.os "darwin" }}
 macos-option-as-alt = true
@@ -39,7 +44,25 @@ keybind = super+shift+c=text:\x1bC
 keybind = super+shift+v=paste_from_clipboard
 keybind = super+a=select_all
 keybind = super+,=reload_config
+keybind = super+shift+,=open_config
+keybind = super+shift+p=toggle_command_palette
+keybind = super+f=start_search
+keybind = super+g=navigate_search:next
+keybind = super+shift+g=navigate_search:previous
+keybind = super+shift+f=end_search
 keybind = super+t=new_tab
+keybind = super+n=new_window
+keybind = super+w=close_tab:this
+keybind = super+shift+w=close_window
+keybind = super+shift+[=previous_tab
+keybind = super+shift+]=next_tab
+keybind = super+page_up=scroll_page_up
+keybind = super+page_down=scroll_page_down
+keybind = super+home=scroll_to_top
+keybind = super+end=scroll_to_bottom
+keybind = super+up=jump_to_prompt:-1
+keybind = super+down=jump_to_prompt:1
+keybind = super+ctrl+f=toggle_fullscreen
 {{- end }}
 keybind = ctrl+left=text:\x01
 keybind = ctrl+right=text:\x05
@@ -48,6 +71,12 @@ keybind = ctrl+alt+left=text:\x1b[1;7D
 keybind = ctrl+alt+right=text:\x1b[1;7C
 keybind = alt+left=text:\x1b\x62
 keybind = alt+right=text:\x1b\x66
+{{- if ne .chezmoi.os "darwin" }}
+keybind = ctrl+shift+left=text:\x1b[1;6D
+keybind = ctrl+shift+right=text:\x1b[1;6C
+keybind = ctrl+shift+up=text:\x1b[1;6A
+keybind = ctrl+shift+down=text:\x1b[1;6B
+{{- end }}
 keybind = ctrl+0=reset_font_size
 keybind = ctrl+equal=increase_font_size:1
 keybind = ctrl+shift+equal=increase_font_size:1
@@ -57,3 +86,24 @@ keybind = ctrl+shift+c=text:\x1bC
 keybind = ctrl+shift+v=paste_from_clipboard
 keybind = ctrl+a=select_all
 keybind = ctrl+,=reload_config
+keybind = ctrl+shift+,=open_config
+keybind = ctrl+shift+p=toggle_command_palette
+keybind = copy=copy_to_clipboard:mixed
+keybind = paste=paste_from_clipboard
+{{- if ne .chezmoi.os "darwin" }}
+keybind = ctrl+insert=copy_to_clipboard:mixed
+keybind = shift+insert=paste_from_selection
+keybind = shift+page_up=scroll_page_up
+keybind = shift+page_down=scroll_page_down
+keybind = shift+home=scroll_to_top
+keybind = shift+end=scroll_to_bottom
+keybind = ctrl+tab=next_tab
+keybind = ctrl+shift+tab=previous_tab
+keybind = ctrl+page_up=previous_tab
+keybind = ctrl+page_down=next_tab
+keybind = ctrl+shift+t=new_tab
+keybind = ctrl+shift+n=new_window
+keybind = ctrl+shift+w=close_tab:this
+keybind = ctrl+enter=toggle_fullscreen
+keybind = ctrl+shift+f=start_search
+{{- end }}

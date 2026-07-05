@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+container_name=${VSCODE_NIX_CONTAINER:-nix}
+server_path=${VSCODE_NIXD_PATH:-/nix/var/nix/profiles/default/bin/nixd}
+workdir=$(pwd -P)
+
+if [ "${CONTAINER_ID:-}" = "$container_name" ]; then
+	exec "$server_path" "$@"
+fi
+
+if ! podman container exists "$container_name"; then
+	printf '%s\n' "vscode-nixd: podman container '$container_name' does not exist" >&2
+	exit 127
+fi
+
+if [ "$(podman inspect --format '{{.State.Running}}' "$container_name")" != "true" ]; then
+	podman start "$container_name" >/dev/null
+fi
+
+exec podman exec -i --workdir "$workdir" "$container_name" "$server_path" "$@"

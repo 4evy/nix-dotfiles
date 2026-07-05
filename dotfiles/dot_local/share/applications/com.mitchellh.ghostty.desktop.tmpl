@@ -1,8 +1,8 @@
 [Desktop Entry]
 Name=Ghostty
 Comment=Terminal emulator
-TryExec=/usr/bin/ghostty
-Exec=/usr/bin/ghostty --gtk-single-instance=true
+TryExec={{ .chezmoi.homeDir }}/.local/bin/ghostty
+Exec={{ .chezmoi.homeDir }}/.local/bin/ghostty --gtk-single-instance=true
 Icon=com.mitchellh.ghostty
 Type=Application
 Categories=System;TerminalEmulator;

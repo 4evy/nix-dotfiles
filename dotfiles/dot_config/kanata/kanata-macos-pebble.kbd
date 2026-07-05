@@ -12,12 +12,6 @@
 
 (defalias
   caps-hyper (tap-hold-press 200 200 esc (multi lmet lctl lalt lsft (layer-while-held hyper)))
-  win-up (macos-window top-half top-two-thirds top-third)
-  win-left (macos-window left-half left-two-thirds first-third)
-  win-down (macos-window bottom-half bottom-two-thirds bottom-third)
-  win-right (macos-window right-half right-two-thirds last-third)
-  win-max-almost (macos-window almost-maximize center)
-  win-max (macos-window maximize)
 )
 
 (deflayer base
@@ -25,5 +19,5 @@
 )
 
 (deflayer hyper
-  _    _           _    _    _    _    _    _    @win-up @win-left @win-down @win-right @win-max-almost @win-max
+  _    _           _    _    _    _    _    _    w a s d ret \
 )

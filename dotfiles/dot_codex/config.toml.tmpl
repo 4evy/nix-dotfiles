@@ -1,13 +1,24 @@
+{{- $ctp := include ".chezmoitemplates/catppuccin_palette.json" | fromJson -}}
+{{- $latte := index $ctp "latte" -}}
+{{- $frappe := index $ctp "frappe" -}}
+{{- $derived := index $ctp "_derived" -}}
+{{- $latteDiffAddedBg := index $derived "latteDiffAddedBg" -}}
+{{- $latteDiffRemovedBg := index $derived "latteDiffRemovedBg" -}}
+{{- $frappeDiffAddedBg := index $derived "frappeDiffAddedBg" -}}
+{{- $frappeDiffRemovedBg := index $derived "frappeDiffRemovedBg" -}}
 model = "gpt-5.5"
 model_reasoning_effort = "high"
 approval_policy = "never"
+default_permissions = ":danger-full-access"
 sandbox_mode = "danger-full-access"
 web_search = "live"
 suppress_unstable_features_warning = true
-trust_level = "trusted"
 
 {{- if eq .chezmoi.os "darwin" }}
-notify = ["{{ .chezmoi.homeDir }}/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient", "turn-ended"]
+notify = [
+  "{{ .chezmoi.homeDir }}/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient",
+  "turn-ended",
+]
 {{- end }}
 
 [features]
@@ -28,20 +39,19 @@ js_repl = false
 notification_condition = "always"
 show_tooltips = false
 theme = "catppuccin-frappe-pink"
-status_line = ["model-with-reasoning", "project-name", "context-remaining", "five-hour-limit", "weekly-limit"]
+terminal_resize_reflow_max_rows = 0
+status_line = [
+  "model-with-reasoning",
+  "project-name",
+  "context-remaining",
+  "five-hour-limit",
+  "weekly-limit",
+]
 status_line_use_colors = true
 
 [tui.keymap.global]
 open_external_editor = "ctrl-x"
 
-[mcp_servers.system-run]
-command = "system-run-mcp"
-startup_timeout_sec = 10
-tool_timeout_sec = 1800
-enabled_tools = ["system-run"]
-default_tools_approval_mode = "approve"
-
-{{- if eq .chezmoi.os "darwin" }}
 [mcp_servers.ghidra]
 url = "http://127.0.0.1:8090/mcp"
 enabled = false
@@ -52,15 +62,24 @@ enabled_tools = [
   "list_instances",
   "connect_instance",
   "check_tools",
+  "list_tool_groups",
+  "search_tools",
+  "import_file",
   "get_current_program_info",
   "list_open_programs",
   "list_project_files",
+  "list_projects",
   "get_project_info",
+  "create_project",
+  "close_project",
   "open_project",
   "load_program",
   "load_program_from_project",
+  "open_program",
+  "close_program",
   "switch_program",
   "save_program",
+  "save_all_programs",
   "analysis_status",
   "run_analysis",
   "reanalyze",
@@ -137,7 +156,6 @@ enabled_tools = [
   "analyze_call_graph",
   "emulate_function",
 ]
-{{- end }}
 
 {{- if lookPath "lldb-mcp-launcher" }}
 [mcp_servers.lldb]
@@ -153,7 +171,19 @@ enabled_tools = [
 {{- end }}
 
 {{- if eq .chezmoi.os "darwin" }}
-{{- $codexResourceRoot := "/Applications/Codex.app/Contents/Resources" }}
+{{- $codexAppRoot := "/Applications/Codex.app" }}
+{{- $codexContentsRoot := joinPath $codexAppRoot "Contents" }}
+{{- $codexResourceRoot := joinPath $codexContentsRoot "Resources" }}
+{{- $browserClientPath := joinPath $codexResourceRoot "plugins/openai-bundled/plugins/browser/scripts/browser-client.mjs" }}
+{{- $codexInfoPlistPath := joinPath $codexContentsRoot "Info.plist" }}
+{{- $browserClientSha := "" }}
+{{- if and (stat $browserClientPath) (lookPath "shasum") }}
+{{- $browserClientSha = (output "shasum" "-a" "256" $browserClientPath | regexFind "^[0-9a-f]+") }}
+{{- end }}
+{{- $codexAppVersion := "" }}
+{{- if and (stat $codexInfoPlistPath) (lookPath "awk") }}
+{{- $codexAppVersion = (output "awk" "/<key>CFBundleShortVersionString<\\/key>/{getline; gsub(/.*<string>|<\\/string>.*/, \"\"); print; exit}" $codexInfoPlistPath | trim) }}
+{{- end }}
 {{- $nodeReplCommand := lookPath (joinPath $codexResourceRoot "cua_node/bin/node_repl") }}
 {{- $nodePath := joinPath $codexResourceRoot "cua_node/bin/node" }}
 {{- if not $nodeReplCommand }}
@@ -173,19 +203,28 @@ NODE_REPL_NODE_MODULE_DIRS = ""
 NODE_REPL_NODE_PATH = "{{ $nodePath }}"
 NODE_REPL_TRUSTED_CODE_PATHS = "{{ .chezmoi.homeDir }}/.codex"
 CODEX_HOME = "{{ .chezmoi.homeDir }}/.codex"
-NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "2de792ebdf729e85542c94275f6654821dddce546d9c7374c915f2297529e313"
-BROWSER_USE_AVAILABLE_BACKENDS = "iab"
+{{- if $browserClientSha }}
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "{{ $browserClientSha }}"
+{{- end }}
+BROWSER_USE_AVAILABLE_BACKENDS = "iab,chrome"
 NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = "Control the in-app browser in conjunction with the Browser Plugin."
 BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
-BROWSER_USE_CODEX_APP_VERSION = "26.602.40724"
+{{- if $codexAppVersion }}
+BROWSER_USE_CODEX_APP_VERSION = "{{ $codexAppVersion }}"
+{{- end }}
 CODEX_CLI_PATH = "/Applications/Codex.app/Contents/Resources/codex"
 
 [marketplaces.openai-bundled]
-last_updated = "2026-06-07T22:25:19Z"
 source_type = "local"
 source = "{{ .chezmoi.homeDir }}/.codex/.tmp/bundled-marketplaces/openai-bundled"
 
 [plugins."browser@openai-bundled"]
+enabled = true
+
+[plugins."chrome@openai-bundled"]
+enabled = true
+
+[plugins."computer-use@openai-bundled"]
 enabled = true
 {{- end }}
 {{- end }}
@@ -194,7 +233,6 @@ enabled = true
 enabled = true
 destructive_enabled = true
 open_world_enabled = true
-default_tools_enabled = true
 default_tools_approval_mode = "approve"
 
 [notice]
@@ -206,29 +244,33 @@ appearanceLightCodeThemeId = "catppuccin"
 appearanceDarkCodeThemeId = "catppuccin"
 
 [desktop.appearanceLightChromeTheme]
-accent = "#ea76cb"
+accent = "{{ index $latte "pink" }}"
 contrast = 45
-ink = "#4c4f69"
+ink = "{{ index $latte "text" }}"
 opaqueWindows = false
-surface = "#eff1f5"
+surface = "{{ index $latte "base" }}"
 
 [desktop.appearanceLightChromeTheme.fonts]
 
 [desktop.appearanceLightChromeTheme.semanticColors]
-diffAdded = "#40a02b"
-diffRemoved = "#d20f39"
-skill = "#8839ef"
+diffAdded = "{{ index $latte "green" }}"
+diffAddedBg = "{{ $latteDiffAddedBg }}"
+diffRemoved = "{{ index $latte "red" }}"
+diffRemovedBg = "{{ $latteDiffRemovedBg }}"
+skill = "{{ index $latte "mauve" }}"
 
 [desktop.appearanceDarkChromeTheme]
-accent = "#f4b8e4"
+accent = "{{ index $frappe "pink" }}"
 contrast = 60
-ink = "#c6d0f5"
+ink = "{{ index $frappe "text" }}"
 opaqueWindows = false
-surface = "#303446"
+surface = "{{ index $frappe "base" }}"
 
 [desktop.appearanceDarkChromeTheme.fonts]
 
 [desktop.appearanceDarkChromeTheme.semanticColors]
-diffAdded = "#a6d189"
-diffRemoved = "#e78284"
-skill = "#ca9ee6"
+diffAdded = "{{ index $frappe "green" }}"
+diffAddedBg = "{{ $frappeDiffAddedBg }}"
+diffRemoved = "{{ index $frappe "red" }}"
+diffRemovedBg = "{{ $frappeDiffRemovedBg }}"
+skill = "{{ index $frappe "mauve" }}"

@@ -1,8 +1,6 @@
 {
   "theme": "catppuccin-frappe-pink",
-  "themes": [
-    "./themes"
-  ],
+  "themes": ["./themes"],
   "extensions": [
     "/run/current-system/sw/bin/agent-statusline-pi",
     "/run/current-system/sw/bin/catppuccin-system-theme-pi",

@@ -1,5 +1,5 @@
 [user]
-name = "FlameFlag"
+name = "4evy"
 email = "git@ps1.sh"
 
 [ui]
@@ -25,7 +25,7 @@ backend = "ssh"
 key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPsZFHUhLSPiz0EF1Q59jzu7IS7qdn3MSEImztN4KgmN"
 
 [signing.backends.ssh]
-program = {{- if eq .chezmoi.os "darwin" -}}
+program = {{ if eq .chezmoi.os "darwin" -}}
 "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
 {{- else -}}
 "/opt/1Password/op-ssh-sign"
@@ -37,7 +37,14 @@ d = ["describe"]
 p = ["git push"]
 e = ["edit"]
 n = ["new"]
+redate.definition = ["util", "exec", "--", "jj-redate"]
+redate.doc = "Interactively set author and committer timestamps on a revision"
+get.definition = ["util", "exec", "--", "jj-get"]
+get.doc = "Fetch a remote Git branch/bookmark and track it locally"
 
 [templates]
-git_push_bookmark = '"flameflag/push-" ++ change_id.short()'
+git_push_bookmark = '"4evy/push-" ++ change_id.short()'
 duplicate_description = 'concat(description, "\n(cherry picked from commit ", commit_id, ")")'
+
+[revsets]
+log = "present(@) | ancestors(immutable_heads().., 2) | ancestors(bookmarks(), 2) | trunk()"

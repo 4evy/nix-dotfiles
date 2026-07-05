@@ -1,45 +1,57 @@
 #!/usr/bin/env bash
+# shellcheck shell=bash
 set -euo pipefail
 
 readonly HOME_DIR={{ .chezmoi.homeDir | quote }}
-PATH="/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/share/nix-dotfiles/immutable/profile/bin:${HOME_DIR}/.local/share/nix-dotfiles/immutable/bin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin:${HOME_DIR}/.nix-profile/bin"
+{{- if eq .chezmoi.os "darwin" }}
+PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin"
+{{- else }}
+PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/run/wrappers/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin"
+{{- end }}
 export PATH
 
 exec_if_usable() {
-  local candidate="$1"
-  shift
+	local candidate="$1"
+	shift
 
-  [[ -n "${candidate}" && -x "${candidate}" ]] || return 1
-  "${candidate}" --version >/dev/null 2>&1 || return 1
-  case "${candidate}" in
-    */zsh | */bash | */sh) export SHELL="${candidate}" ;;
-  esac
-  exec "${candidate}" "$@"
+	[[ -n "${candidate}" && -x "${candidate}" ]] || return 1
+	"${candidate}" --version >/dev/null 2>&1 || return 1
+	case "${candidate}" in
+		*/zsh | */bash | */sh) export SHELL="${candidate}" ;;
+	esac
+	exec "${candidate}" "$@"
 }
 
 exec_command_if_usable() {
-  local resolved
+	local resolved
 
-  resolved="$(command -v "$1" 2>/dev/null)" || return 1
-  shift
-  exec_if_usable "${resolved}" "$@"
+	resolved="$(command -v "$1" 2>/dev/null)" || return 1
+	shift
+	exec_if_usable "${resolved}" "$@"
 }
 
+{{- if eq .chezmoi.os "darwin" }}
 for shell in \
-  /usr/bin/zsh \
-  /bin/zsh \
-  "${HOME_DIR}/.local/share/nix-dotfiles/immutable/profile/bin/zsh" \
-  "${HOME_DIR}/.local/share/nix-dotfiles/immutable/bin/zsh" \
-  "${HOME_DIR}/.nix-profile/bin/zsh" \
-  "${SHELL:-}" \
-  /usr/bin/bash \
-  /bin/bash \
-  "${HOME_DIR}/.local/share/nix-dotfiles/immutable/profile/bin/bash" \
-  "${HOME_DIR}/.local/share/nix-dotfiles/immutable/bin/bash" \
-  "${HOME_DIR}/.nix-profile/bin/bash"; do
-  if exec_if_usable "${shell}" "$@"; then
-    exit 0
-  fi
+	/opt/homebrew/bin/zsh \
+	/usr/bin/zsh \
+	/bin/zsh \
+	"${SHELL:-}" \
+	/opt/homebrew/bin/bash \
+	/usr/bin/bash \
+	/bin/bash; do
+{{- else }}
+for shell in \
+	/home/linuxbrew/.linuxbrew/bin/zsh \
+	/usr/bin/zsh \
+	/bin/zsh \
+	"${SHELL:-}" \
+	/home/linuxbrew/.linuxbrew/bin/bash \
+	/usr/bin/bash \
+	/bin/bash; do
+{{- end }}
+	if exec_if_usable "${shell}" "$@"; then
+		exit 0
+	fi
 done
 
 exec /bin/sh "$@"

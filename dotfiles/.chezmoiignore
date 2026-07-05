@@ -23,10 +23,8 @@
 .config/ghostty/
 .config/helix/
 .config/kanata/
-.config/nushell/
 .config/raycast/
 .config/yazi/
-.config/zed/
 .config/zellij/
 .ssh/config
 .ssh/github_key
@@ -46,6 +44,9 @@ Library/
 {{ if eq .chezmoi.os "darwin" }}
 .config/Code/
 .config/autostart/
+.config/gtk-3.0/
+.config/gtk-4.0/
 .config/kanata/
+.config/systemd/
 .local/share/applications/
 {{ end }}

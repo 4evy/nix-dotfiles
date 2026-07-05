@@ -1,358 +1,206 @@
-_enable_bash_shopt() {
-  local opt
+# shellcheck shell=bash
+#       ▄▄                            ▄▄
+#       ██                            ██
+#       ██▄███▄    ▄█████▄  ▄▄█████▄  ██▄████▄
+#       ██▀  ▀██   ▀ ▄▄▄██  ██▄▄▄▄ ▀  ██▀   ██
+#       ██    ██  ▄██▀▀▀██   ▀▀▀▀██▄  ██    ██
+#       ███▄▄██▀  ██▄▄▄███  █▄▄▄▄▄██  ██    ██
+#       ▀▀ ▀▀▀     ▀▀▀▀ ▀▀   ▀▀▀▀▀▀   ▀▀    ▀▀
+#       B A S H / signal deck
+#  .bashenv 〰 terminal tune-up 〰 Oh My Bash
+#  starship/fzf/atuin 〰 shared commands 〰 zoxide
+#  ░▒▓ scripts stay quiet; interactive shells get the full rig
 
-  for opt; do
-    shopt -s "$opt" 2>/dev/null || true
-  done
-}
+# ✦ 00 / airlock
+#      .bashenv brings PATH + exports; prompt work waits behind `$-`.
+# shellcheck source=/dev/null
+[[ -r "$HOME/.bashenv" ]] && source "$HOME/.bashenv"
 
-_enable_bash_shopt array_expand_once globskipdots
-
-if [[ "$TERM" == "xterm-ghostty" ]] && ! infocmp xterm-ghostty &>/dev/null; then
-  export TERM=xterm-256color
+# ✦ 01 / terminal tuning fork
+#      Ghostty gets its integration; missing terminfo drops to a common signal.
+if [[ -n "${GHOSTTY_RESOURCES_DIR:-}" ]] &&
+	[[ -r "${GHOSTTY_RESOURCES_DIR}/shell-integration/bash/ghostty.bash" ]]; then
+	builtin source "${GHOSTTY_RESOURCES_DIR}/shell-integration/bash/ghostty.bash"
 fi
 
-_path_prepend_once() {
-  local dir new_path="" filtered_path="" old_ifs path_value="${PATH:-}"
-
-  for dir; do
-    [[ -n "$dir" && ":$new_path:" != *":$dir:"* ]] && new_path="${new_path:+$new_path:}$dir"
-  done
-
-  old_ifs=$IFS
-  IFS=:
-  for dir in $path_value; do
-    [[ -n "$dir" && ":$new_path:$filtered_path:" != *":$dir:"* ]] && filtered_path="${filtered_path:+$filtered_path:}$dir"
-  done
-  IFS=$old_ifs
-
-  PATH="$new_path${new_path:+${filtered_path:+:}}$filtered_path"
-}
-
-_command_wrapper() {
-  local -r command_name=$1
-  local -r command_path=$2
-  local quoted_path
-
-  printf -v quoted_path '%q' "$command_path"
-  eval "$command_name() { command $quoted_path \"\$@\"; }"
-}
-
-# Prefer user-local tools installed by Ansible and language toolchains.
-_path_prepend_once \
-  "$HOME/.pi/agent/bin" \
-  "$HOME/.bun/bin" \
-  "$HOME/.bun/install/global/node_modules/.bin" \
-  "$HOME/.cache/.bun/bin" \
-  "$HOME/.npm/bin" \
-  "$HOME/.local/share/nix-dotfiles/immutable/profile/bin" \
-  "$HOME/.local/bin" \
-  "$HOME/.local/share/nix-dotfiles/immutable/bin" \
-  "$HOME/.cargo/bin" \
-  "$HOME/.go/bin" \
-  "$HOME/.yarn/bin"
-{{- if eq .chezmoi.os "linux" }}
-_path_prepend_once /usr/local/bin /usr/bin /bin /usr/sbin /sbin
-{{- end }}
-if [[ -d /run/wrappers/bin ]]; then
-  _path_prepend_once /run/wrappers/bin
-fi
-export PATH
-
-_immutable_wrapper_marker="# nix-dotfiles: immutable-wrapper"
-_is_immutable_wrapper_path() {
-  [[ -f "$1" ]] && command grep -Fqx "$_immutable_wrapper_marker" "$1" 2>/dev/null
-}
-_is_immutable_wrapper_command() {
-  local command_path
-  command_path="$(command -v "$1" 2>/dev/null)" || return 1
-  _is_immutable_wrapper_path "$command_path"
-}
-
-_nix_dotfiles_flake="${NIX_DOTFILES_FLAKE:-}"
-if [[ -z "$_nix_dotfiles_flake" ]]; then
-  case "$(uname -s 2>/dev/null)" in
-    Darwin)
-      _nix_dotfiles_candidates=("$HOME/Developer/nix-dotfiles" "$HOME/nix-dotfiles" "/etc/nixos")
-      ;;
-    *)
-      _nix_dotfiles_candidates=("$HOME/nix-dotfiles" "/etc/nixos")
-      ;;
-  esac
-  for _nix_dotfiles_dir in "${_nix_dotfiles_candidates[@]}"; do
-    [[ -f "$_nix_dotfiles_dir/flake.nix" ]] || continue
-    _nix_dotfiles_flake="$_nix_dotfiles_dir"
-    break
-  done
-fi
-if [[ -z "$_nix_dotfiles_flake" ]]; then
-  _nix_dotfiles_flake="/etc/nixos"
-fi
-if [[ -d "$_nix_dotfiles_flake" ]]; then
-  _nix_dotfiles_flake="$(
-    cd -P -- "$_nix_dotfiles_flake" 2>/dev/null &&
-      pwd ||
-      printf '%s\n' "$_nix_dotfiles_flake"
-  )"
-fi
-unset _nix_dotfiles_dir _nix_dotfiles_candidates
-
-_immutable_nix_host=0
-if _is_immutable_wrapper_command nix; then
-  _immutable_nix_host=1
-fi
-_portable_nix_host=0
-if ((_immutable_nix_host == 1)) || [[ ! -e /etc/NIXOS ]]; then
-  _portable_nix_host=1
+if [[ "${TERM:-}" == "xterm-ghostty" ]] && ! infocmp xterm-ghostty &>/dev/null; then
+	export TERM=xterm-256color
 fi
 
-_startup_command() {
-  local command_path
-  command_path="$(command -v "$1" 2>/dev/null)" || return 1
-  if [[ "${2:-}" != "allow-wrapper" ]] && _is_immutable_wrapper_path "$command_path"; then
-    command_path="$(PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" command -v "$1" 2>/dev/null)" || return 1
-  fi
-  [[ -n "$command_path" ]] || return 1
-  printf '%s\n' "$command_path"
-}
-
-# Bail out for non-interactive shells (e.g. `ssh host cmd`, scp).
-# Everything below assumes an interactive prompt — running it on every
-# non-interactive ssh invocation is both noisy (starship/atuin warnings)
-# and slow.
 [[ $- != *i* ]] && return
 
-# Oh My Bash configuration. Prompt rendering is handled by starship.
+# ✦ 02 / tiny Bash manners
+#      shopt keeps glob and array expansion behavior predictable.
+shopt -s array_expand_once globskipdots
+
+# ✦ 03 / loader rig
+#      Resolve real binaries once, then wrap them while init scripts load.
+
+_dotfiles_wrap_command() {
+	local -r command_name=$1
+	local -r command_path=$2
+	local quoted_path
+
+	printf -v quoted_path '%q' "$command_path"
+	eval "$command_name() { command $quoted_path \"\$@\"; }"
+}
+
+_dotfiles_command_path() {
+	local command_path
+	command_path="$(type -P -- "$1")" || return 1
+	[[ -n "$command_path" ]] || return 1
+	printf '%s\n' "$command_path"
+}
+
+# ✦ 04 / repo coordinate
+#      DOTFILES_REPO wins; platform defaults are probed and normalized after.
+
+_dotfiles_ansible_playbook() {
+	if command -v ansible-playbook >/dev/null 2>&1; then
+		ansible-playbook "$@"
+	elif command -v uvx >/dev/null 2>&1; then
+		uvx --from ansible-core ansible-playbook "$@"
+	else
+		printf '%s\n' "ansible-playbook and uvx are not available" >&2
+		return 127
+	fi
+}
+
+_dotfiles_repo_path="${DOTFILES_REPO:-}"
+if [[ -z "$_dotfiles_repo_path" ]]; then
+	case "$(uname -s 2>/dev/null)" in
+		Darwin)
+			_dotfiles_repo_candidates=("$HOME/Developer/dotfiles" "$HOME/dotfiles")
+			;;
+		*)
+			_dotfiles_repo_candidates=("$HOME/dotfiles")
+			;;
+	esac
+	for _dotfiles_repo_candidate in "${_dotfiles_repo_candidates[@]}"; do
+		[[ -f "$_dotfiles_repo_candidate/Justfile" ]] || continue
+		[[ -d "$_dotfiles_repo_candidate/ansible" ]] || continue
+		_dotfiles_repo_path="$_dotfiles_repo_candidate"
+		break
+	done
+fi
+if [[ -z "$_dotfiles_repo_path" ]]; then
+	_dotfiles_repo_path="$HOME/dotfiles"
+fi
+if [[ -d "$_dotfiles_repo_path" ]]; then
+	_dotfiles_repo_path="$(
+		cd -P -- "$_dotfiles_repo_path" 2>/dev/null &&
+			pwd ||
+			printf '%s\n' "$_dotfiles_repo_path"
+	)"
+fi
+unset _dotfiles_repo_candidate _dotfiles_repo_candidates
+
+# ✦ 05 / Oh My Bash frame
+#      Framework plugins load here; daily commands wait in the shared bus.
 export OSH="$HOME/.oh-my-bash"
 # shellcheck disable=SC2034
 OSH_THEME=""
 
-# Plugins
+# Plugin list, no mystery guests.
 # shellcheck disable=SC2034
 plugins=(git bashmarks)
 
-# Completions
+# Completion list; gh joins only when present.
 completions=(git ssh system)
-if _startup_command gh >/dev/null; then
-  completions+=(gh)
+if _dotfiles_command_path gh >/dev/null; then
+	completions+=(gh)
 fi
 
-# Aliases (oh-my-bash)
+# Shared commands come later, after framework setup.
 # shellcheck disable=SC2034
 aliases=()
 
 if [[ -r "$OSH/oh-my-bash.sh" ]]; then
-  # shellcheck source=/dev/null
-  source "$OSH/oh-my-bash.sh"
+	# shellcheck source=/dev/null
+	source "$OSH/oh-my-bash.sh"
 fi
 
-# Tool Integrations (cached init files)
-_starship_bin="$(_startup_command starship 2>/dev/null || true)"
+# ✦ 06 / Readline focus sink
+#      Terminal focus events become no-op Readline keys.
+
+_dotfiles_disable_terminal_focus_reporting() {
+	[[ -t 1 ]] || return 0
+	printf '\e[?1004l' >/dev/tty 2>/dev/null || true
+}
+
+bind '"\e[I": ""' 2>/dev/null || true
+bind '"\e[O": ""' 2>/dev/null || true
+
+# ✦ 07 / prompt + picker rail
+#      starship ⇢ fzf ⇢ atuin; cache wins, live init covers first boot.
+_starship_bin="$(_dotfiles_command_path starship 2>/dev/null || true)"
 if [[ -n "$_starship_bin" ]]; then
-  _command_wrapper starship "$_starship_bin"
+	_dotfiles_wrap_command starship "$_starship_bin"
 fi
 if [[ -n "$_starship_bin" && -r "$HOME/.cache/starship/init.bash" ]]; then
-  # shellcheck source=/dev/null
-  source "$HOME/.cache/starship/init.bash"
+	# shellcheck source=/dev/null
+	source "$HOME/.cache/starship/init.bash"
 elif [[ -n "$_starship_bin" ]]; then
-  eval "$("$_starship_bin" init bash)"
+	eval "$("$_starship_bin" init bash)"
 fi
 unset _starship_bin
-if _startup_command tv >/dev/null && [[ -r "$HOME/.cache/television/init.bash" ]]; then
-  # shellcheck source=/dev/null
-  source "$HOME/.cache/television/init.bash"
-fi
-_fzf_bin="$(_startup_command fzf 2>/dev/null || true)"
+_fzf_bin="$(_dotfiles_command_path fzf 2>/dev/null || true)"
 if [[ -n "$_fzf_bin" ]]; then
-  _command_wrapper fzf "$_fzf_bin"
-  eval "$("$_fzf_bin" --bash)"
+	_dotfiles_wrap_command fzf "$_fzf_bin"
+	if [[ -r "$HOME/.cache/fzf/init.bash" ]]; then
+		# shellcheck source=/dev/null
+		source "$HOME/.cache/fzf/init.bash"
+	else
+		eval "$("$_fzf_bin" --bash)"
+	fi
 fi
 unset _fzf_bin
-_atuin_bin="$(_startup_command atuin allow-wrapper 2>/dev/null || true)"
+_atuin_bin="$(_dotfiles_command_path atuin 2>/dev/null || true)"
 if [[ -t 0 && -t 1 && -n "$_atuin_bin" && -r "$HOME/.cache/atuin/init.bash" ]]; then
-  _command_wrapper atuin "$_atuin_bin"
-  # shellcheck source=/dev/null
-  source "$HOME/.cache/atuin/init.bash"
-  __atuin_search_cmd() {
-    local -a search_args=("$@")
-    local result_file status
+	_dotfiles_wrap_command atuin "$_atuin_bin"
+	# shellcheck source=/dev/null
+	source "$HOME/.cache/atuin/init.bash"
+	__atuin_search_cmd() (
+		local -a search_args=("$@")
+		local result_file status
 
-    result_file="$(mktemp)" || return 1
-    ATUIN_SHELL=bash ATUIN_LOG=error ATUIN_QUERY=$READLINE_LINE atuin search "${search_args[@]}" -i --result-file "$result_file" 1>&2
-    status=$?
-    cat "$result_file"
-    rm -f "$result_file"
-    return "$status"
-  }
+		result_file="$(mktemp)" || exit 1
+		trap 'rm -f -- "$result_file"' EXIT
+		ATUIN_SHELL=bash \
+			ATUIN_LOG=error \
+			ATUIN_QUERY=$READLINE_LINE \
+			atuin search "${search_args[@]}" -i --result-file "$result_file" 1>&2
+		status=$?
+		cat -- "$result_file"
+		exit "$status"
+	)
 fi
 unset _atuin_bin
 
-# Completions (cached)
+# ✦ 08 / completion cache
+#      Generated shards stay in ~/.cache/bash/completions.
 for f in "$HOME/.cache/bash/completions"/*; do
-  # shellcheck disable=SC1090
-  [[ -f "$f" ]] && source "$f"
+	# shellcheck source=/dev/null
+	[[ -f "$f" ]] && source "$f"
 done
 
-# Use 1Password locally, but preserve sshd's forwarded agent in SSH sessions.
-{{- if eq .chezmoi.os "darwin" }}
-_1p_ssh_auth_sock="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
-{{- else }}
-_1p_ssh_auth_sock="$HOME/.1password/agent.sock"
-{{- end }}
-if [[ -z "${SSH_CONNECTION:-}" ]]; then
-  export SSH_AUTH_SOCK="$_1p_ssh_auth_sock"
-fi
-unset _1p_ssh_auth_sock
+# ✦ 09 / command bus
+#      Shared aliases enter after prompt and framework wiring.
 
-# Environment
-export EDITOR="hx"
-export VISUAL="hx"
-
-# Aliases
-alias v="hx"
-alias vi="hx"
-alias vim="hx"
-alias h="hx"
-alias l="eza --icons"
-alias ll="eza -la --icons"
-alias la="eza -la --icons"
-alias lt="eza --tree --icons"
-alias cat="bat"
-alias btop="zellij-theme-run btop"
-alias htop="zellij-theme-run btop"
-alias neofetch="pfetch"
-alias top="zellij-theme-run btop"
-
-# yt-dlp shortcuts
-_yt_dlp_script() {
-  env -u PROMPT_MULTILINE_INDICATOR yt-dlp-script "$@"
-}
-alias m4a="_yt_dlp_script m4a"
-alias m4a-cut="_yt_dlp_script m4a-cut"
-alias mp3="_yt_dlp_script mp3"
-alias mp3-cut="_yt_dlp_script mp3-cut"
-alias mp4="_yt_dlp_script mp4"
-alias mp4-cut="_yt_dlp_script mp4-cut"
-
-# Agents Aliases
-alias cc="claude --allow-dangerously-skip-permissions"
-alias oo="opencode"
-free() {
-  local runner
-  runner="$(command -v system-runner)"
-  if [[ -z "$runner" ]]; then
-    printf '%s\n' "free: system-runner is not installed yet; install system-run-mcp first" >&2
-    return 127
-  fi
-  sudo -n "$runner" "$@"
-}
-f() {
-  free "$@"
-}
-cx() {
-  zellij-theme-run codex "$@"
-}
-cxg() {
-  zellij-theme-run codex -c mcp_servers.ghidra.enabled=true -c mcp_servers.lldb.enabled=true "$@"
-}
-
-# Nix
-{{- if eq .chezmoi.os "darwin" }}
-update() {
-  nix flake update --flake "$_nix_dotfiles_flake" "$@"
-}
-rebuild() {
-  nh darwin switch "$_nix_dotfiles_flake" "$@"
-}
-check() {
-  free darwin-rebuild check --flake "$_nix_dotfiles_flake" "$@"
-}
-micfix() {
-  free killall coreaudiod "$@"
-}
-{{- else }}
-update() {
-  if ((_portable_nix_host == 1)); then
-    nix run "$_nix_dotfiles_flake#immutable-activate" -- --flake "$_nix_dotfiles_flake" --update --host-update "$@"
-    return
-  fi
-  nix flake update --flake "$_nix_dotfiles_flake" "$@"
-}
-rebuild() {
-  if ((_portable_nix_host == 1)); then
-    nix run "$_nix_dotfiles_flake#immutable-activate" -- --flake "$_nix_dotfiles_flake" "$@"
-    return
-  fi
-  free nh os switch "$_nix_dotfiles_flake" "$@"
-}
-check() {
-  nix flake check "$_nix_dotfiles_flake" "$@"
-  if ((_portable_nix_host == 1)); then
-    nix build "$_nix_dotfiles_flake#immutable-profile"
-  fi
-}
-micfix() {
-  systemctl --user restart pipewire pipewire-pulse wireplumber "$@"
-}
-{{- end }}
-alias cza="chezmoi apply --force"
-
-# yazi with cwd sync
-function yy() {
-  local tmp cwd
-
-  tmp="$(mktemp -t "yazi-cwd.XXXXX")"
-  yazi "$@" --cwd-file="$tmp"
-  if cwd="$(command cat -- "$tmp")" && [[ -n "$cwd" && "$cwd" != "$PWD" ]]; then
-    builtin cd -- "$cwd" || return
-  fi
-  rm -f -- "$tmp"
-}
-
-# shadow system python
-export UV_PYTHON_PREFERENCE="only-managed"
-
-function python() { uv run python "$@"; }
-function python3() { uv run python3 "$@"; }
-function pip() {
-  [[ -z "$VIRTUAL_ENV" && ! -d ".venv" ]] && uv venv -q
-  uv pip "$@"
-}
-function pip3() {
-  [[ -z "$VIRTUAL_ENV" && ! -d ".venv" ]] && uv venv -q
-  uv pip "$@"
-}
-
-if type complete >/dev/null 2>&1; then
-  if declare -F _fzf_path_completion >/dev/null 2>&1; then
-    complete -o bashdefault -o default -F _fzf_path_completion python python3 pip pip3
-  else
-    complete -o bashdefault -o default -f python python3 pip pip3
-  fi
+if [[ -r "$HOME/.config/shell/interactive.bash" ]]; then
+	# shellcheck source=/dev/null
+	source "$HOME/.config/shell/interactive.bash"
 fi
 
-# fzf Configuration
-export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
-export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-export FZF_ALT_C_COMMAND="fd --type d --hidden --follow --exclude .git"
-export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border
-  --color=bg+:#414559,bg:#303446,spinner:#f4b8e4,hl:#e78284
-  --color=fg:#c6d0f5,header:#e78284,info:#f4b8e4,pointer:#f4b8e4
-  --color=marker:#babbf1,fg+:#c6d0f5,prompt:#f4b8e4,hl+:#e78284
-  --color=selected-bg:#51576d,border:#737994,label:#c6d0f5"
+# ✦ 10 / zoxide last word
+#      zoxide loads late so its cd wrapper wins.
 
-# Zoxide (must be at the end of .bashrc)
-_zoxide_bin="$(_startup_command zoxide 2>/dev/null || true)"
-if [[ -n "$_zoxide_bin" ]]; then
-  if [[ -r "$HOME/.cache/zoxide/init.bash" ]]; then
-    # shellcheck source=/dev/null
-    source "$HOME/.cache/zoxide/init.bash"
-  else
-    eval "$("$_zoxide_bin" init bash)"
-  fi
-  alias cd="z"
+if [[ -r "$HOME/.config/shell/zoxide.bash" ]]; then
+	# shellcheck source=/dev/null
+	source "$HOME/.config/shell/zoxide.bash"
 fi
-unset _zoxide_bin
 
-unset -f _enable_bash_shopt _path_prepend_once _command_wrapper _is_immutable_wrapper_path _is_immutable_wrapper_command _startup_command
-unset _immutable_wrapper_marker _immutable_nix_host _portable_nix_host
+# ✦ 11 / clean exit
+#      Startup helpers leave before the prompt appears.
+
+unset -f _dotfiles_wrap_command _dotfiles_command_path

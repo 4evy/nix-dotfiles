@@ -1,5 +1,4 @@
-# Keep login bash aligned with the non-interactive environment.
-# shellcheck disable=SC1091
-[[ -r "$HOME/.bashenv" ]] && source "$HOME/.bashenv"
-# shellcheck disable=SC1091
+# Login bash reads this instead of ~/.bashrc; delegate so env setup stays in
+# one place.
+# shellcheck source=/dev/null
 [[ -r "$HOME/.bashrc" ]] && source "$HOME/.bashrc"

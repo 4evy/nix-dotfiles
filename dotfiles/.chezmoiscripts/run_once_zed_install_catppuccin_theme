@@ -1,2 +1,0 @@
-#!/usr/bin/env sh
-exec chezmoi-support zed-install-catppuccin-theme "$@"

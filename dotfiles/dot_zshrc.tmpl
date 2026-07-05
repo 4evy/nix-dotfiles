@@ -1,107 +1,116 @@
-# Fall back to a common terminfo entry on remote hosts without Ghostty support.
-if [[ "$TERM" == "xterm-ghostty" ]] && ! infocmp xterm-ghostty &>/dev/null; then
+# ░▀▀█░█▀▀░█░█░░░█▀▀░█▀█░█▀█░█▀▀░█▀█░█░░░█▀▀
+# ░▄▀░░▀▀█░█▀█░░░█░░░█░█░█░█░▀▀█░█░█░█░░░█▀▀
+# ░▀▀▀░▀▀▀░▀░▀░░░▀▀▀░▀▀▀░▀░▀░▀▀▀░▀▀▀░▀▀▀░▀▀▀
+# zsh / console deck
+#   ⣀⣀ ⢀⣀ ⣇⡀   ⢀⣀ ⢀⡀ ⣀⡀ ⢀⣀ ⢀⡀ ⡀   ⢀⡀
+#   ⠴⠥ ⠭⠕ ⠇⠸   ⠣⠤ ⠣⠜ ⠇⠸ ⠭⠕ ⠣⠜ ⠧⠤ ⠣⠭
+#
+#      ╭──── A / TERM + Ghostty ──────╮
+#      │ Ghostty  TERM  Zellij truce   │
+#      ╰───────────────┬──────────────╯
+#                      ▼
+#      ╭──── B / plugin + prompt rail ────────────────────────╮
+#      │ OMZ → syntax inks → fzf-tab → fzf → Starship → Atuin │
+#      ╰───────────────┬──────────────────────────────────────╯
+#                      ▼
+#      ╭──── C / typed surface ─────────────────────────────╮
+#      │ interactive.zsh → zoxide owns cd → fzf-tab enable  │
+#      ╰────────────────────────────────────────────────────╯
+#
+# cache if warm :: live if fresh :: quiet title/cwd reporting inside Zellij
+
+#  /"\/\_..--------------------._/\/"\
+# (     _|| A1 TERM + GHOSTTY  ||_     )
+#  \_/\/ || Ghostty + fallback || \/\_/
+#        || Zellij gets peace  ||
+#  /"\/\_|---------------------|_/\/"\
+# (     _|                     |_     )
+#  \_/\/ `---------------------' \/\_/
+if [[ "${TERM:-}" == "xterm-ghostty" ]] && ! infocmp xterm-ghostty &>/dev/null; then
   export TERM=xterm-256color
 fi
 
-# Prefer user-local tools installed by Ansible and language toolchains.
-typeset -U path PATH
-path=(
-  {{- if eq .chezmoi.os "linux" }}
-  "/usr/local/bin"
-  "/usr/bin"
-  "/bin"
-  "/usr/sbin"
-  "/sbin"
-  {{- end }}
-  "$HOME/.pi/agent/bin"
-  "$HOME/.bun/bin"
-  "$HOME/.bun/install/global/node_modules/.bin"
-  "$HOME/.cache/.bun/bin"
-  "$HOME/.npm/bin"
-  "$HOME/.local/share/nix-dotfiles/immutable/profile/bin"
-  "$HOME/.local/share/nix-dotfiles/immutable/bin"
-  "$HOME/.local/bin"
-  "$HOME/.cargo/bin"
-  "$HOME/.go/bin"
-  "$HOME/.yarn/bin"
-  "${path[@]}"
-)
-if [[ -d /run/wrappers/bin ]]; then
-  path=(/run/wrappers/bin "${path[@]}")
+if [[ -z "${ZELLIJ:-}" ]] \
+  && [[ -n "${GHOSTTY_RESOURCES_DIR:-}" ]] \
+  && [[ -r "${GHOSTTY_RESOURCES_DIR}/shell-integration/zsh/ghostty-integration" ]]; then
+  source "${GHOSTTY_RESOURCES_DIR}/shell-integration/zsh/ghostty-integration"
 fi
-export PATH
 
-_command_wrapper() {
+# A2 ∿ boot tools
+#   ⟦ command path ⟧──wrap while init runs──⟦ unset before prompt ⟧
+
+_dotfiles_wrap_command() {
   emulate -L zsh
   local -r command_name=$1
   local -r command_path=$2
-  local quoted_path
-
-  printf -v quoted_path '%q' "$command_path"
-  eval "$command_name() { command $quoted_path \"\$@\"; }"
+  eval "$command_name() { command ${(q)command_path} \"\$@\"; }"
 }
 
-_immutable_wrapper_marker="# nix-dotfiles: immutable-wrapper"
-_is_immutable_wrapper_path() {
-  emulate -L zsh
-  [[ -f "$1" ]] && command grep -Fqx "$_immutable_wrapper_marker" "$1" 2>/dev/null
-}
-_is_immutable_wrapper_command() {
-  emulate -L zsh
-  local command_path
-  command_path="$(command -v "$1" 2>/dev/null)" || return 1
-  _is_immutable_wrapper_path "$command_path"
-}
+# A3 ∿ repo compass
+#        DOTFILES_REPO
+#            ├─ Darwin → ~/Developer/dotfiles → ~/dotfiles
+#            └─ else   → ~/dotfiles
+#   update/check/rebuild come back here before doing heavier work
 
-_nix_dotfiles_flake="${NIX_DOTFILES_FLAKE:-}"
-if [[ -z "$_nix_dotfiles_flake" ]]; then
+_dotfiles_repo_path="${DOTFILES_REPO:-}"
+if [[ -z "$_dotfiles_repo_path" ]]; then
   case "$(uname -s 2>/dev/null)" in
     Darwin)
-      _nix_dotfiles_candidates=("$HOME/Developer/nix-dotfiles" "$HOME/nix-dotfiles" "/etc/nixos")
+      _dotfiles_repo_candidates=("$HOME/Developer/dotfiles" "$HOME/dotfiles")
       ;;
     *)
-      _nix_dotfiles_candidates=("$HOME/nix-dotfiles" "/etc/nixos")
+      _dotfiles_repo_candidates=("$HOME/dotfiles")
       ;;
   esac
-  for _nix_dotfiles_dir in "${_nix_dotfiles_candidates[@]}"; do
-    [[ -f "$_nix_dotfiles_dir/flake.nix" ]] || continue
-    _nix_dotfiles_flake="$_nix_dotfiles_dir"
+  for _dotfiles_repo_candidate in "${_dotfiles_repo_candidates[@]}"; do
+    [[ -f "$_dotfiles_repo_candidate/Justfile" ]] || continue
+    [[ -d "$_dotfiles_repo_candidate/ansible" ]] || continue
+    _dotfiles_repo_path="$_dotfiles_repo_candidate"
     break
   done
 fi
-if [[ -z "$_nix_dotfiles_flake" ]]; then
-  _nix_dotfiles_flake="/etc/nixos"
+if [[ -z "$_dotfiles_repo_path" ]]; then
+  _dotfiles_repo_path="$HOME/dotfiles"
 fi
-if [[ -d "$_nix_dotfiles_flake" ]]; then
-  _nix_dotfiles_flake="$(
-    cd -P -- "$_nix_dotfiles_flake" 2>/dev/null &&
+if [[ -d "$_dotfiles_repo_path" ]]; then
+  _dotfiles_repo_path="$(
+    cd -P -- "$_dotfiles_repo_path" 2>/dev/null &&
       pwd ||
-      printf '%s\n' "$_nix_dotfiles_flake"
+      printf '%s\n' "$_dotfiles_repo_path"
   )"
 fi
-unset _nix_dotfiles_dir _nix_dotfiles_candidates
+unset _dotfiles_repo_candidate _dotfiles_repo_candidates
 
-_immutable_nix_host=0
-if _is_immutable_wrapper_command nix; then
-  _immutable_nix_host=1
-fi
-_portable_nix_host=0
-if [[ "$_immutable_nix_host" -eq 1 || ! -e /etc/NIXOS ]]; then
-  _portable_nix_host=1
-fi
-
-_startup_command() {
+_dotfiles_command_path() {
   emulate -L zsh
-  local command_path
-  command_path="$(command -v "$1" 2>/dev/null)" || return 1
-  if [[ "${2:-}" != "allow-wrapper" ]] && _is_immutable_wrapper_path "$command_path"; then
-    command_path="$(PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" command -v "$1" 2>/dev/null)" || return 1
-  fi
-  [[ -n "$command_path" ]] || return 1
-  printf '%s\n' "$command_path"
+  (( $+commands[$1] )) || return 1
+  print -r -- "$commands[$1]"
 }
 
-# Load Oh My Zsh without its prompt or self-update behavior.
+# A4 ∿ provision shim
+#   ansible-playbook when it exists; uvx when the machine is still bare
+
+_dotfiles_ansible_playbook() {
+  emulate -L zsh
+  if command -v ansible-playbook >/dev/null 2>&1; then
+    ansible-playbook "$@"
+  elif command -v uvx >/dev/null 2>&1; then
+    uvx --from ansible-core ansible-playbook "$@"
+  else
+    print -u2 "ansible-playbook and uvx are not available"
+    return 127
+  fi
+}
+
+#      __^__                         __^__
+#     ( ___ )──── B1 PLUGIN RACK ───( ___ )
+#      | / |                         | \ |
+#      | / | OMZ wakes plugins       | \ |
+#      | / | fzf-tab keeps Tab       | \ |
+#      | / | syntax inks load early  | \ |
+#      |___|                         |___|
+#     (_____)───────────────────────(_____)
+# Starship owns the prompt; Atuin waits for a real TTY.
 export ZSH="$HOME/.oh-my-zsh"
 # shellcheck disable=SC2034
 ZSH_THEME=""
@@ -110,7 +119,7 @@ DISABLE_AUTO_UPDATE="true"
 # shellcheck disable=SC2034
 DISABLE_UNTRACKED_FILES_DIRTY="true"
 
-# Enable the Oh My Zsh plugins used in interactive sessions.
+# Plugin list, curated and explicit. No surprise guests.
 plugins=(
   git
   rust
@@ -126,27 +135,72 @@ plugins=(
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
-if _startup_command gh >/dev/null; then
+if _dotfiles_command_path gh >/dev/null; then
   plugins+=(gh)
 fi
 
-# Add cached completion definitions before Oh My Zsh runs compinit.
+# Cached definitions walk in before compinit.
 fpath=("$HOME/.cache/zsh/completions" "${fpath[@]}")
+
+# Syntax palette loads before Oh My Zsh wakes the plugin.
+
+if [[ -r "$HOME/.config/shell/zsh-syntax-highlighting.zsh" ]]; then
+  # shellcheck source=/dev/null
+  source "$HOME/.config/shell/zsh-syntax-highlighting.zsh"
+fi
 
 if [[ -r "$ZSH/oh-my-zsh.sh" ]]; then
   # shellcheck source=/dev/null
   source "$ZSH/oh-my-zsh.sh"
 fi
 
-# Load fzf's native key bindings without letting its completion widget take Tab
-# away from fzf-tab.
+# Zellij already manages terminal state; trim duplicate title/cwd reporters.
+if [[ -n "${ZELLIJ:-}" ]]; then
+  precmd_functions=(${precmd_functions:#_ghostty_deferred_init})
+  precmd_functions=(${precmd_functions:#_ghostty_precmd})
+  precmd_functions=(${precmd_functions:#omz_termsupport_precmd})
+  precmd_functions=(${precmd_functions:#omz_termsupport_cwd})
+  preexec_functions=(${preexec_functions:#_ghostty_preexec})
+  preexec_functions=(${preexec_functions:#omz_termsupport_preexec})
+  chpwd_functions=(${chpwd_functions:#_ghostty_report_pwd})
+fi
+
+# B2 ∿ ZLE focus sink
+#   focus bytes  ESC [ I / ESC [ O  ──▶ silent widget ──▶ no prompt junk
+
+_dotfiles_disable_terminal_focus_reporting() {
+  emulate -L zsh
+  [[ -t 1 ]] || return 0
+  print -rn -- $'\e[?1004l' >/dev/tty 2>/dev/null || true
+}
+
+_dotfiles_ignore_terminal_focus_event() {}
+zle -N _dotfiles_ignore_terminal_focus_event
+bindkey $'\e[I' _dotfiles_ignore_terminal_focus_event
+bindkey $'\e[O' _dotfiles_ignore_terminal_focus_event
+
+# B3 ∿ picker / prompt / history lane
+#      fzf keymap ─┬─ keeps Tab free for fzf-tab
+#      zstyle hints│
+#      Starship ───┼─ prompt chrome
+#      Atuin ──────┘  history search, only on real terminals
+#      cache lane: ~/.cache/*/init.zsh  |  fallback: direct init
+
+# Load fzf's key bindings without letting its completion widget steal Tab from
+# fzf-tab.
 _fzf_init() {
   emulate -L zsh
   local fzf_bin
-  fzf_bin="$(_startup_command fzf)" || return
-  _command_wrapper fzf "$fzf_bin"
+  fzf_bin="$(_dotfiles_command_path fzf)" || return
+  _dotfiles_wrap_command fzf "$fzf_bin"
 
   local init
+  if [[ -r "$HOME/.cache/fzf/init.zsh" ]]; then
+    # shellcheck source=/dev/null
+    source "$HOME/.cache/fzf/init.zsh"
+    return
+  fi
+
   init="$(
     "$fzf_bin" --zsh | sed \
       -e '/^### completion\.zsh ###$/,$d' \
@@ -165,14 +219,12 @@ zstyle ':completion:*:*:*:*:*' menu no
 zstyle ':completion:*:descriptions' format '[%d]'
 zstyle ':completion:*' group-name ''
 zstyle ':fzf-tab:*' switch-group '<' '>'
-if (( $+functions[enable-fzf-tab] )); then
-  enable-fzf-tab
-fi
 
-# Source pre-generated startup hooks to keep shell startup fast.
-_starship_bin="$(_startup_command starship 2>/dev/null || true)"
+# Cached init files are generated by chezmoi; direct command init is the
+# fresh-machine fallback.
+_starship_bin="$(_dotfiles_command_path starship 2>/dev/null || true)"
 if [[ -n "$_starship_bin" ]]; then
-  _command_wrapper starship "$_starship_bin"
+  _dotfiles_wrap_command starship "$_starship_bin"
 fi
 if [[ -n "$_starship_bin" && -r "$HOME/.cache/starship/init.zsh" ]]; then
   # shellcheck source=/dev/null
@@ -181,13 +233,9 @@ elif [[ -n "$_starship_bin" ]]; then
   eval "$("$_starship_bin" init zsh)"
 fi
 unset _starship_bin
-if _startup_command tv >/dev/null && [[ -r "$HOME/.cache/television/init.zsh" ]]; then
-  # shellcheck source=/dev/null
-  source "$HOME/.cache/television/init.zsh"
-fi
-_atuin_bin="$(_startup_command atuin allow-wrapper 2>/dev/null || true)"
+_atuin_bin="$(_dotfiles_command_path atuin 2>/dev/null || true)"
 if [[ -t 0 && -t 1 && -n "$_atuin_bin" && -r "$HOME/.cache/atuin/init.zsh" ]]; then
-  _command_wrapper atuin "$_atuin_bin"
+  _dotfiles_wrap_command atuin "$_atuin_bin"
   # shellcheck source=/dev/null
   source "$HOME/.cache/atuin/init.zsh"
   _atuin_search() {
@@ -197,10 +245,17 @@ if [[ -t 0 && -t 1 && -n "$_atuin_bin" && -r "$HOME/.cache/atuin/init.zsh" ]]; t
     local output result_file __atuin_status
     result_file="$(mktemp)" || return 1
     # shellcheck disable=SC2153
-    ATUIN_SHELL=zsh ATUIN_LOG=error ATUIN_QUERY=$BUFFER atuin search "$@" -i --result-file "$result_file" </dev/tty >/dev/tty 2>/dev/tty
-    __atuin_status=$?
-    output="$(<"$result_file")"
-    rm -f "$result_file"
+    {
+      ATUIN_SHELL=zsh \
+        ATUIN_LOG=error \
+        ATUIN_QUERY=$BUFFER \
+        atuin search "$@" -i --result-file "$result_file" \
+        </dev/tty >/dev/tty 2>/dev/tty
+      __atuin_status=$?
+      output="$(<"$result_file")"
+    } always {
+      rm -f -- "$result_file"
+    }
 
     zle reset-prompt
     if [[ -n "${zle_bracketed_paste[1]-}" ]]; then
@@ -229,162 +284,30 @@ if [[ -t 0 && -t 1 && -n "$_atuin_bin" && -r "$HOME/.cache/atuin/init.zsh" ]]; t
 fi
 unset _atuin_bin
 
-# Use 1Password locally, but preserve sshd's forwarded agent in SSH sessions.
-{{- if eq .chezmoi.os "darwin" }}
-_1p_ssh_auth_sock="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
-{{- else }}
-_1p_ssh_auth_sock="$HOME/.1password/agent.sock"
-{{- end }}
-if [[ -z "${SSH_CONNECTION:-}" ]]; then
-  export SSH_AUTH_SOCK="$_1p_ssh_auth_sock"
-fi
-unset _1p_ssh_auth_sock
+# C1 ∿ command bus
+#   ~/.config/shell/interactive.zsh
+#      ├─ shared aliases + workflows
+#      └─ zsh compdefs after aliases exist
 
-# Prefer Helix for command-line editing.
-export EDITOR="hx"
-export VISUAL="hx"
-
-# Shortcuts for common tools and preferred replacements.
-alias v="hx"
-alias vi="hx"
-alias vim="hx"
-alias h="hx"
-alias l="eza --icons"
-alias ll="eza -la --icons"
-alias la="eza -la --icons"
-alias lt="eza --tree --icons"
-alias btop="zellij-theme-run btop"
-alias htop="zellij-theme-run btop"
-alias neofetch="pfetch"
-alias top="zellij-theme-run btop"
-
-# yt-dlp shortcuts
-_yt_dlp_script() {
-  env -u PROMPT_MULTILINE_INDICATOR yt-dlp-script "$@"
-}
-alias m4a="_yt_dlp_script m4a"
-alias m4a-cut="_yt_dlp_script m4a-cut"
-alias mp3="_yt_dlp_script mp3"
-alias mp3-cut="_yt_dlp_script mp3-cut"
-alias mp4="_yt_dlp_script mp4"
-alias mp4-cut="_yt_dlp_script mp4-cut"
-
-# Agents Aliases
-alias cc="claude --allow-dangerously-skip-permissions"
-alias oo="opencode"
-free() {
-  local runner
-  runner="$(command -v system-runner)"
-  if [[ -z "$runner" ]]; then
-    print -u2 "free: system-runner is not installed yet; install system-run-mcp first"
-    return 127
-  fi
-  sudo -n "$runner" "$@"
-}
-f() {
-  free "$@"
-}
-cx() {
-  zellij-theme-run codex "$@"
-}
-cxg() {
-  zellij-theme-run codex -c mcp_servers.ghidra.enabled=true -c mcp_servers.lldb.enabled=true "$@"
-}
-
-# Nix
-{{- if eq .chezmoi.os "darwin" }}
-update() {
-  nix flake update --flake "$_nix_dotfiles_flake" "$@"
-}
-rebuild() {
-  nh darwin switch "$_nix_dotfiles_flake" "$@"
-}
-check() {
-  free darwin-rebuild check --flake "$_nix_dotfiles_flake" "$@"
-}
-micfix() {
-  free killall coreaudiod "$@"
-}
-{{- else }}
-update() {
-  if [[ "$_portable_nix_host" -eq 1 ]]; then
-    nix run "$_nix_dotfiles_flake#immutable-activate" -- --flake "$_nix_dotfiles_flake" --update --host-update "$@"
-    return
-  fi
-  nix flake update --flake "$_nix_dotfiles_flake" "$@"
-}
-rebuild() {
-  if [[ "$_portable_nix_host" -eq 1 ]]; then
-    nix run "$_nix_dotfiles_flake#immutable-activate" -- --flake "$_nix_dotfiles_flake" "$@"
-    return
-  fi
-  free nh os switch "$_nix_dotfiles_flake" "$@"
-}
-check() {
-  nix flake check "$_nix_dotfiles_flake" "$@"
-  if [[ "$_portable_nix_host" -eq 1 ]]; then
-    nix build "$_nix_dotfiles_flake#immutable-profile"
-  fi
-}
-micfix() {
-  systemctl --user restart pipewire pipewire-pulse wireplumber "$@"
-}
-{{- end }}
-alias cza="chezmoi apply --force"
-
-# yazi with cwd sync
-function yy() {
-  local tmp
-
-  tmp="$(mktemp -t "yazi-cwd.XXXXX")"
-  yazi "$@" --cwd-file="$tmp"
-  if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
-    builtin cd -- "$cwd" || return
-  fi
-  rm -f -- "$tmp"
-}
-
-# Configure fzf to search hidden files while ignoring Git internals.
-export FZF_DEFAULT_COMMAND="fd --type f --hidden --follow --exclude .git"
-export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-export FZF_ALT_C_COMMAND="fd --type d --hidden --follow --exclude .git"
-export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border
-  --color=bg+:#414559,bg:#303446,spinner:#f4b8e4,hl:#e78284
-  --color=fg:#c6d0f5,header:#e78284,info:#f4b8e4,pointer:#f4b8e4
-  --color=marker:#babbf1,fg+:#c6d0f5,prompt:#f4b8e4,hl+:#e78284
-  --color=selected-bg:#51576d,border:#737994,label:#c6d0f5"
-
-# Shadow system python
-export UV_PYTHON_PREFERENCE="only-managed"
-
-function python() { uv run python "$@"; }
-function python3() { uv run python3 "$@"; }
-function pip() {
-  [[ -z "$VIRTUAL_ENV" && ! -d ".venv" ]] && uv venv -q
-  uv pip "$@"
-}
-function pip3() {
-  [[ -z "$VIRTUAL_ENV" && ! -d ".venv" ]] && uv venv -q
-  uv pip "$@"
-}
-
-if type compdef >/dev/null 2>&1; then
-  compdef _python python python3
-  compdef _pip pip pip3
+if [[ -r "$HOME/.config/shell/interactive.zsh" ]]; then
+  # shellcheck source=/dev/null
+  source "$HOME/.config/shell/interactive.zsh"
 fi
 
-# Load zoxide last so its directory-jump hook wins.
-_zoxide_bin="$(_startup_command zoxide 2>/dev/null || true)"
-if [[ -n "$_zoxide_bin" ]]; then
-  if [[ -r "$HOME/.cache/zoxide/init.zsh" ]]; then
-    # shellcheck source=/dev/null
-    source "$HOME/.cache/zoxide/init.zsh"
-  else
-    eval "$("$_zoxide_bin" init zsh)"
-  fi
-  alias cd="z"
-fi
-unset _zoxide_bin
+# C2 ∿ zoxide last word
+#   framework first, zoxide after; `cd` gets the final say here
+#      cwd stream ───────────────▶ zoxide db ───────────────▶ z / zi
 
-unset -f _command_wrapper _is_immutable_wrapper_path _is_immutable_wrapper_command _startup_command
-unset _immutable_wrapper_marker _immutable_nix_host _portable_nix_host
+if [[ -r "$HOME/.config/shell/zoxide.zsh" ]]; then
+  # shellcheck source=/dev/null
+  source "$HOME/.config/shell/zoxide.zsh"
+fi
+
+if (( $+functions[enable-fzf-tab] )); then
+  enable-fzf-tab
+fi
+
+# C3 ∿ clean exit
+#   startup-only helpers leave before the prompt opens
+
+unset -f _dotfiles_wrap_command _dotfiles_command_path

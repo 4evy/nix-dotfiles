@@ -11,8 +11,19 @@ hyperlinks = "auto"
 
 [statusline]
 lines = [
-  ["dir", "context", "quota", "pace", "vcs"],
-  ["model", "changes", "elapsed", "cache"],
+  [
+    "dir",
+    "context",
+    "quota",
+    "pace",
+    "vcs",
+  ],
+  [
+    "model",
+    "changes",
+    "elapsed",
+    "cache",
+  ],
 ]
 
 [segments.cache]

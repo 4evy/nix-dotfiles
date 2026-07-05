@@ -1,0 +1,322 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+## usage: jj get PR_NUMBER [GITHUB_REPO]
+##        jj get GITHUB_PR_URL
+##        jj get BOOKMARK [REMOTE] [BASE]
+##        jj get BOOKMARK@REMOTE [BASE]
+##        JJ_GET_REPO=OWNER/REPO jj get PR_NUMBER
+##        JJ_GET_BASE=BASE jj get BOOKMARK [REMOTE]
+set -euo pipefail
+
+usage() {
+	sed -n 's/^##[[:space:]]\{0,1\}//p' "${BASH_SOURCE[0]}"
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+	usage
+	exit 0
+fi
+
+if (($# < 1 || $# > 3)); then
+	usage >&2
+	exit 2
+fi
+
+target=$1
+
+if [[ "$target" == -* || "${2:-}" == -* || "${3:-}" == -* ]]; then
+	usage >&2
+	exit 2
+fi
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+	printf '%s\n' "jj-get: this command requires a colocated Git repository" >&2
+	exit 1
+fi
+
+jj_args=()
+if [[ -n "${JJ_WORKSPACE_ROOT:-}" ]]; then
+	jj_args=(-R "$JJ_WORKSPACE_ROOT")
+fi
+
+is_shallow() {
+	[[ "$(git rev-parse --is-shallow-repository 2>/dev/null)" == true ]]
+}
+
+infer_branch_base() {
+	local remote=$1
+	local symbolic_ref
+	local remote_head
+
+	if symbolic_ref="$(git symbolic-ref --quiet --short "refs/remotes/${remote}/HEAD" 2>/dev/null)"; then
+		printf '%s\n' "${symbolic_ref#"${remote}"/}"
+		return
+	fi
+
+	remote_head="$(
+		git ls-remote --symref "$remote" HEAD 2>/dev/null |
+			awk '$1 == "ref:" { sub("^refs/heads/", "", $2); print $2; exit }'
+	)"
+	if [[ -n "$remote_head" ]]; then
+		printf '%s\n' "$remote_head"
+		return
+	fi
+
+	return 1
+}
+
+github_repo_from_url() {
+	local value=$1
+	case "$value" in
+		git@github.com:*.git)
+			value="${value#git@github.com:}"
+			value="${value%.git}"
+			;;
+		https://github.com/*.git)
+			value="${value#https://github.com/}"
+			value="${value%.git}"
+			;;
+		https://github.com/*)
+			value="${value#https://github.com/}"
+			value="${value%%/pull/*}"
+			;;
+		ssh://git@github.com/*.git)
+			value="${value#ssh://git@github.com/}"
+			value="${value%.git}"
+			;;
+	esac
+
+	if [[ "$value" == */* ]]; then
+		printf '%s\n' "$value"
+		return
+	fi
+
+	return 1
+}
+
+normalize_github_repo_arg() {
+	local repo=$1
+	local remote_url
+
+	if git remote get-url "$repo" >/dev/null 2>&1; then
+		remote_url="$(git remote get-url "$repo")"
+		github_repo_from_url "$remote_url"
+		return
+	fi
+
+	github_repo_from_url "$repo"
+}
+
+canonical_git_url() {
+	local value=$1
+	case "$value" in
+		git@github.com:*)
+			value="${value#git@github.com:}"
+			;;
+		ssh://git@github.com/*)
+			value="${value#ssh://git@github.com/}"
+			;;
+		https://github.com/*)
+			value="${value#https://github.com/}"
+			;;
+	esac
+	value="${value%.git}"
+	printf '%s\n' "$value"
+}
+
+remote_for_url() {
+	local target
+	local remote
+	local remote_url
+
+	target="$(canonical_git_url "$1")"
+	while IFS= read -r remote; do
+		if ! remote_url="$(git remote get-url "$remote" 2>/dev/null)"; then
+			continue
+		fi
+		if [[ "$(canonical_git_url "$remote_url")" == "$target" ]]; then
+			printf '%s\n' "$remote"
+			return
+		fi
+	done < <(git remote)
+
+	return 1
+}
+
+infer_pr_repo() {
+	if ! command -v gh >/dev/null 2>&1; then
+		printf '%s\n' "jj-get: gh is required for PR numbers; pass a branch name instead" >&2
+		return 1
+	fi
+
+	gh repo view --json nameWithOwner,parent \
+		--jq 'if .parent != null then "\(.parent.owner.login)/\(.parent.name)" else .nameWithOwner end'
+}
+
+resolve_pr() {
+	local pr=$1
+	local repo=${2:-${JJ_GET_REPO:-}}
+	local pr_fields=()
+	local base
+	local bookmark
+	local head_ref
+	local head_repo
+	local repo_info
+	local remote_name_for_url
+	local ssh_url
+	local remote_name="${JJ_GET_PR_REMOTE:-github-pr}"
+	local refspec
+	local fetch_args=()
+
+	if ! command -v gh >/dev/null 2>&1; then
+		printf '%s\n' "jj-get: gh is required for PR numbers" >&2
+		exit 127
+	fi
+
+	if [[ -z "$repo" ]]; then
+		if ! repo="$(infer_pr_repo)"; then
+			exit 2
+		fi
+	elif ! repo="$(normalize_github_repo_arg "$repo")"; then
+		printf 'jj-get: expected GitHub repo OWNER/REPO, GitHub URL, or remote name; got: %s\n' "${2:-}" >&2
+		exit 2
+	fi
+
+	mapfile -t pr_fields < <(
+		gh pr view "$pr" -R "$repo" --json baseRefName,headRefName,headRepository \
+			--jq '.baseRefName, .headRefName, (.headRepository.nameWithOwner // "")'
+	)
+	base=${pr_fields[0]:-}
+	head_ref=${pr_fields[1]:-}
+	head_repo=${pr_fields[2]:-}
+	if [[ -z "$base" ]]; then
+		printf 'jj-get: could not resolve base branch for PR %s in %s\n' "$pr" "$repo" >&2
+		exit 2
+	fi
+	if [[ -z "$head_ref" ]]; then
+		printf 'jj-get: could not resolve head branch for PR %s in %s\n' "$pr" "$repo" >&2
+		exit 2
+	fi
+
+	if is_shallow; then
+		fetch_args+=(--shallow-exclude="refs/heads/${base}")
+	fi
+
+	if [[ -n "$head_repo" ]]; then
+		repo_info="$(
+			gh repo view "$head_repo" --json sshUrl,url \
+				--jq '[.sshUrl, (.url + ".git")] | map(select(. != null and . != "")) | .[0]'
+		)"
+		if [[ -z "$repo_info" ]]; then
+			printf 'jj-get: could not resolve fetch URL for GitHub repo: %s\n' "$head_repo" >&2
+			exit 2
+		fi
+		ssh_url=$repo_info
+		if remote_name_for_url="$(remote_for_url "$ssh_url")"; then
+			remote_name=$remote_name_for_url
+		fi
+		bookmark=$head_ref
+		refspec="+refs/heads/${head_ref}:refs/remotes/${remote_name}/${head_ref}"
+	else
+		repo_info="$(
+			gh repo view "$repo" --json sshUrl,url \
+				--jq '[.sshUrl, (.url + ".git")] | map(select(. != null and . != "")) | .[0]'
+		)"
+		if [[ -z "$repo_info" ]]; then
+			printf 'jj-get: could not resolve fetch URL for GitHub repo: %s\n' "$repo" >&2
+			exit 2
+		fi
+		ssh_url=$repo_info
+		bookmark="pr/${pr}"
+		head_ref=$pr
+		refspec="+refs/pull/${pr}/head:refs/remotes/${remote_name}/${head_ref}"
+	fi
+
+	git fetch "${fetch_args[@]}" --prune --no-write-fetch-head --no-tags -- "$ssh_url" "$refspec"
+	jj "${jj_args[@]}" git import
+	if is_shallow; then
+		jj "${jj_args[@]}" --quiet debug reindex
+	fi
+	jj "${jj_args[@]}" bookmark set --allow-backwards "$bookmark" -r "${head_ref}@${remote_name}"
+}
+
+resolve_branch() {
+	local bookmark=$1
+	local remote="${2:-}"
+	local base="${3:-${JJ_GET_BASE:-}}"
+	local base_ref
+	local refspec
+
+	if [[ -z "$remote" && "$bookmark" == *@* ]]; then
+		remote="${bookmark##*@}"
+		bookmark="${bookmark%@*}"
+	elif [[ "$bookmark" == *@* ]]; then
+		base="$remote"
+		remote="${bookmark##*@}"
+		bookmark="${bookmark%@*}"
+	fi
+
+	if [[ -z "$bookmark" ]]; then
+		printf '%s\n' "jj-get: missing bookmark" >&2
+		exit 2
+	fi
+
+	if [[ -z "$remote" ]]; then
+		mapfile -t remotes < <(git remote)
+		if ((${#remotes[@]} == 1)); then
+			remote="${remotes[0]}"
+		elif git remote get-url origin >/dev/null 2>&1; then
+			remote=origin
+		else
+			printf '%s\n' "jj-get: multiple remotes found; pass REMOTE explicitly" >&2
+			exit 2
+		fi
+	fi
+
+	if ! git remote get-url "$remote" >/dev/null 2>&1; then
+		printf 'jj-get: unknown remote: %s\n' "$remote" >&2
+		exit 2
+	fi
+
+	if is_shallow; then
+		if [[ -z "$base" ]]; then
+			if ! base="$(infer_branch_base "$remote")"; then
+				printf '%s\n' "jj-get: could not infer remote default branch; pass BASE or set JJ_GET_BASE" >&2
+				exit 2
+			fi
+		fi
+		if [[ "$base" == "${remote}/"* ]]; then
+			base="${base#"${remote}"/}"
+		fi
+		if [[ "$base" == refs/* ]]; then
+			base_ref="$base"
+		else
+			base_ref="refs/heads/${base}"
+		fi
+
+		refspec="+refs/heads/${bookmark}:refs/remotes/${remote}/${bookmark}"
+		git fetch --shallow-exclude="$base_ref" --prune --no-write-fetch-head --no-tags -- "$remote" "$refspec"
+		jj "${jj_args[@]}" git import
+		jj "${jj_args[@]}" --quiet debug reindex
+	else
+		jj "${jj_args[@]}" git fetch --remote "$remote" --branch "$bookmark"
+	fi
+
+	jj "${jj_args[@]}" bookmark track "${bookmark}@${remote}"
+}
+
+if [[ "$target" =~ ^[0-9]+$ ]]; then
+	if (($# > 2)); then
+		usage >&2
+		exit 2
+	fi
+	resolve_pr "$target" "${2:-}"
+elif [[ "$target" =~ ^https://github\.com/([^/]+)/([^/]+)/pull/([0-9]+)(/.*)?$ ]]; then
+	if (($# > 1)); then
+		usage >&2
+		exit 2
+	fi
+	resolve_pr "${BASH_REMATCH[3]}" "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+else
+	resolve_branch "$@"
+fi

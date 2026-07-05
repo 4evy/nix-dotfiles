@@ -1,6 +1,11 @@
 {
   "chat.disableAIFeatures": true,
-  "editor.fontFamily": "'TX02 Nerd Font', 'TX-02', 'MonaspiceKr Nerd Font Mono', monospace",
+  "github.copilot.enable": {
+    "*": false
+  },
+  "github.copilot.editor.enableCodeActions": false,
+  "github.copilot.nextEditSuggestions.enabled": false,
+  "editor.fontFamily": "'JetBrainsMono Nerd Font Mono', 'Noto Sans Mono', monospace",
   "editor.wordWrap": "on",
   "editor.mouseWheelZoom": true,
   "editor.guides.bracketPairs": "active",
@@ -16,13 +21,43 @@
   "workbench.iconTheme": "catppuccin-frappe",
   "window.zoomLevel": 1.5,
   "window.titleBarStyle": "custom",
-  "terminal.integrated.fontFamily": "'TX02 Nerd Font', 'TX-02', 'MonaspiceKr Nerd Font Mono', monospace",
+  "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font Mono', 'Noto Sans Mono', monospace",
   "terminal.integrated.minimumContrastRatio": 1,
   "terminal.integrated.macOptionIsMeta": true,
+  "files.trimTrailingWhitespace": true,
+  "files.trimFinalNewlines": true,
+  "files.insertFinalNewline": true,
   "diffEditor.ignoreTrimWhitespace": false,
   "security.workspace.trust.enabled": false,
   "git.enableCommitSigning": true,
+  "git.mergeEditor": true,
+  "git.branchProtection": ["main", "master"],
+  "git.branchProtectionPrompt": "alwaysCommitToNewBranch",
+  "git.branchRandomName.enable": true,
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+  "python.languageServer": "None",
+  "python.defaultInterpreterPath": "{{- if lookPath `python` -}}{{ lookPath `python` }}{{- else if lookPath `python3` -}}{{ lookPath `python3` }}{{- else -}}python{{- end -}}",
+  "ty.importStrategy": "fromEnvironment",
+  "ty.path": [
+    "{{- if lookPath `ty` -}}{{ lookPath `ty` }}{{- else -}}ty{{- end -}}"
+  ],
+  "ruff.importStrategy": "fromEnvironment",
+  "ruff.path": [
+    "{{- if lookPath `ruff` -}}{{ lookPath `ruff` }}{{- else -}}ruff{{- end -}}"
+  ],
+  "ruff.nativeServer": "on",
   "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "[go]": {
+    "editor.defaultFormatter": "golang.go",
+    "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
       "source.organizeImports": "explicit"
     }
@@ -45,21 +80,57 @@
     "editor.formatOnSave": true,
     "editor.formatOnType": true
   },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.formatOnSave": true
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.formatOnSave": true
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.formatOnSave": true
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml",
+    "editor.formatOnSave": true
+  },
+  "[lua]": {
+    "editor.defaultFormatter": "sumneko.lua",
+    "editor.formatOnSave": true
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
   "nix.enableLanguageServer": true,
-  "nix.serverPath": "nil",
-  "nix.formatterPath": "nixfmt",
+  "nix.serverPath": "{{- if lookPath `vscode-nixd` -}}{{ lookPath `vscode-nixd` }}{{- else if lookPath `nixd` -}}{{ lookPath `nixd` }}{{- else if lookPath `nil` -}}{{ lookPath `nil` }}{{- else -}}nixd{{- end -}}",
+  "nix.formatterPath": "{{- if lookPath `vscode-nixfmt` -}}{{ lookPath `vscode-nixfmt` }}{{- else if lookPath `nixfmt` -}}{{ lookPath `nixfmt` }}{{- else -}}nixfmt{{- end -}}",
   "nix.serverSettings": {
     "nil": {
       "formatting": {
         "command": [
-          "nixfmt"
+          "{{- if lookPath `vscode-nixfmt` -}}{{ lookPath `vscode-nixfmt` }}{{- else if lookPath `nixfmt` -}}{{ lookPath `nixfmt` }}{{- else -}}nixfmt{{- end -}}"
         ]
       }
     },
     "nixd": {
       "formatting": {
         "command": [
-          "nixfmt"
+          "{{- if lookPath `vscode-nixfmt` -}}{{ lookPath `vscode-nixfmt` }}{{- else if lookPath `nixfmt` -}}{{ lookPath `nixfmt` }}{{- else -}}nixfmt{{- end -}}"
         ]
       }
     }
@@ -73,5 +144,5 @@
     "https://json.schemastore.org/": true,
     "https://json-schema.org/": true,
     "https://esm.sh": true
-  },
+  }
 }

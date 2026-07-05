@@ -1,0 +1,740 @@
+# shellcheck disable=SC2154
+# ░█▀▀░█▄█░█▀▄░█▀▀
+# ░█░░░█░█░█░█░▀▀█
+# ░▀▀▀░▀░▀░▀▀░░▀▀▀
+# C M D S / shared command bus
+#  .+"+.+"+.+"+.+"+.+"+.+"+.
+# (                         )
+#  ) one command bus       (
+# (  Bash and Zsh share it  )
+#  ) no alias drift        (
+# (                         )
+#  "+.+"+.+"+.+"+.+"+.+"+.+"
+# A lane: editor / files / media
+# B lane: host runner / codex / Brewfile
+# C lane: repo chores / yazi / uv / fzf palette
+#
+# loaded late on purpose: frameworks first, daily commands after
+
+# A1 / editor default
+#      h v vi vim ───────────────> hx, no ceremony
+
+export EDITOR="hx"
+export VISUAL="hx"
+
+alias h="hx"
+alias v="hx"
+alias vi="hx"
+alias vim="hx"
+
+# A2 / looking around
+#      eza gets icons; btop stays themed; neofetch quietly becomes pfetch
+
+alias l="eza --icons"
+alias la="eza -la --icons"
+alias ll="eza -la --icons"
+alias lt="eza --tree --icons"
+
+alias btop="zellij-theme-run btop"
+alias htop="zellij-theme-run btop"
+alias top="zellij-theme-run btop"
+alias neofetch="pfetch"
+
+# A3 / media cuts
+#      m4a ─┐  mp3 ─┐  mp4 ─┐
+#           └─ cut variants share one yt-dlp runner
+
+_dotfiles_ytdlp() {
+	env -u PROMPT_MULTILINE_INDICATOR "$HOME/.local/bin/yt-dlp-script" "$@"
+}
+
+m4a() { _dotfiles_ytdlp m4a "$@"; }
+m4a-cut() { _dotfiles_ytdlp m4a-cut "$@"; }
+mp3() { _dotfiles_ytdlp mp3 "$@"; }
+mp3-cut() { _dotfiles_ytdlp mp3-cut "$@"; }
+mp4() { _dotfiles_ytdlp mp4 "$@"; }
+mp4-cut() { _dotfiles_ytdlp mp4-cut "$@"; }
+
+# A4 / tiny commands
+#      oo cza pmclean jj :: short names because muscle memory is real
+
+alias oo="opencode"
+alias cza="chezmoi apply --force"
+alias pmclean="podman system prune"
+
+jj() {
+	local shim_result
+	local shim_state
+	local shim_status
+
+	if [[ $# -ge 2 && "$1" == git && "$2" == fetch && -x "$HOME/.local/bin/jj-git-fetch" ]]; then
+		if ! shim_state="$(mktemp "${TMPDIR:-/tmp}/jj-git-fetch-shim.XXXXXX")"; then
+			command jj "$@"
+			return
+		fi
+
+		shim_status=0
+		JJ_GIT_FETCH_SHIM_STATE="$shim_state" "$HOME/.local/bin/jj-git-fetch" "$@" || shim_status=$?
+		shim_result="$(<"$shim_state")"
+		rm -f -- "$shim_state"
+
+		if [[ "$shim_result" == handled ]]; then
+			return "$shim_status"
+		fi
+		if [[ "$shim_result" != delegate ]]; then
+			return "$shim_status"
+		fi
+	fi
+
+	command jj "$@"
+}
+
+_dotfiles_tk_path_is_lock() {
+	case "$1" in
+		flake.lock | */flake.lock | \
+			Cargo.lock | */Cargo.lock | \
+			composer.lock | */composer.lock | \
+			Gemfile.lock | */Gemfile.lock | \
+			go.sum | */go.sum | \
+			npm-shrinkwrap.json | */npm-shrinkwrap.json | \
+			package-lock.json | */package-lock.json | \
+			Pipfile.lock | */Pipfile.lock | \
+			pnpm-lock.yaml | */pnpm-lock.yaml | \
+			poetry.lock | */poetry.lock | \
+			bun.lock | */bun.lock | \
+			bun.lockb | */bun.lockb | \
+			uv.lock | */uv.lock | \
+			yarn.lock | */yarn.lock)
+			return 0
+			;;
+	esac
+	return 1
+}
+
+tk() (
+	local root prefix tmp tracked attrs mirror
+	local file_path attr_name value raw arg_max arg_bytes dest dest_dir
+	local -a tokei_args pathspecs git_pathspecs files
+
+	if ! command -v tokei >/dev/null 2>&1; then
+		printf '%s\n' "tokei is not installed" >&2
+		exit 127
+	fi
+
+	if ! command -v git >/dev/null 2>&1 ||
+		! root="$(git rev-parse --show-toplevel 2>/dev/null)" ||
+		[[ -z "$root" ]]; then
+		command tokei "$@"
+		exit
+	fi
+
+	prefix="$(git rev-parse --show-prefix 2>/dev/null || true)"
+
+	tokei_args=()
+	pathspecs=()
+	while (($#)); do
+		if [[ "$1" == "--" ]]; then
+			shift
+			pathspecs=("$@")
+			break
+		fi
+		tokei_args+=("$1")
+		shift
+	done
+
+	git_pathspecs=()
+	if ((${#pathspecs[@]} == 0)); then
+		if [[ -n "$prefix" ]]; then
+			git_pathspecs=("$prefix")
+		else
+			git_pathspecs=(".")
+		fi
+	else
+		for raw in "${pathspecs[@]}"; do
+			case "$raw" in
+				:*)
+					git_pathspecs+=("$raw")
+					;;
+				"$root")
+					git_pathspecs+=(".")
+					;;
+				"$root"/*)
+					git_pathspecs+=("${raw#"$root"/}")
+					;;
+				/*)
+					git_pathspecs+=("$raw")
+					;;
+				*)
+					git_pathspecs+=("${prefix}${raw}")
+					;;
+			esac
+		done
+	fi
+
+	tmp="$(mktemp -d "${TMPDIR:-/tmp}/tk.XXXXXXXX")" || exit
+	trap 'rm -rf -- "$tmp"' EXIT HUP INT TERM
+	tracked="$tmp/tracked.z"
+	attrs="$tmp/attrs.z"
+
+	if ! git -C "$root" ls-files -z --cached --deduplicate --full-name -- "${git_pathspecs[@]}" >"$tracked"; then
+		exit
+	fi
+
+	if [[ ! -s "$tracked" ]]; then
+		printf '%s\n' "tk: no tracked files under requested scope" >&2
+		exit 0
+	fi
+
+	cd "$root" || exit
+	files=()
+	if git check-attr --stdin -z linguist-generated <"$tracked" >"$attrs" 2>/dev/null; then
+		while IFS= read -r -d '' file_path &&
+			IFS= read -r -d '' attr_name &&
+			IFS= read -r -d '' value; do
+			: "$attr_name"
+			[[ -e "$file_path" && ! -d "$file_path" ]] || continue
+			case "$value" in
+				set | true)
+					continue
+					;;
+			esac
+			if _dotfiles_tk_path_is_lock "$file_path"; then
+				continue
+			fi
+			files+=("$file_path")
+		done <"$attrs"
+	else
+		while IFS= read -r -d '' file_path; do
+			[[ -e "$file_path" && ! -d "$file_path" ]] || continue
+			if _dotfiles_tk_path_is_lock "$file_path"; then
+				continue
+			fi
+			files+=("$file_path")
+		done <"$tracked"
+	fi
+
+	if ((${#files[@]} == 0)); then
+		printf '%s\n' "tk: no tracked, non-generated files to count" >&2
+		exit 0
+	fi
+
+	arg_bytes=0
+	for raw in "${tokei_args[@]}" "${files[@]}"; do
+		arg_bytes=$((arg_bytes + ${#raw} + 1))
+	done
+	arg_max="$(getconf ARG_MAX 2>/dev/null || printf '%s\n' 262144)"
+	case "$arg_max" in
+		'' | *[!0-9]*)
+			arg_max=262144
+			;;
+	esac
+
+	if ((arg_bytes < arg_max - 32768)); then
+		command tokei "${tokei_args[@]}" -- "${files[@]}"
+		exit
+	fi
+
+	mirror="$tmp/tree"
+	mkdir -p -- "$mirror" || exit
+	for file_path in "${files[@]}"; do
+		dest="$mirror/$file_path"
+		dest_dir="${dest%/*}"
+		mkdir -p -- "$dest_dir" || exit
+		if [[ -L "$file_path" ]]; then
+			cp -pL -- "$file_path" "$dest" || exit
+		else
+			ln -- "$file_path" "$dest" 2>/dev/null || cp -p -- "$file_path" "$dest" || exit
+		fi
+	done
+
+	command tokei "${tokei_args[@]}" --hidden -- "$mirror"
+)
+
+# B1 / host runner
+#      container shell asks the host; native shell uses sudo -n and stays honest
+
+_dotfiles_system_runner() {
+	local runner="$HOME/.local/bin/system-runner"
+
+	if [[ ! -x "$runner" ]]; then
+		printf '%s\n' "system-runner is not installed" >&2
+		return 127
+	fi
+
+	if [[ -f /.dockerenv || -f /run/.containerenv ]]; then
+		if command -v distrobox-host-exec >/dev/null 2>&1; then
+			distrobox-host-exec sudo -n "$runner" "$@"
+			return
+		fi
+	fi
+
+	sudo -n "$runner" "$@"
+}
+
+free() {
+	_dotfiles_system_runner "$@"
+}
+
+## usage: f COMMAND [ARG...]
+f_usage() {
+	sed -n 's/^##[[:space:]]\{0,1\}//p' "${BASH_SOURCE[0]}"
+}
+
+f() {
+	if (($# == 0)); then
+		f_usage >&2
+		return 2
+	fi
+
+	case "$1" in
+		cza)
+			shift
+			free chezmoi apply --force "$@"
+			;;
+		*)
+			free "$@"
+			;;
+	esac
+}
+
+# B2 / codex wrapper
+#      focus reset ⇢ themed zellij ⇢ optional debug tools ⇢ focus reset
+
+cx() {
+	local cmd_status
+
+	_dotfiles_disable_terminal_focus_reporting
+	zellij-theme-run codex "$@"
+	cmd_status=$?
+	_dotfiles_disable_terminal_focus_reporting
+
+	return "$cmd_status"
+}
+
+_dotfiles_ghidra_mcp_state_dir() {
+	if [[ -n "${GHIDRA_MCP_STATE:-}" ]]; then
+		printf '%s\n' "$GHIDRA_MCP_STATE"
+	elif [[ -n "${XDG_STATE_HOME:-}" ]]; then
+		printf '%s\n' "$XDG_STATE_HOME/ghidra-mcp-headless"
+	else
+		printf '%s\n' "$HOME/.local/state/ghidra-mcp-headless"
+	fi
+}
+
+_dotfiles_ghidra_mcp_ready() {
+	local host="${GHIDRA_MCP_BRIDGE_HOST:-127.0.0.1}"
+	local port="${GHIDRA_MCP_BRIDGE_PORT:-8090}"
+
+	if command -v nc >/dev/null 2>&1; then
+		nc -z "$host" "$port" >/dev/null 2>&1
+		return
+	fi
+
+	if command -v curl >/dev/null 2>&1; then
+		curl --silent --show-error --max-time 1 --output /dev/null "http://$host:$port/mcp" >/dev/null 2>&1
+		return
+	fi
+
+	return 1
+}
+
+_dotfiles_ghidra_mcp_prune_refs() {
+	local refs_dir=$1
+	local ref
+	local pid
+
+	[[ -d "$refs_dir" ]] || return 0
+
+	while IFS= read -r ref; do
+		pid=
+		IFS= read -r pid <"$ref" || pid=
+		if [[ -z "$pid" ]] || ! kill -0 "$pid" >/dev/null 2>&1; then
+			rm -f -- "$ref"
+		fi
+	done < <(find "$refs_dir" -type f -name '*.ref' -print 2>/dev/null)
+}
+
+_dotfiles_ghidra_mcp_has_refs() {
+	local refs_dir=$1
+
+	_dotfiles_ghidra_mcp_prune_refs "$refs_dir"
+	find "$refs_dir" -type f -name '*.ref' -print -quit 2>/dev/null | grep -q .
+}
+
+_dotfiles_register_ghidra_mcp_for_cxg() {
+	local state_dir
+	local refs_dir
+	local ref_file
+
+	state_dir="$(_dotfiles_ghidra_mcp_state_dir)"
+	refs_dir="$state_dir/cxg-refs"
+	mkdir -p "$refs_dir" || return
+
+	ref_file="$refs_dir/$$-$RANDOM-$SECONDS.ref"
+	printf '%s\n' "$$" >"$ref_file" || return
+
+	_dotfiles_cxg_ghidra_mcp_ref_file="$ref_file"
+	_dotfiles_cxg_ghidra_mcp_state_dir="$state_dir"
+}
+
+_dotfiles_wait_ghidra_mcp() {
+	local pid=$1
+	local log_file=$2
+	local timeout="${GHIDRA_MCP_STARTUP_TIMEOUT_SEC:-60}"
+	local deadline=$((SECONDS + timeout))
+
+	while ((SECONDS < deadline)); do
+		if _dotfiles_ghidra_mcp_ready; then
+			return 0
+		fi
+		if ! kill -0 "$pid" >/dev/null 2>&1; then
+			printf '%s\n' "ghidra-mcp exited before becoming ready; log: $log_file" >&2
+			[[ ! -r "$log_file" ]] || tail -n 40 "$log_file" >&2
+			return 1
+		fi
+		sleep 1
+	done
+
+	printf '%s\n' "ghidra-mcp did not become ready within ${timeout}s; log: $log_file" >&2
+	[[ ! -r "$log_file" ]] || tail -n 40 "$log_file" >&2
+	return 1
+}
+
+_dotfiles_acquire_ghidra_mcp_start_lock() {
+	local lock_dir=$1
+	local timeout="${GHIDRA_MCP_STARTUP_TIMEOUT_SEC:-60}"
+	local deadline=$((SECONDS + timeout))
+	local lock_pid
+
+	while ! mkdir "$lock_dir" 2>/dev/null; do
+		if _dotfiles_ghidra_mcp_ready; then
+			return 2
+		fi
+
+		lock_pid=
+		IFS= read -r lock_pid <"$lock_dir/pid" 2>/dev/null || lock_pid=
+		if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" >/dev/null 2>&1; then
+			rm -f -- "$lock_dir/pid"
+			rmdir "$lock_dir" 2>/dev/null || true
+			continue
+		fi
+
+		if ((SECONDS >= deadline)); then
+			printf '%s\n' "ghidra-mcp startup is already in progress and did not become ready within ${timeout}s" >&2
+			return 1
+		fi
+		sleep 1
+	done
+
+	printf '%s\n' "$$" >"$lock_dir/pid" || true
+	return 0
+}
+
+_dotfiles_release_ghidra_mcp_start_lock() {
+	local lock_dir=$1
+
+	rm -f -- "$lock_dir/pid"
+	rmdir "$lock_dir" 2>/dev/null || true
+}
+
+_dotfiles_start_ghidra_mcp_for_cxg() {
+	local state_dir
+	local log_file
+	local lock_dir
+	local lock_status
+	local pid_file
+
+	_dotfiles_cxg_ghidra_mcp_pid=
+	_dotfiles_cxg_started_ghidra_mcp=0
+
+	if _dotfiles_ghidra_mcp_ready; then
+		return 0
+	fi
+
+	state_dir="${_dotfiles_cxg_ghidra_mcp_state_dir:-$(_dotfiles_ghidra_mcp_state_dir)}"
+	mkdir -p "$state_dir" || return
+	log_file="$state_dir/cxg-ghidra-mcp.log"
+	lock_dir="$state_dir/cxg-ghidra-mcp.start.lock"
+	pid_file="$state_dir/cxg-ghidra-mcp.pid"
+
+	_dotfiles_acquire_ghidra_mcp_start_lock "$lock_dir"
+	lock_status=$?
+	if ((lock_status == 2)); then
+		return 0
+	fi
+	if ((lock_status != 0)); then
+		return "$lock_status"
+	fi
+
+	if _dotfiles_ghidra_mcp_ready; then
+		_dotfiles_release_ghidra_mcp_start_lock "$lock_dir"
+		return 0
+	fi
+
+	if command -v ghidra-mcp-serve >/dev/null 2>&1; then
+		env \
+			GHIDRA_MCP_ALLOW_SCRIPTS="${GHIDRA_MCP_ALLOW_SCRIPTS:-1}" \
+			GHIDRA_MCP_STATE="$state_dir" \
+			JAVA_OPTS="${JAVA_OPTS:--Xmx4g -XX:+UseG1GC}" \
+			ghidra-mcp-serve >"$log_file" 2>&1 &
+	elif command -v nix >/dev/null 2>&1 && [[ -f "$_dotfiles_repo_path/flake.nix" ]]; then
+		env \
+			GHIDRA_MCP_ALLOW_SCRIPTS="${GHIDRA_MCP_ALLOW_SCRIPTS:-1}" \
+			GHIDRA_MCP_STATE="$state_dir" \
+			JAVA_OPTS="${JAVA_OPTS:--Xmx4g -XX:+UseG1GC}" \
+			nix run "$_dotfiles_repo_path#ghidra-mcp" >"$log_file" 2>&1 &
+	else
+		_dotfiles_release_ghidra_mcp_start_lock "$lock_dir"
+		printf '%s\n' "ghidra-mcp-serve is not on PATH and nix flake fallback is unavailable" >&2
+		return 127
+	fi
+
+	_dotfiles_cxg_ghidra_mcp_pid=$!
+	_dotfiles_cxg_started_ghidra_mcp=1
+	printf '%s\n' "$_dotfiles_cxg_ghidra_mcp_pid" >"$pid_file" || true
+
+	if ! _dotfiles_wait_ghidra_mcp "$_dotfiles_cxg_ghidra_mcp_pid" "$log_file"; then
+		kill "$_dotfiles_cxg_ghidra_mcp_pid" >/dev/null 2>&1 || true
+		wait "$_dotfiles_cxg_ghidra_mcp_pid" >/dev/null 2>&1 || true
+		rm -f -- "$pid_file"
+		_dotfiles_release_ghidra_mcp_start_lock "$lock_dir"
+		return 1
+	fi
+
+	_dotfiles_release_ghidra_mcp_start_lock "$lock_dir"
+}
+
+_dotfiles_stop_ghidra_mcp_for_cxg() {
+	local state_dir="${_dotfiles_cxg_ghidra_mcp_state_dir:-$(_dotfiles_ghidra_mcp_state_dir)}"
+	local refs_dir="$state_dir/cxg-refs"
+	local pid_file="$state_dir/cxg-ghidra-mcp.pid"
+	local server_pid="${_dotfiles_cxg_ghidra_mcp_pid:-}"
+
+	if [[ -n "${_dotfiles_cxg_ghidra_mcp_ref_file:-}" ]]; then
+		rm -f -- "$_dotfiles_cxg_ghidra_mcp_ref_file"
+		_dotfiles_cxg_ghidra_mcp_ref_file=
+	fi
+
+	if _dotfiles_ghidra_mcp_has_refs "$refs_dir"; then
+		_dotfiles_cxg_ghidra_mcp_pid=
+		_dotfiles_cxg_started_ghidra_mcp=0
+		_dotfiles_cxg_ghidra_mcp_state_dir=
+		return 0
+	fi
+
+	if [[ -z "$server_pid" ]] && [[ -r "$pid_file" ]]; then
+		IFS= read -r server_pid <"$pid_file" || server_pid=
+	fi
+
+	if [[ -n "$server_pid" ]]; then
+		kill "$server_pid" >/dev/null 2>&1 || true
+		wait "$server_pid" >/dev/null 2>&1 || true
+	fi
+
+	rm -f -- "$pid_file"
+	_dotfiles_cxg_ghidra_mcp_pid=
+	_dotfiles_cxg_started_ghidra_mcp=0
+	_dotfiles_cxg_ghidra_mcp_state_dir=
+}
+
+cxg() (
+	local -a codex_args
+	local cmd_status
+
+	trap '_dotfiles_stop_ghidra_mcp_for_cxg' EXIT
+	trap 'exit 129' HUP
+	trap 'exit 130' INT
+	trap 'exit 143' TERM
+
+	_dotfiles_register_ghidra_mcp_for_cxg
+	cmd_status=$?
+	if ((cmd_status != 0)); then
+		exit "$cmd_status"
+	fi
+
+	_dotfiles_start_ghidra_mcp_for_cxg
+	cmd_status=$?
+	if ((cmd_status != 0)); then
+		exit "$cmd_status"
+	fi
+
+	codex_args=(-c mcp_servers.ghidra.enabled=true)
+	if command -v lldb-mcp-launcher >/dev/null 2>&1; then
+		codex_args+=(-c mcp_servers.lldb.enabled=true)
+	fi
+
+	_dotfiles_disable_terminal_focus_reporting
+	zellij-theme-run codex "${codex_args[@]}" "$@"
+	cmd_status=$?
+	_dotfiles_disable_terminal_focus_reporting
+
+	exit "$cmd_status"
+)
+
+# B3 / Brewfile receipts
+#      one explicit file path, loud errors, no ambient Brewfile guessing
+
+_dotfiles_brewfile_path() {
+	printf '%s\n' "$_dotfiles_repo_path/Brewfile"
+}
+
+_dotfiles_brew_bundle() {
+	local brewfile
+
+	if ! command -v brew >/dev/null 2>&1; then
+		printf '%s\n' "brew is not installed" >&2
+		return 127
+	fi
+
+	brewfile="$(_dotfiles_brewfile_path)"
+	if [[ ! -f "$brewfile" ]]; then
+		printf '%s\n' "Brewfile not found: $brewfile" >&2
+		return 1
+	fi
+
+	command brew bundle --file "$brewfile" "$@"
+}
+
+brewfile() {
+	_dotfiles_brew_bundle "$@"
+}
+
+brewcheck() {
+	_dotfiles_brew_bundle check --verbose "$@"
+}
+
+brewup() {
+	_dotfiles_brew_bundle install --jobs auto --force-cleanup "$@"
+}
+
+# C1 / repo choreography
+#      update  ▰▱▱ apply userland and refresh chezmoi
+#      rebuild ▰▰▱ bootstrap or image switch
+#      check   ▰▰▰ syntax/lint runway
+
+{{- if eq .chezmoi.os "darwin" }}
+update() {
+	(
+		cd "$_dotfiles_repo_path" &&
+			_dotfiles_ansible_playbook ansible/playbooks/userland.yml "$@"
+	) || return
+	chezmoi apply --refresh-externals=always --force
+}
+
+rebuild() {
+	(
+		cd "$_dotfiles_repo_path" &&
+			_dotfiles_ansible_playbook ansible/playbooks/bootstrap.yml "$@" &&
+			_dotfiles_ansible_playbook ansible/playbooks/userland.yml "$@"
+	)
+}
+
+check() {
+	(
+		cd "$_dotfiles_repo_path" &&
+			_dotfiles_brew_bundle check --verbose &&
+			_dotfiles_ansible_playbook --syntax-check ansible/playbooks/bootstrap.yml &&
+			_dotfiles_ansible_playbook --syntax-check ansible/playbooks/userland.yml &&
+			_dotfiles_ansible_playbook --syntax-check ansible/playbooks/site.yml
+	)
+}
+
+micfix() {
+	free killall coreaudiod "$@"
+}
+{{- else }}
+update() {
+	(
+		cd "$_dotfiles_repo_path" &&
+			_dotfiles_ansible_playbook ansible/playbooks/userland.yml
+	) || return
+	chezmoi apply --refresh-externals=always --force || return
+	(
+		cd "$_dotfiles_repo_path" &&
+			_dotfiles_ansible_playbook ansible/playbooks/host.yml
+	)
+}
+
+rebuild() {
+	(
+		cd "$_dotfiles_repo_path" &&
+			free env \
+				-u XDG_RUNTIME_DIR \
+				-u DBUS_SESSION_BUS_ADDRESS \
+				-u WAYLAND_DISPLAY \
+				-u DISPLAY \
+				-u SSH_AUTH_SOCK \
+				podman build \
+				--pull=newer \
+				--tag localhost/spectrum:local \
+				--file spectrum/Containerfile \
+				.
+	) || return
+	free bootc switch --transport containers-storage localhost/spectrum:local "$@"
+}
+
+check() {
+	(
+		cd "$_dotfiles_repo_path" &&
+			_dotfiles_brew_bundle check --verbose &&
+			just check &&
+			_dotfiles_ansible_playbook --syntax-check ansible/playbooks/bootstrap.yml &&
+			_dotfiles_ansible_playbook --syntax-check ansible/playbooks/userland.yml &&
+			_dotfiles_ansible_playbook --syntax-check ansible/playbooks/host.yml &&
+			_dotfiles_ansible_playbook --syntax-check ansible/playbooks/site.yml
+	)
+}
+
+micfix() {
+	systemctl --user restart pipewire pipewire-pulse wireplumber "$@"
+}
+{{- end }}
+
+# C2 / yazi handoff
+#      yazi writes the destination; the parent shell follows it there
+
+yy() {
+	local tmp cwd cmd_status
+
+	tmp="$(mktemp -t "yazi-cwd.XXXXX")" || return
+	yazi "$@" --cwd-file="$tmp"
+	cmd_status=$?
+	if cwd="$(command cat -- "$tmp")" && [[ -n "$cwd" && "$cwd" != "$PWD" ]]; then
+		builtin cd -- "$cwd" || cmd_status=$?
+	fi
+	rm -f -- "$tmp"
+
+	return "$cmd_status"
+}
+
+# C3 / Python via uv
+#      python ⇢ uv run
+#      pip    ⇢ venv only when the project has none
+
+python() { uv run python "$@"; }
+python3() { uv run python3 "$@"; }
+
+pip() {
+	[[ -z "$VIRTUAL_ENV" && ! -d ".venv" ]] && uv venv -q
+	uv pip "$@"
+}
+
+pip3() {
+	[[ -z "$VIRTUAL_ENV" && ! -d ".venv" ]] && uv venv -q
+	uv pip "$@"
+}
+
+# C4 / fzf palette
+#      Catppuccin Frappe :: pink prompt ◇ lavender marker ◇ calm border
+
+{{- $ctp := include ".chezmoitemplates/catppuccin_palette.json" | fromJson }}
+{{- $p := index $ctp "frappe" }}
+export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border
+  --color=bg+:{{ index $p "surface0" }},bg:{{ index $p "base" }}\
+,spinner:{{ index $p "pink" }},hl:{{ index $p "red" }}
+  --color=fg:{{ index $p "text" }},header:{{ index $p "red" }}\
+,info:{{ index $p "pink" }},pointer:{{ index $p "pink" }}
+  --color=marker:{{ index $p "lavender" }},fg+:{{ index $p "text" }}\
+,prompt:{{ index $p "pink" }},hl+:{{ index $p "red" }}
+  --color=selected-bg:{{ index $p "surface1" }},border:{{ index $p "overlay0" }}\
+,label:{{ index $p "text" }}"

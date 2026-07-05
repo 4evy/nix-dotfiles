@@ -1,17 +1,24 @@
-theme = "catppuccin_frappe_pink"
+[theme]
+dark = "catppuccin_frappe_pink"
+light = "catppuccin_latte_pink"
+fallback = "catppuccin_frappe_pink"
 
 [editor]
 auto-format = true
 auto-save = false
-idle-timeout = 50
+idle-timeout = 100
 color-modes = true
 cursorline = true
 line-number = "relative"
 true-color = true
+kitty-keyboard-protocol = "auto"
 mouse = true
 bufferline = "always"
 completion-replace = true
 completion-trigger-len = 1
+end-of-line-diagnostics = "hint"
+popup-border = "all"
+rainbow-brackets = true
 
 [editor.cursor-shape]
 insert = "bar"
@@ -38,6 +45,10 @@ trail = "•"
 [editor.lsp]
 display-messages = true
 display-inlay-hints = true
+display-progress-messages = true
+
+[editor.inline-diagnostics]
+cursor-line = "warning"
 
 [editor.file-picker]
 git-global = true
@@ -45,6 +56,9 @@ git-ignore = true
 hidden = false
 
 [editor.soft-wrap]
+enable = true
+
+[editor.smart-tab]
 enable = true
 
 [editor.search]
@@ -59,7 +73,12 @@ g = { g = "goto_file_start", q = ":reflow" }
 Z = { Z = ":write-quit", Q = ":quit!" }
 "space" = { "space" = "file_picker" }
 C-space = "yank_to_clipboard"
+tab = "move_parent_node_end"
+S-tab = "move_parent_node_start"
 esc = ["collapse_selection", "keep_primary_selection"]
+
+[keys.insert]
+S-tab = "move_parent_node_start"
 
 [keys.select]
 "{" = "page_cursor_half_up"
@@ -68,3 +87,5 @@ G = "goto_file_end"
 g = { g = "goto_file_start", q = ":reflow" }
 Z = { Z = ":write-quit", Q = ":quit!" }
 C-space = "yank_to_clipboard"
+tab = "extend_parent_node_end"
+S-tab = "extend_parent_node_start"

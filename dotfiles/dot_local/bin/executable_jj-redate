@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+## usage: jj redate [REVSETS]...
+##        jj redate -r REVSET [REVSETS]...
+set -euo pipefail
+
+usage() {
+	sed -n 's/^##[[:space:]]\{0,1\}//p' "${BASH_SOURCE[0]}"
+}
+
+revsets=()
+while (($# > 0)); do
+	case $1 in
+		-r | --revision)
+			if (($# < 2)); then
+				usage >&2
+				exit 2
+			fi
+			revsets+=("$2")
+			shift 2
+			;;
+		--revision=*)
+			revsets+=("${1#*=}")
+			shift
+			;;
+		-h | --help)
+			usage
+			exit 0
+			;;
+		--)
+			shift
+			while (($# > 0)); do
+				revsets+=("$1")
+				shift
+			done
+			;;
+		-*)
+			printf 'jj-redate: unknown option: %s\n' "$1" >&2
+			usage >&2
+			exit 2
+			;;
+		*)
+			revsets+=("$1")
+			shift
+			;;
+	esac
+done
+if ((${#revsets[@]} == 0)); then
+	revsets=("@")
+fi
+
+revset_label="${revsets[*]}"
+revset="$(
+	printf '%s\n' "${revsets[@]}" |
+		awk 'NF { printf "%s(%s)", separator, $0; separator = " | " }'
+)"
+
+python_bin=""
+for candidate in python3 python; do
+	if command -v "$candidate" >/dev/null 2>&1; then
+		python_bin="$candidate"
+		break
+	fi
+done
+if [[ -z "$python_bin" ]]; then
+	printf '%s\n' "jj-redate requires python3 or python to validate the timestamp" >&2
+	exit 127
+fi
+
+prompt_input() {
+	local prompt=$1
+	local default_value=$2
+	local value
+
+	if [[ -z "${JJ_REDATE_NO_GUM:-}" && -t 0 && -t 1 ]] && command -v gum >/dev/null 2>&1; then
+		gum input --prompt "$prompt" --value "$default_value" --placeholder "$default_value"
+		return
+	fi
+
+	printf '%s' "$prompt" >&2
+	if ! IFS= read -r value; then
+		if [[ -t 0 ]]; then
+			value="$default_value"
+		else
+			printf '\n%s\n' "no input received for ${prompt}" >&2
+			exit 1
+		fi
+	fi
+	if [[ -z "$value" ]]; then
+		value="$default_value"
+	fi
+	printf '%s\n' "$value"
+}
+
+default_date="$(date +%Y-%m-%d)"
+default_time="$(date +%H:%M:%S)"
+
+date_value="$(prompt_input 'Date (YYYY-MM-DD): ' "$default_date")"
+time_value="$(prompt_input 'Time (HH[:MM[:SS]]): ' "$default_time")"
+
+timestamp="$(
+	"$python_bin" - "$date_value" "$time_value" <<'PY'
+import re
+import sys
+from datetime import datetime
+
+date_value = sys.argv[1].strip()
+time_value = sys.argv[2].strip()
+
+if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_value):
+    raise SystemExit(f"invalid date: {date_value!r}; expected YYYY-MM-DD")
+
+if re.fullmatch(r"\d{1,2}", time_value):
+    time_value = f"{time_value}:00:00"
+elif re.fullmatch(r"\d{1,2}:\d{2}", time_value):
+    time_value = f"{time_value}:00"
+elif not re.fullmatch(r"\d{1,2}:\d{2}:\d{2}", time_value):
+    raise SystemExit(f"invalid time: {time_value!r}; expected HH, HH:MM, or HH:MM:SS")
+
+try:
+    local_dt = datetime.strptime(f"{date_value} {time_value}", "%Y-%m-%d %H:%M:%S").astimezone()
+except ValueError as err:
+    raise SystemExit(str(err))
+
+print(local_dt.isoformat(timespec="seconds"))
+PY
+)"
+
+if [[ -z "${JJ_REDATE_NO_GUM:-}" && -t 0 && -t 1 ]] && command -v gum >/dev/null 2>&1; then
+	gum confirm "Set author and committer timestamp on ${revset_label} to ${timestamp}?" || exit 1
+else
+	printf 'Setting author and committer timestamp on %s to %s\n' "$revset_label" "$timestamp" >&2
+fi
+
+jj_args=()
+if [[ -n "${JJ_WORKSPACE_ROOT:-}" ]]; then
+	jj_args=(-R "$JJ_WORKSPACE_ROOT")
+fi
+
+jj_with_timestamp() {
+	local command_timestamp=$1
+	shift
+
+	JJ_TIMESTAMP="$command_timestamp" jj "${jj_args[@]}" \
+		--config "debug.commit-timestamp=\"$command_timestamp\"" \
+		"$@"
+}
+
+verify_selected_timestamps() {
+	local failed=0
+	local actual_timestamps
+	local author_timestamp
+	local committer_timestamp
+	local change_id
+
+	while IFS= read -r change_id; do
+		if [[ -z "$change_id" ]]; then
+			continue
+		fi
+
+		actual_timestamps="$(
+			jj "${jj_args[@]}" --color never --no-pager log \
+				-r "change_id($change_id)" \
+				--no-graph \
+				--template 'author.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "\t" ++ committer.timestamp().format("%Y-%m-%dT%H:%M:%S%:z") ++ "\n"'
+		)"
+
+		while IFS=$'\t' read -r author_timestamp committer_timestamp; do
+			if [[ "$author_timestamp" == "$timestamp" && "$committer_timestamp" == "$timestamp" ]]; then
+				continue
+			fi
+
+			printf 'jj-redate: expected %s on change %s; author=%s committer=%s\n' \
+				"$timestamp" "$change_id" "$author_timestamp" "$committer_timestamp" >&2
+			failed=1
+		done <<<"$actual_timestamps"
+	done <<<"$selected_change_ids"
+
+	return "$failed"
+}
+
+redate_via_git_import() {
+	local change_id
+	local commit_id
+	local new_commit_id
+	local bookmark
+	local temp_bookmark
+	local temp_index
+
+	jj "${jj_args[@]}" git root >/dev/null
+	git rev-parse --git-dir >/dev/null
+
+	while IFS= read -r change_id; do
+		if [[ -z "$change_id" ]]; then
+			continue
+		fi
+
+		while IFS= read -r commit_id; do
+			if [[ -z "$commit_id" ]]; then
+				continue
+			fi
+
+			bookmark="$(
+				git for-each-ref --format='%(objectname)%09%(refname:strip=2)' refs/heads |
+					awk -F '\t' -v commit_id="$commit_id" '$1 == commit_id { print $2; exit }'
+			)"
+			temp_bookmark=""
+			if [[ -z "$bookmark" ]]; then
+				temp_bookmark="jj-redate-tmp-${change_id:0:12}-${commit_id:0:12}"
+				temp_index=0
+				while git show-ref --verify --quiet "refs/heads/$temp_bookmark"; do
+					temp_index=$((temp_index + 1))
+					temp_bookmark="jj-redate-tmp-${change_id:0:12}-${commit_id:0:12}-$temp_index"
+				done
+				bookmark="$temp_bookmark"
+				git update-ref "refs/heads/$bookmark" "$commit_id"
+				jj "${jj_args[@]}" --quiet git import
+			fi
+
+			new_commit_id="$(
+				"$python_bin" - "$commit_id" "$timestamp" <<'PY'
+import re
+import subprocess
+import sys
+from datetime import datetime
+
+commit_id = sys.argv[1]
+timestamp = sys.argv[2]
+dt = datetime.fromisoformat(timestamp)
+epoch = int(dt.timestamp())
+offset = dt.strftime("%z")
+replacement = f" {epoch} {offset}".encode()
+
+raw = subprocess.check_output(["git", "cat-file", "commit", commit_id])
+raw = re.sub(rb"^(author .+?) \d+ [+-]\d{4}$", rb"\1" + replacement, raw, flags=re.M)
+raw = re.sub(rb"^(committer .+?) \d+ [+-]\d{4}$", rb"\1" + replacement, raw, flags=re.M)
+
+new_commit_id = subprocess.check_output(
+    ["git", "hash-object", "-t", "commit", "-w", "--stdin"],
+    input=raw,
+)
+print(new_commit_id.decode().strip())
+PY
+			)"
+
+			git update-ref "refs/heads/$bookmark" "$new_commit_id" "$commit_id"
+			jj "${jj_args[@]}" --quiet git import
+			if [[ -n "$temp_bookmark" ]]; then
+				jj "${jj_args[@]}" --quiet bookmark forget "$temp_bookmark"
+			fi
+		done <<<"$(
+			jj "${jj_args[@]}" --color never --no-pager log \
+				-r "change_id($change_id)" \
+				--no-graph \
+				--template 'commit_id ++ "\n"'
+		)"
+	done <<<"$selected_change_ids"
+}
+
+restore_descendant_timestamps() {
+	if [[ -z "$descendant_timestamps" ]]; then
+		return
+	fi
+
+	while IFS=$'\t' read -r change_id committer_timestamp; do
+		if [[ -z "$change_id" || -z "$committer_timestamp" ]]; then
+			continue
+		fi
+		jj_with_timestamp "$committer_timestamp" --quiet metaedit \
+			--force-rewrite \
+			-r "change_id($change_id)"
+	done <<<"$descendant_timestamps"
+}
+
+selected_change_ids="$(
+	jj "${jj_args[@]}" --color never --no-pager log \
+		-r "$revset" \
+		--reversed \
+		--no-graph \
+		--template 'change_id ++ "\n"'
+)"
+
+descendant_timestamps="$(
+	jj "${jj_args[@]}" --color never --no-pager log \
+		-r "(${revset}):: ~ (${revset})" \
+		--reversed \
+		--no-graph \
+		--template 'change_id ++ "\t" ++ committer.timestamp().format("%Y-%m-%dT%H:%M:%S%.3f%:z") ++ "\n"'
+)"
+
+jj_with_timestamp "$timestamp" metaedit \
+	--author-timestamp "$timestamp" \
+	--force-rewrite \
+	-r "$revset"
+
+if ! verify_selected_timestamps; then
+	printf '%s\n' 'jj-redate: retrying through Git import fallback' >&2
+	if ! redate_via_git_import || ! verify_selected_timestamps; then
+		restore_descendant_timestamps
+		exit 1
+	fi
+fi
+
+restore_descendant_timestamps

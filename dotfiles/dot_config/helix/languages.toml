@@ -4,12 +4,6 @@ auto-format = true
 language-servers = ["ruff"]
 
 [[language]]
-name = "nix"
-file-types = ["nix", { glob = "*.nix.tmpl" }]
-auto-format = true
-language-servers = ["nil-filtered"]
-
-[[language]]
 name = "bash"
 file-types = [
   "sh",
@@ -26,8 +20,8 @@ file-types = [
 ]
 auto-format = true
 diagnostic-severity = "warning"
-formatter = { command = "shfmt", args = ["-w"] }
-language-servers = ["bash-language-server-filtered"]
+formatter = { command = "shfmt", args = ["-i", "2", "-bn"] }
+language-servers = ["bash-language-server"]
 
 [[language]]
 name = "javascript"
@@ -45,29 +39,33 @@ name = "json"
 file-types = ["json", "jsonc", { glob = "*.json.tmpl" }]
 auto-format = true
 indent = { tab-width = 2, unit = "  " }
-language-servers = ["vscode-json-language-server-filtered"]
+language-servers = ["vscode-json-language-server"]
 
 [[language]]
 name = "yaml"
 file-types = ["yaml", "yml", { glob = "*.yaml.tmpl" }, { glob = "*.yml.tmpl" }]
 auto-format = true
-language-servers = ["yaml-language-server-filtered"]
+language-servers = ["yaml-language-server"]
 
 [[language]]
 name = "toml"
-file-types = ["toml", { glob = "*.toml.tmpl" }, { glob = ".chezmoiexternal.toml.tmpl" }]
+file-types = [
+  "toml",
+  { glob = "*.toml.tmpl" },
+  { glob = ".chezmoiexternal.toml.tmpl" },
+]
 auto-format = true
-language-servers = ["taplo-filtered"]
+language-servers = ["taplo"]
 
-[language-server.bash-language-server-filtered]
-command = "lsp-diagnostic-filter"
-args = ["--", "bash-language-server", "start"]
+[[language]]
+name = "nix"
+auto-format = true
+formatter = { command = "nixfmt" }
+language-servers = ["nil"]
 
-[language-server.nil-filtered]
-command = "lsp-diagnostic-filter"
-args = ["--", "nil"]
-[language-server.nil-filtered.config.nil.formatting]
-command = ["nixfmt"]
+[language-server.bash-language-server]
+command = "bash-language-server"
+args = ["start"]
 
 [language-server.ruff]
 command = "ruff"
@@ -79,19 +77,29 @@ extendSelect = ["I"]
 
 [language-server.typescript-language-server]
 command = "bunx"
-args = ["--bun", "-p", "typescript-language-server", "typescript-language-server", "--stdio"]
+args = [
+  "--bun",
+  "-p",
+  "typescript-language-server",
+  "typescript-language-server",
+  "--stdio",
+]
 [language-server.typescript-language-server.config]
 hostInfo = "helix"
 
 [language-server.vscode-css-language-server]
 command = "bunx"
-args = ["--bun", "-p", "vscode-langservers-extracted", "vscode-css-language-server", "--stdio"]
-
-[language-server.vscode-json-language-server-filtered]
-command = "lsp-diagnostic-filter"
 args = [
-  "--",
-  "bunx",
+  "--bun",
+  "-p",
+  "vscode-langservers-extracted",
+  "vscode-css-language-server",
+  "--stdio",
+]
+
+[language-server.vscode-json-language-server]
+command = "bunx"
+args = [
   "--bun",
   "-p",
   "vscode-langservers-extracted",
@@ -99,17 +107,23 @@ args = [
   "--stdio",
 ]
 
-[language-server.yaml-language-server-filtered]
-command = "lsp-diagnostic-filter"
-args = ["--", "yaml-language-server", "--stdio"]
-[language-server.yaml-language-server-filtered.config.yaml]
+[language-server.yaml-language-server]
+command = "yaml-language-server"
+args = ["--stdio"]
+[language-server.yaml-language-server.config.yaml]
 format = { enable = true }
 validation = true
 schemas = { https = true }
 
-[language-server.taplo-filtered]
-command = "lsp-diagnostic-filter"
-args = ["--", "taplo", "lsp", "stdio"]
-[language-server.taplo-filtered.config.formatter]
+[language-server.taplo]
+command = "taplo"
+args = ["lsp", "stdio"]
+[language-server.taplo.config.formatter]
 alignEntries = true
 columnWidth = 100
+
+[language-server.nil]
+command = "nil"
+
+[language-server.just-lsp]
+command = "just-lsp"

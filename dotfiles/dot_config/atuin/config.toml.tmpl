@@ -1,5 +1,4 @@
-db_path = "{{ .chezmoi.homeDir }}/.local/share/atuin/history.db"
-key_path = "{{ .chezmoi.homeDir }}/.local/share/atuin/key"
+data_dir = "{{ .chezmoi.homeDir }}/.local/share/atuin"
 
 sync_address = "http://127.0.0.1:8888"
 auto_sync = true
@@ -13,8 +12,10 @@ style = "compact"
 inline_height = 40
 show_preview = true
 
+[theme]
+name = "catppuccin-frappe-pink"
+
 [daemon]
 enabled = true
 autostart = true
-socket_path = "{{ .chezmoi.homeDir }}/.local/share/atuin/atuin.sock"
 sync_frequency = 300

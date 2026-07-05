@@ -1,43 +1,15 @@
 "{{ .chezmoi.homeDir }}/.local/share/zellij/plugins/zjstatus.wasm" {
     ChangeApplicationState
-    RunCommands
     ReadApplicationState
+    RunCommands
 }
 "zjstatus" {
     ChangeApplicationState
-    FullHdAccess
-    InterceptInput
-    MessageAndLaunchOtherPlugins
-    OpenFiles
-    OpenTerminalsOrPlugins
     ReadApplicationState
-    ReadCliPipes
-    ReadPaneContents
-    ReadSessionEnvironmentVariables
-    Reconfigure
-    RunActionsAsUser
     RunCommands
-    StartWebServer
-    WebAccess
-    WriteToClipboard
-    WriteToStdin
 }
 "file:{{ .chezmoi.homeDir }}/.local/share/zellij/plugins/zjstatus.wasm" {
     ChangeApplicationState
-    FullHdAccess
-    InterceptInput
-    MessageAndLaunchOtherPlugins
-    OpenFiles
-    OpenTerminalsOrPlugins
     ReadApplicationState
-    ReadCliPipes
-    ReadPaneContents
-    ReadSessionEnvironmentVariables
-    Reconfigure
-    RunActionsAsUser
     RunCommands
-    StartWebServer
-    WebAccess
-    WriteToClipboard
-    WriteToStdin
 }

@@ -1,15 +1,10 @@
 (defcfg
   process-unmapped-keys yes
   log-layer-changes yes
-  linux-dev (
-    "/dev/input/by-id/usb-ITE_Tech._Inc._ITE_Device_8910_-event-kbd"
-    "/dev/input/by-id/bluetooth-Logitech_Pebble_K380s-event-kbd"
-    "/dev/input/by-id/usb-Ducky_Ducky_One2_Mini_RGB_DK-V1.09-201006-event-if03"
-    "/dev/input/by-id/usb-Ducky_Ducky_One2_Mini_RGB_DK-V1.09-201006-event-kbd"
-    "/dev/input/by-id/usb-Ducky_Ducky_One2_Mini_RGB_DK-V1.10-201231-event-if03"
-    "/dev/input/by-id/usb-Ducky_Ducky_One2_Mini_RGB_DK-V1.10-201231-event-kbd"
-    "/dev/input/by-id/usb-Logitech_USB_Receiver-if01-event-mouse"
-    "/dev/input/by-id/usb-Logitech_USB_Receiver-event-kbd"
+  linux-dev-names-include (
+    "ITE Tech. Inc. ITE Device(8910) Keyboard"
+    "LIFT Mouse"
+    "Pebble K380s"
   )
 )
 
