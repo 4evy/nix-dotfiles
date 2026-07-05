@@ -165,6 +165,9 @@ jobs:
         run: |
           set -euo pipefail
           digest_file=$(mktemp)
+          # sudo podman writes this digest file as root; mktemp creates it as the
+          # runner user with restrictive permissions.
+          chmod 666 "$digest_file"
           trap 'rm -f "$digest_file"' EXIT
 
           pushed_default=false
