@@ -1,30 +1,43 @@
 package chromiumbrowser
 
 import (
+	_ "embed"
 	"errors"
 	"os"
-	"path/filepath"
 	"slices"
+	"strings"
 
+	"github.com/4evy/dotfiles/internal/common/fileutil"
 	"github.com/buildkite/shellwords"
-	"github.com/google/renameio/v2/maybe"
 )
 
+//go:embed scripts/wrapper.sh
+var wrapperScriptTemplate string
+
 func writeWrapper(target, launcher string, options *InstallOptions) error {
+	return WriteWrapper(target, launcher, options.Flags, options.extraWrapperFlags)
+}
+
+func WriteWrapper(target, launcher, flagsText string, extraFlags []string) error {
 	var flags []string
-	if options.Flags != "" {
+	if flagsText != "" {
 		var err error
-		flags, err = shellwords.SplitPosix(options.Flags)
+		flags, err = shellwords.SplitPosix(flagsText)
 		if err != nil {
 			return err
 		}
 	}
-	args := slices.Concat([]string{launcher}, flags, options.extraWrapperFlags)
+	args := slices.Concat([]string{launcher}, flags, extraFlags)
 	content := renderWrapperScript(args)
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-		return err
+	return fileutil.WriteExecutable(target, []byte(content))
+}
+
+func renderWrapperScript(args []string) string {
+	quoted := make([]string, 0, len(args))
+	for _, arg := range args {
+		quoted = append(quoted, shellwords.QuotePosix(arg))
 	}
-	return maybe.WriteFile(target, []byte(content), 0o755)
+	return strings.ReplaceAll(wrapperScriptTemplate, "__COMMAND__", strings.Join(quoted, " "))
 }
 
 func replaceSymlink(oldname, newname string) error {

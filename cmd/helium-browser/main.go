@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/cli"
-	"github.com/FlameFlag/nix-dotfiles/internal/helium"
+	"github.com/4evy/dotfiles/internal/common/cli"
+	"github.com/4evy/dotfiles/internal/helium"
 	"github.com/spf13/cobra"
 )
 
@@ -14,27 +14,29 @@ var version = "dev"
 func main() {
 	cmd := &cobra.Command{
 		Use:   "helium-browser",
-		Short: "Install and configure Helium browser",
+		Short: "Configure Helium browser",
 	}
-	installOptions := helium.InstallOptions{ApplySettings: true}
-	install := &cobra.Command{
-		Use:   "install <macos|linux> <cache-dir> <bin-dir> <flags>",
-		Short: "Install Helium and configure extensions",
-		Args:  cobra.ExactArgs(4),
+
+	configureOptions := helium.InstallOptions{ApplySettings: true}
+	configure := &cobra.Command{
+		Use:   "configure <macos|linux> <cache-dir> <app-dir> <bin-dir> <flags>",
+		Short: "Configure an existing Helium application",
+		Args:  cobra.ExactArgs(5),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			installOptions.Mode = args[0]
-			installOptions.Root = args[1]
-			installOptions.BinDir = args[2]
-			installOptions.Flags = args[3]
-			return helium.Install(installOptions)
+			configureOptions.Mode = args[0]
+			configureOptions.Root = args[1]
+			configureOptions.AppDir = args[2]
+			configureOptions.BinDir = args[3]
+			configureOptions.Flags = args[4]
+			return helium.ConfigureInstalled(configureOptions)
 		},
 	}
-	install.Flags().
-		StringArrayVar(&installOptions.Settings, "settings", nil, "Additional extension settings JSON file")
-	install.Flags().
-		StringVar(&installOptions.SecretsPath, "secrets", "", "SOPS secrets file containing private extension settings")
-	install.Flags().
-		BoolVar(&installOptions.ApplySettings, "apply-settings", true, "Apply Helium extension settings after install")
+	configure.Flags().
+		StringArrayVar(&configureOptions.Settings, "settings", nil, "Additional extension settings JSON file")
+	configure.Flags().
+		StringVar(&configureOptions.SecretsPath, "secrets", "", "SOPS secrets file containing private native Chromium settings")
+	configure.Flags().
+		BoolVar(&configureOptions.ApplySettings, "apply-settings", true, "Apply Helium profile settings after install")
 
 	applyOptions := helium.ApplyOptions{}
 	applySettings := &cobra.Command{
@@ -60,7 +62,7 @@ func main() {
 	applySettings.Flags().
 		BoolVar(&applyOptions.GitHubToken, "gh-token", false, "Ask gh for an auth token and store it for Refined GitHub")
 	_ = applySettings.MarkFlagRequired("profile-dir")
-	cmd.AddCommand(install, applySettings)
+	cmd.AddCommand(configure, applySettings)
 
 	if err := cli.Execute(context.Background(), cmd, os.Args[1:], version); err != nil {
 		os.Exit(1)

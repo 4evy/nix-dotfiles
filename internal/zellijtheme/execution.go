@@ -9,9 +9,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/envx"
-	commonprocess "github.com/FlameFlag/nix-dotfiles/internal/common/process"
-	"github.com/FlameFlag/nix-dotfiles/internal/zellijtheme/codex"
+	"github.com/4evy/dotfiles/internal/common/envx"
+	commonprocess "github.com/4evy/dotfiles/internal/common/process"
+	"github.com/4evy/dotfiles/internal/zellijtheme/codex"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -67,7 +67,7 @@ func (r runnerSpec) run(extraArgs []string) (int, error) {
 	var skip []string
 	for _, name := range r.SkipEnv {
 		if value := os.Getenv(name); value != "" {
-			skip = append(skip, value)
+			skip = append(skip, filepath.SplitList(value)...)
 		}
 	}
 	if exe, err := os.Executable(); err == nil {
@@ -105,8 +105,7 @@ func (r runnerSpec) run(extraArgs []string) (int, error) {
 			}
 		}
 		for _, candidate := range candidates {
-			matchedSkip := false
-			for _, other := range skip {
+			matchedSkip := slices.ContainsFunc(skip, func(other string) bool {
 				samePath := candidate == other
 				sameResolvedPath := false
 				if !samePath {
@@ -114,11 +113,8 @@ func (r runnerSpec) run(extraArgs []string) (int, error) {
 					right, rerr := filepath.EvalSymlinks(other)
 					sameResolvedPath = lerr == nil && rerr == nil && left == right
 				}
-				if samePath || sameResolvedPath {
-					matchedSkip = true
-					break
-				}
-			}
+				return samePath || sameResolvedPath
+			})
 			if !matchedSkip {
 				executable = candidate
 				break
@@ -145,12 +141,12 @@ func (r runnerSpec) run(extraArgs []string) (int, error) {
 	switch r.EnvOverlay {
 	case "":
 	case "codex-trust":
-		overlay, filteredArgs, overlayCleanup, err := codex.CreateTrustOverlayForArgs(theme.Name, extraArgs)
+		codexEnv, filteredArgs, overlayCleanup, err := codex.CreateTrustRuntimeForArgs(theme.Name, extraArgs)
 		if err != nil {
 			return 1, err
 		}
 		extraArgs = filteredArgs
-		runtimeEnv = []string{"CODEX_HOME=" + overlay}
+		runtimeEnv = codexEnv
 		cleanup = overlayCleanup
 	default:
 		return 1, fmt.Errorf("%s has unknown env overlay %q", r.Name, r.EnvOverlay)

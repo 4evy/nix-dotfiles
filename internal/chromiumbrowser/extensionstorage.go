@@ -37,21 +37,6 @@ func ApplyExtensionSettings(options ApplyOptions) error {
 		}
 		sources = append(sources, SettingsSource{Name: path, Data: data})
 	}
-	for _, path := range options.CookieAutoDeleteTOML {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("read Cookie AutoDelete TOML file %s: %w", path, err)
-		}
-		source, err := CookieAutoDeleteSettingsSourceForExtensionFromTOML(
-			path,
-			data,
-			options.ExtensionIDs.cookieAutoDeleteID(),
-		)
-		if err != nil {
-			return err
-		}
-		sources = append(sources, source)
-	}
 
 	for _, source := range sources {
 		var settings settingsFile
@@ -153,13 +138,6 @@ func applyRefinedGitHubToken(options ApplyOptions) error {
 			return db.Put([]byte("options"), stored, nil)
 		},
 	)
-}
-
-func (ids ExtensionIDs) cookieAutoDeleteID() string {
-	if ids.CookieAutoDelete != "" {
-		return ids.CookieAutoDelete
-	}
-	return defaultCookieAutoDeleteID
 }
 
 func (ids ExtensionIDs) refinedGitHubID() string {

@@ -1,12 +1,18 @@
 package zellijtheme
 
 import (
-	"math"
+	"bytes"
+	_ "embed"
+	"encoding/json"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/x/ansi"
+	"github.com/lucasb-eyer/go-colorful"
 )
 
 type Colors struct {
@@ -26,10 +32,47 @@ const (
 	Light
 )
 
+//go:embed catppuccin_palette.json
+var catppuccinPaletteJSON []byte
+
+var catppuccinPalette = mustParseCatppuccinPalette()
+
 var (
-	Frappe = Theme{Name: "catppuccin-frappe-pink", Colors: Colors{FG: "#c6d0f5", BG: "#303446"}}
-	Latte  = Theme{Name: "catppuccin-latte-pink", Colors: Colors{FG: "#4c4f69", BG: "#eff1f5"}}
+	Frappe = themeFromPalette("catppuccin-frappe-pink", "frappe")
+	Latte  = themeFromPalette("catppuccin-latte-pink", "latte")
 )
+
+type catppuccinPaletteMap map[string]map[string]string
+
+func mustParseCatppuccinPalette() catppuccinPaletteMap {
+	var palette catppuccinPaletteMap
+	if err := json.Unmarshal(catppuccinPaletteJSON, &palette); err != nil {
+		panic(err)
+	}
+	return palette
+}
+
+func themeFromPalette(name, flavor string) Theme {
+	colors, ok := catppuccinPalette[flavor]
+	if !ok {
+		panic("missing Catppuccin flavor: " + flavor)
+	}
+	return Theme{
+		Name: name,
+		Colors: Colors{
+			FG: mustPaletteColor(colors, flavor, "text"),
+			BG: mustPaletteColor(colors, flavor, "base"),
+		},
+	}
+}
+
+func mustPaletteColor(colors map[string]string, flavor, name string) string {
+	color := colors[name]
+	if color == "" {
+		panic("missing Catppuccin color: " + flavor + "." + name)
+	}
+	return color
+}
 
 type themeProbePlan struct {
 	fallback Theme
@@ -56,6 +99,11 @@ var systemThemeProbePlans = map[string]themeProbePlan{
 }
 
 func DetectSystemTheme() Theme {
+	for _, name := range []string{"COLOR_SCHEME", "TERMINAL_THEME", "THEME"} {
+		if mode, ok := themeModeFromText(os.Getenv(name)); ok {
+			return themeForMode(mode)
+		}
+	}
 	if mode, ok := detectTerminalTheme(100 * time.Millisecond); ok {
 		return themeForMode(mode)
 	}
@@ -90,81 +138,75 @@ func themeModeFromText(text string) (TerminalThemeMode, bool) {
 		return Light, true
 	}
 	switch strings.Trim(text, "'\"") {
-	case "default", "adwaita":
+	case "frappe", "macchiato", "mocha", "catppuccin-frappe-pink":
+		return Dark, true
+	case "latte", "catppuccin-latte-pink":
 		return Light, true
 	}
 	return Dark, false
 }
 
 func ParseTerminalThemeReport(buffer []byte) (TerminalThemeMode, bool) {
-	text := string(buffer)
-	if strings.Contains(text, "\x1b[?997;1n") {
+	if bytes.Contains(buffer, []byte("\x1b[?997;1n")) {
 		return Dark, true
 	}
-	if strings.Contains(text, "\x1b[?997;2n") {
+	if bytes.Contains(buffer, []byte("\x1b[?997;2n")) {
 		return Light, true
 	}
-	rest := text
-	for {
-		start := strings.Index(rest, "\x1b]11;")
-		if start < 0 {
+
+	parser := ansi.NewParser()
+	state := byte(0)
+	for len(buffer) > 0 {
+		_, _, n, nextState := ansi.DecodeSequence(buffer, state, parser)
+		if n <= 0 {
 			return Dark, false
 		}
-		after := rest[start+len("\x1b]11;"):]
-		bell := strings.IndexByte(after, '\a')
-		st := strings.Index(after, "\x1b\\")
-		var end int
-		skip := 1
-		switch {
-		case bell >= 0 && (st < 0 || bell < st):
-			end = bell
-		case st >= 0:
-			end = st
-			skip = 2
-		default:
-			return Dark, false
+		if parser.Command() == 11 {
+			if mode, ok := themeModeFromOSC11Data(parser.Data()); ok {
+				return mode, true
+			}
 		}
-		value := strings.TrimPrefix(after[:end], "rgb:")
-		red, restValue, ok := strings.Cut(value, "/")
-		if ok {
-			green, blue, ok := strings.Cut(restValue, "/")
-			if !ok || strings.Contains(blue, "/") {
-				rest = after[end+skip:]
-				continue
-			}
-			r, ok := parseColorComponent(red)
-			if !ok {
-				rest = after[end+skip:]
-				continue
-			}
-			g, ok := parseColorComponent(green)
-			if !ok {
-				rest = after[end+skip:]
-				continue
-			}
-			b, ok := parseColorComponent(blue)
-			if !ok {
-				rest = after[end+skip:]
-				continue
-			}
-			channel := func(value uint8) float64 {
-				v := float64(value) / 255
-				if v <= 0.04045 {
-					return v / 12.92
-				}
-				return math.Pow((v+0.055)/1.055, 2.4)
-			}
-			luminance := 0.2126*channel(r) + 0.7152*channel(g) + 0.0722*channel(b)
-			if luminance > 0.5 {
-				return Light, true
-			}
-			return Dark, true
-		}
-		rest = after[end+skip:]
+		state = nextState
+		buffer = buffer[n:]
 	}
+	return Dark, false
 }
 
-func parseColorComponent(value string) (uint8, bool) {
+func themeModeFromOSC11Data(data []byte) (TerminalThemeMode, bool) {
+	value, ok := strings.CutPrefix(string(data), "11;")
+	if !ok {
+		return Dark, false
+	}
+	value = strings.TrimPrefix(value, "rgb:")
+	red, rest, ok := strings.Cut(value, "/")
+	if !ok {
+		return Dark, false
+	}
+	green, blue, ok := strings.Cut(rest, "/")
+	if !ok || strings.Contains(blue, "/") {
+		return Dark, false
+	}
+	r, ok := parseColorComponent(red)
+	if !ok {
+		return Dark, false
+	}
+	g, ok := parseColorComponent(green)
+	if !ok {
+		return Dark, false
+	}
+	b, ok := parseColorComponent(blue)
+	if !ok {
+		return Dark, false
+	}
+	linearRed, linearGreen, linearBlue := (colorful.Color{R: r, G: g, B: b}).LinearRgb()
+	luminance := 0.2126*linearRed + 0.7152*linearGreen + 0.0722*linearBlue
+	if luminance > 0.5 {
+		return Light, true
+	}
+	return Dark, true
+}
+
+func parseColorComponent(value string) (float64, bool) {
 	if value == "" || len(value) > 4 {
 		return 0, false
 	}
@@ -173,5 +215,5 @@ func parseColorComponent(value string) (uint8, bool) {
 		return 0, false
 	}
 	maxValue := uint64(1<<(len(value)*4)) - 1
-	return uint8((parsed*255 + maxValue/2) / maxValue), true
+	return float64(parsed) / float64(maxValue), true
 }

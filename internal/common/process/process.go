@@ -9,13 +9,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/envx"
+	"github.com/4evy/dotfiles/internal/common/envx"
 )
 
 const (
@@ -137,9 +136,6 @@ func CaptureWithEnvAndStdin(argv []string, env []string, stdin []byte) (Output, 
 }
 
 func ExecutableName(name string) string {
-	if runtime.GOOS == "windows" && filepath.Ext(name) == "" {
-		return name + ".exe"
-	}
 	return name
 }
 
@@ -172,7 +168,7 @@ func IsPathLike(name string) bool {
 }
 
 func IsExecutableFile(info os.FileInfo) bool {
-	return !info.IsDir() && (runtime.GOOS == "windows" || info.Mode()&0o111 != 0)
+	return !info.IsDir() && info.Mode()&0o111 != 0
 }
 
 func timeoutFromEnv(name string, fallback time.Duration) time.Duration {

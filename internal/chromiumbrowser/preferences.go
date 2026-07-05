@@ -7,17 +7,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+
+	"github.com/4evy/dotfiles/internal/common/fileutil"
 )
 
 const (
 	PreferencesFilename = "Preferences"
+	LocalStateFilename  = "Local State"
+	VariationsFilename  = "Variations"
 )
 
 type PreferencePatch func(map[string]any)
 
 func (browser Browser) ApplyBrowserPreferenceSettings(profileDir string) error {
-	preferences, err := readPreferences(profileDir)
+	preferences, err := ReadPreferences(profileDir)
 	if err != nil {
 		return err
 	}
@@ -26,17 +31,102 @@ func (browser Browser) ApplyBrowserPreferenceSettings(profileDir string) error {
 		patch(preferences)
 	}
 
-	return writePreferences(profileDir, preferences)
+	return WritePreferences(profileDir, preferences)
 }
 
-func readPreferences(profileDir string) (map[string]any, error) {
+func (browser Browser) ApplyBrowserLocalStateSettings(profileDir string) error {
+	if len(browser.LocalStatePatches) == 0 {
+		return nil
+	}
+	localState, err := ReadLocalState(profileDir)
+	if err != nil {
+		return err
+	}
+	for _, patch := range browser.LocalStatePatches {
+		patch(localState)
+	}
+	return WriteLocalState(profileDir, localState)
+}
+
+func (browser Browser) ApplyBrowserVariationSettings(profileDir string) error {
+	if len(browser.VariationPatches) == 0 {
+		return nil
+	}
+	variations, err := ReadVariations(profileDir)
+	if err != nil {
+		return err
+	}
+	for _, patch := range browser.VariationPatches {
+		patch(variations)
+	}
+	return WriteVariations(profileDir, variations)
+}
+
+func ReadPreferences(profileDir string) (map[string]any, error) {
 	path := filepath.Join(profileDir, PreferencesFilename)
+	preferences, err := readPreferenceFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read Chromium Preferences: %w", err)
+	}
+	return preferences, nil
+}
+
+func WritePreferences(profileDir string, preferences map[string]any) error {
+	if _, err := fileutil.WriteJSONIfChanged(
+		filepath.Join(profileDir, PreferencesFilename),
+		preferences,
+		0o600,
+	); err != nil {
+		return fmt.Errorf("write Chromium Preferences: %w", err)
+	}
+	return nil
+}
+
+func ReadLocalState(profileDir string) (map[string]any, error) {
+	localState, err := readPreferenceFile(localStatePath(profileDir))
+	if err != nil {
+		return nil, fmt.Errorf("read Chromium Local State: %w", err)
+	}
+	return localState, nil
+}
+
+func WriteLocalState(profileDir string, localState map[string]any) error {
+	if _, err := fileutil.WriteJSONIfChanged(localStatePath(profileDir), localState, 0o600); err != nil {
+		return fmt.Errorf("write Chromium Local State: %w", err)
+	}
+	return nil
+}
+
+func ReadVariations(profileDir string) (map[string]any, error) {
+	variations, err := readPreferenceFile(variationsPath(profileDir))
+	if err != nil {
+		return nil, fmt.Errorf("read Chromium Variations: %w", err)
+	}
+	return variations, nil
+}
+
+func WriteVariations(profileDir string, variations map[string]any) error {
+	if _, err := fileutil.WriteJSONIfChanged(variationsPath(profileDir), variations, 0o600); err != nil {
+		return fmt.Errorf("write Chromium Variations: %w", err)
+	}
+	return nil
+}
+
+func localStatePath(profileDir string) string {
+	return filepath.Join(filepath.Dir(profileDir), LocalStateFilename)
+}
+
+func variationsPath(profileDir string) string {
+	return filepath.Join(filepath.Dir(profileDir), VariationsFilename)
+}
+
+func readPreferenceFile(path string) (map[string]any, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return map[string]any{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read Chromium Preferences: %w", err)
+		return nil, err
 	}
 	if len(bytes.TrimSpace(data)) == 0 {
 		return map[string]any{}, nil
@@ -46,24 +136,9 @@ func readPreferences(profileDir string) (map[string]any, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	if err := decoder.Decode(&preferences); err != nil {
-		return nil, fmt.Errorf("parse Chromium Preferences: %w", err)
+		return nil, err
 	}
 	return preferences, nil
-}
-
-func writePreferences(profileDir string, preferences map[string]any) error {
-	if err := os.MkdirAll(profileDir, 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(preferences, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode Chromium Preferences: %w", err)
-	}
-	data = append(data, '\n')
-	if err := os.WriteFile(filepath.Join(profileDir, PreferencesFilename), data, 0o600); err != nil {
-		return fmt.Errorf("write Chromium Preferences: %w", err)
-	}
-	return nil
 }
 
 func NestedObject(root map[string]any, dottedPath string) map[string]any {
@@ -102,11 +177,11 @@ func EnsureAcceleratorAdded(customAccelerators map[string]any, commandID, accele
 	if !ok {
 		added = []any{}
 	}
-	for _, existing := range added {
-		if existing == accelerator {
-			command["added"] = added
-			return
-		}
+	if slices.ContainsFunc(added, func(existing any) bool {
+		return existing == accelerator
+	}) {
+		command["added"] = added
+		return
 	}
 	command["added"] = append(added, accelerator)
 }

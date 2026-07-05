@@ -1,0 +1,9 @@
+[[patch]]
+name = "suppress_install_options_page"
+old = 'case"install":yield browser.runtime.openOptionsPage();break;case"update":'
+new = 'case"install":break;case"update":'
+
+[[patch]]
+name = "disable_open_options_page_calls"
+old = 'browser.runtime.openOptionsPage()'
+new = 'Promise.resolve()'

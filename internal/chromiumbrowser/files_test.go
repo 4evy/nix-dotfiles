@@ -74,7 +74,7 @@ func TestLinuxDesktopEntryAddsStartupWMClass(t *testing.T) {
 		"",
 	}, "\n")
 
-	got := linuxDesktopEntry(input, "/home/user/.local/bin/helium-browser", "helium", "helium-browser")
+	got := LinuxDesktopEntry(input, "/home/user/.local/bin/helium-browser", "helium", "helium-browser")
 
 	for _, want := range []string{
 		"Exec=/home/user/.local/bin/helium-browser %U",

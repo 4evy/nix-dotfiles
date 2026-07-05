@@ -23,9 +23,6 @@ func TestCatalogIsValid(t *testing.T) {
 	if len(catalog.UpdateURL) == 0 {
 		t.Fatal("update URL extensions are empty")
 	}
-	if len(catalog.ZIP) == 0 {
-		t.Fatal("ZIP extensions are empty")
-	}
 }
 
 func TestValidExtensionIDMatchesChromiumIDShape(t *testing.T) {
@@ -65,10 +62,13 @@ func TestValidExternalVersionMatchesChromiumExternalVersionShape(t *testing.T) {
 }
 
 func TestUnpackedExtensionIDMatchesChromiumPathID(t *testing.T) {
-	path := "/var/home/e0vi/.cache/nix-dotfiles/ansible/helium-browser/extensions/unpacked/hebmefdjnehapihcomeennjpdjghcpdn"
-	want := "blmgbeglgmflebeojobnhanokhchhekk"
+	path := "/var/home/4evy/.cache/dotfiles/ansible/helium-browser/extensions/unpacked/aeblfdkhhhdcdjpifhhbdiojplfjncoa"
+	want := "eemjflinlmihebpkelplffenpkclceef"
 	if got := UnpackedExtensionID(path); got != want {
 		t.Fatalf("UnpackedExtensionID(%q) = %q, want %q", path, got, want)
+	}
+	if got := UnpackedExtensionID(path + "/../aeblfdkhhhdcdjpifhhbdiojplfjncoa"); got != want {
+		t.Fatalf("UnpackedExtensionID with redundant path segments = %q, want %q", got, want)
 	}
 }
 
@@ -151,8 +151,8 @@ func TestInstallPinsChromeStoreExtensionsToCRXFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.LoadExtensionPaths) == 0 {
-		t.Fatal("load extension paths are empty")
+	if len(result.LoadExtensionPaths) != 0 {
+		t.Fatalf("load extension paths = %#v, want none", result.LoadExtensionPaths)
 	}
 
 	externalDir := filepath.Join(home, ".config/net.imput.helium/External Extensions")

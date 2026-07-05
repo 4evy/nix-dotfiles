@@ -3,13 +3,13 @@ name = "codex"
 programs = [
   "$ZELLIJ_THEME_RUN_CODEX_BIN",
   "$CODEX_ZELLIJ_THEME_CODEX_BIN",
-  "codex",
   "~/.bun/bin/codex",
   "~/.cache/.bun/bin/codex",
   "~/.npm/bin/codex",
-  "~/.local/bin/codex",
+  "codex",
 ]
 default_args = ["--dangerously-bypass-approvals-and-sandbox"]
+skip_env = ["ZELLIJ_THEME_RUN_CODEX_WRAPPER"]
 env_overlay = "codex-trust"
 startup_pane_color = true
 
@@ -36,7 +36,7 @@ quote = true
 
 [[runner]]
 name = "helix"
-programs = ["hx", "helix"]
+programs = ["~/.local/share/dotfiles/helix-tip/bin/hx", "hx", "helix"]
 skip_env = ["ZELLIJ_THEME_RUN_WRAPPER", "HELIX_AUTO_THEME_WRAPPER"]
 
 [runner.config]

@@ -1,16 +1,14 @@
 package zellijtheme
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/envx"
+	"github.com/4evy/dotfiles/internal/common/envx"
 )
 
 type zellijEnvironment struct {
@@ -59,8 +57,45 @@ func RunZellij(extraArgs []string) (int, error) {
 			"quit",
 		}
 	}
+	theme := DetectSystemTheme()
+	args = appendThemeOptions(args, extraArgs, theme)
 	args = append(args, extraArgs...)
-	return RunInheritEnv("zellij", args, append(os.Environ(), "ZELLIJ_SOCKET_DIR="+socketDir))
+	return RunInheritEnv(
+		"zellij",
+		args,
+		append(os.Environ(), "ZELLIJ_SOCKET_DIR="+socketDir, "ZELLIJ_THEME_RUN_THEME="+theme.Name),
+	)
+}
+
+func appendThemeOptions(args, extraArgs []string, theme Theme) []string {
+	if !hasZellijOption(args, "--theme") && !hasZellijOption(extraArgs, "--theme") {
+		args = append(args, "--theme", theme.Name)
+	}
+	if !hasZellijOption(args, "--theme-dark") && !hasZellijOption(extraArgs, "--theme-dark") {
+		args = append(args, "--theme-dark", Frappe.Name)
+	}
+	if !hasZellijOption(args, "--theme-light") && !hasZellijOption(extraArgs, "--theme-light") {
+		args = append(args, "--theme-light", Latte.Name)
+	}
+	return args
+}
+
+func hasZellijOption(args []string, name string) bool {
+	for index, arg := range args {
+		if arg == "--" {
+			return false
+		}
+		if arg == name {
+			return true
+		}
+		if strings.HasPrefix(arg, name+"=") {
+			return true
+		}
+		if arg == "options" && index == 0 {
+			continue
+		}
+	}
+	return false
 }
 
 type StartupPaneColor struct {
@@ -72,30 +107,14 @@ func StartStartupPaneColor(theme Theme) StartupPaneColor {
 	_, err := exec.LookPath("zellij")
 	enabled := environment.Active != "" && err == nil
 	if enabled {
-		stdoutLock.Lock()
-		info, err := os.Stdout.Stat()
-		if err == nil && info.Mode()&os.ModeCharDevice != 0 {
-			fmt.Fprintf(
-				os.Stdout,
-				"\x1b]10;%s\x1b\\\x1b]11;%s\x1b\\",
-				theme.Colors.FG,
-				theme.Colors.BG,
-			)
-			_ = os.Stdout.Sync()
-		}
-		stdoutLock.Unlock()
+		// Important: keep Codex startup tinting scoped to zellij's pane color.
+		// Do not use OSC 10/11 here: those mutate Ghostty's terminal palette
+		// directly, and after Codex exits Ghostty can keep rendering the old
+		// background until the pane is manually cleared or repainted.
+		RunSilent("zellij", "action", "set-pane-color", "--fg", theme.Colors.FG, "--bg", theme.Colors.BG)
 
-		paneID := environment.PaneID
 		go func() {
-			if paneID != "" {
-				for range 3 {
-					time.Sleep(500 * time.Millisecond)
-					RunSilent("zellij", "action", "write", "--pane-id", paneID, "27", "91", "73")
-				}
-				time.Sleep(1500 * time.Millisecond)
-			} else {
-				time.Sleep(3 * time.Second)
-			}
+			time.Sleep(3 * time.Second)
 			RunSilent("zellij", "action", "set-pane-color", "--reset")
 		}()
 	}
@@ -107,5 +126,3 @@ func (s StartupPaneColor) Close() {
 		RunSilent("zellij", "action", "set-pane-color", "--reset")
 	}
 }
-
-var stdoutLock sync.Mutex

@@ -1,17 +1,21 @@
 package chromiumbrowser
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/4evy/dotfiles/internal/common/chromiumext"
+)
 
 type InstallOptions struct {
-	Mode                 string
-	Root                 string
-	AppDir               string
-	BinDir               string
-	Flags                string
-	Settings             []string
-	SettingsSource       []SettingsSource
-	CookieAutoDeleteTOML []string
-	ApplySettings        bool
+	Mode           string
+	Root           string
+	AppDir         string
+	BinDir         string
+	Flags          string
+	Settings       []string
+	SettingsSource []SettingsSource
+	BundlePatches  []chromiumext.BundlePatch
+	ApplySettings  bool
 
 	extraWrapperFlags  []string
 	extensionIDAliases map[string]string
@@ -30,4 +34,21 @@ func (browser Browser) Install(options InstallOptions) error {
 	default:
 		return fmt.Errorf("unsupported installer mode: %s", options.Mode)
 	}
+}
+
+func (browser Browser) applyInstallSettings(options *InstallOptions) error {
+	if !options.ApplySettings {
+		return nil
+	}
+	profile := browser.DefaultProfileDir(options.Mode)
+	if profile == "" {
+		return nil
+	}
+	return browser.ApplyProfileSettings(ApplyOptions{
+		ProfileDir:         profile,
+		Settings:           options.Settings,
+		SettingsSource:     options.SettingsSource,
+		ExtensionIDAliases: options.extensionIDAliases,
+		GitHubToken:        true,
+	})
 }

@@ -1,7 +1,6 @@
 package chromiumbrowser
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -38,18 +37,28 @@ external_extension_dirs = [
 ]
 
 [extensions]
-cookie_auto_delete_id = "cookie-extension"
 refined_github_id = "github-extension"
 
 [[preferences.values]]
 path = "example.browser.enabled"
 value = true
 
-[[preferences.accelerators]]
-path = "example.browser.custom_accelerators"
-command_id = "1"
-accelerator = "Control+One"
-`), "test config")
+[[preferences.local_state_values]]
+path = "example.browser.local_enabled"
+value = true
+
+[[preferences.variation_values]]
+path = "example.browser.variation_enabled"
+value = true
+
+	[[preferences.accelerators]]
+	path = "example.browser.custom_accelerators"
+	command_id = "1"
+	accelerator = "Control+One"
+
+	[preferences.cookies]
+	allow = ["[*.]example.com"]
+	`), "test config")
 	assert.NilError(t, err)
 
 	browser := config.Browser()
@@ -67,7 +76,6 @@ accelerator = "Control+One"
 	assert.Equal(t, browser.MacOSAppDir, filepath.FromSlash("/home/browser-test/Applications/Example.app"))
 	assert.Equal(t, browser.MacOSLauncherPath, filepath.Join("Contents", "MacOS", "Example"))
 	assert.Equal(t, browser.DefaultProfileDir("linux"), filepath.FromSlash("/xdg/config/example/Default"))
-	assert.Equal(t, browser.ExtensionIDs.CookieAutoDelete, "cookie-extension")
 	assert.Equal(t, browser.ExtensionIDs.RefinedGitHub, "github-extension")
 	assert.DeepEqual(
 		t,
@@ -84,6 +92,21 @@ accelerator = "Control+One"
 	customAccelerators := exampleBrowser["custom_accelerators"].(map[string]any)
 	command := customAccelerators["1"].(map[string]any)
 	assert.DeepEqual(t, command["added"], []any{"Control+One"})
+	cookieExceptions := preferences["profile"].(map[string]any)["content_settings"].(map[string]any)["exceptions"].(map[string]any)["cookies"].(map[string]any)
+	assert.DeepEqual(t, cookieExceptions["[*.]example.com,*"], map[string]any{"setting": 1})
+
+	localState := map[string]any{}
+	for _, patch := range browser.LocalStatePatches {
+		patch(localState)
+	}
+	exampleLocalBrowser := localState["example"].(map[string]any)["browser"].(map[string]any)
+	assert.Equal(t, exampleLocalBrowser["local_enabled"], true)
+
+	variations := map[string]any{}
+	for _, patch := range browser.VariationPatches {
+		patch(variations)
+	}
+	assert.Equal(t, variations["example.browser.variation_enabled"], true)
 }
 
 func TestLoadConfigRejectsIncompletePreferenceAccelerators(t *testing.T) {
@@ -95,20 +118,4 @@ path = "example.browser.custom_accelerators"
 command_id = "1"
 `), "test config")
 	assert.ErrorContains(t, err, "incomplete preference accelerator")
-}
-
-func TestCookieAutoDeleteSettingsSourceForExtensionFromTOMLUsesConfiguredID(t *testing.T) {
-	source, err := CookieAutoDeleteSettingsSourceForExtensionFromTOML(
-		"cad.toml",
-		[]byte(`
-[settings]
-activeMode = true
-`),
-		"custom-cookie-extension",
-	)
-	assert.NilError(t, err)
-
-	var settings settingsFile
-	assert.NilError(t, json.Unmarshal(source.Data, &settings))
-	assert.Equal(t, settings.Local[0].ID, "custom-cookie-extension")
 }

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/cli"
-	"github.com/FlameFlag/nix-dotfiles/internal/zellijtheme"
+	"github.com/4evy/dotfiles/internal/common/cli"
+	"github.com/4evy/dotfiles/internal/zellijtheme"
 	"github.com/spf13/cobra"
 )
 

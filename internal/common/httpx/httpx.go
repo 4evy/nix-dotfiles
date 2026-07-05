@@ -1,7 +1,6 @@
 package httpx
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,12 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/google/renameio/v2"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
-var defaultRetryableClient = sync.OnceValue(func() *http.Client {
-	return RetryableClient(0)
+var defaultRestyClient = sync.OnceValue(func() *resty.Client {
+	return configureResty(resty.New().SetTimeout(defaultTimeout))
 })
 
 type Client struct {
@@ -29,44 +29,39 @@ type TextResponse struct {
 	Body   string
 }
 
+const defaultTimeout = 30 * time.Second
+
 func (c *Client) GetBearerText(url, token string) (TextResponse, error) {
-	req, err := c.request(http.MethodGet, url, nil)
-	if err != nil {
-		return TextResponse{}, err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	return c.text(req)
+	resp, err := c.request().SetAuthToken(token).Get(url)
+	return textResponse(resp, err)
 }
 
 func (c *Client) PostJSONBearerText(url, token string, body any) (TextResponse, error) {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return TextResponse{}, err
-	}
-	req, err := c.request(http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return TextResponse{}, err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-	return c.text(req)
+	resp, err := c.request().
+		SetAuthToken(token).
+		SetHeader("Content-Type", "application/json").
+		SetBody(body).
+		Post(url)
+	return textResponse(resp, err)
 }
 
 func (c *Client) Reader(url string) (io.ReadCloser, error) {
-	resp, err := c.get(url)
+	resp, err := c.rawGet(url)
 	if err != nil {
 		return nil, err
 	}
-	return resp.Body, nil
+	return resp.RawBody(), nil
 }
 
 func (c *Client) Bytes(url string) ([]byte, error) {
-	resp, err := c.get(url)
+	resp, err := c.request().Get(url)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	if resp.IsError() {
+		return nil, fmt.Errorf("GET %s: %s", url, resp.Status())
+	}
+	return resp.Body(), nil
 }
 
 func (c *Client) Text(url string) (string, error) {
@@ -78,20 +73,22 @@ func (c *Client) Text(url string) (string, error) {
 }
 
 func (c *Client) JSON(url string, out any) error {
-	resp, err := c.get(url)
+	resp, err := c.request().Get(url)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	return json.NewDecoder(resp.Body).Decode(out)
+	if resp.IsError() {
+		return fmt.Errorf("GET %s: %s", url, resp.Status())
+	}
+	return json.Unmarshal(resp.Body(), out)
 }
 
 func (c *Client) DownloadFile(url, path string) error {
-	resp, err := c.get(url)
+	resp, err := c.rawGet(url)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer resp.RawBody().Close()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -100,65 +97,71 @@ func (c *Client) DownloadFile(url, path string) error {
 		return err
 	}
 	defer file.Cleanup()
-	_, copyErr := io.Copy(file, resp.Body)
+	_, copyErr := io.Copy(file, resp.RawBody())
 	if copyErr != nil {
 		return copyErr
 	}
 	return file.CloseAtomicallyReplace()
 }
 
-func (c *Client) get(url string) (*http.Response, error) {
-	req, err := c.request(http.MethodGet, url, nil)
+func (c *Client) ResolveURL(url string) (string, error) {
+	resp, err := c.request().Head(url)
+	if err != nil {
+		return "", err
+	}
+	if resp.IsError() {
+		return "", fmt.Errorf("HEAD %s: %s", url, resp.Status())
+	}
+	return resp.RawResponse.Request.URL.String(), nil
+}
+
+func (c *Client) rawGet(url string) (*resty.Response, error) {
+	resp, err := c.request().SetDoNotParseResponse(true).Get(url)
 	if err != nil {
 		return nil, err
 	}
-	client := c.HTTP
-	if client == nil {
-		client = defaultRetryableClient()
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		defer resp.Body.Close()
-		return nil, fmt.Errorf("GET %s: %s", url, resp.Status)
+	if resp.IsError() {
+		defer resp.RawBody().Close()
+		return nil, fmt.Errorf("GET %s: %s", url, resp.Status())
 	}
 	return resp, nil
 }
 
-func (c *Client) text(req *http.Request) (TextResponse, error) {
-	client := c.HTTP
-	if client == nil {
-		client = defaultRetryableClient()
-	}
-	resp, err := client.Do(req)
+func textResponse(resp *resty.Response, err error) (TextResponse, error) {
 	if err != nil {
 		return TextResponse{}, err
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return TextResponse{}, err
-	}
-	return TextResponse{Status: resp.StatusCode, Body: string(body)}, nil
+	return TextResponse{Status: resp.StatusCode(), Body: resp.String()}, nil
 }
 
 func RetryableClient(timeout time.Duration) *http.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.Logger = nil
 	retryClient.RetryMax = 3
-	retryClient.HTTPClient = &http.Client{Timeout: timeout}
-	return retryClient.StandardClient()
+	client := retryClient.StandardClient()
+	client.Timeout = timeout
+	return client
 }
 
-func (c *Client) request(method, url string, body io.Reader) (*http.Request, error) {
-	req, err := http.NewRequest(method, url, body)
-	if err != nil {
-		return nil, err
-	}
+func (c *Client) request() *resty.Request {
+	req := c.resty().R()
 	if c.UserAgent != "" {
-		req.Header.Set("User-Agent", c.UserAgent)
+		req.SetHeader("User-Agent", c.UserAgent)
 	}
-	return req, nil
+	return req
+}
+
+func (c *Client) resty() *resty.Client {
+	if c.HTTP == nil {
+		return defaultRestyClient()
+	}
+	return configureResty(resty.NewWithClient(c.HTTP))
+}
+
+func configureResty(client *resty.Client) *resty.Client {
+	return client.
+		SetRetryCount(3).
+		AddRetryCondition(func(resp *resty.Response, err error) bool {
+			return err != nil || resp.StatusCode() >= http.StatusInternalServerError
+		})
 }

@@ -74,6 +74,7 @@ func TestApplyWritesLocalAndSyncSettings(t *testing.T) {
 func TestApplyMergesRefinedGitHubToken(t *testing.T) {
 	root := t.TempDir()
 	profileDir := filepath.Join(root, "profile")
+	refinedGitHubID := defaultConfig.Browser.ExtensionIDs.RefinedGitHub
 	dbPath := filepath.Join(profileDir, "Sync Extension Settings", refinedGitHubID)
 	if err := os.MkdirAll(dbPath, 0o755); err != nil {
 		t.Fatal(err)
@@ -162,7 +163,12 @@ func TestDefaultSettingsSourcesAreValid(t *testing.T) {
 	}
 	totalLocal := 0
 	for _, source := range sources {
-		var settings settingsFile
+		var settings struct {
+			Local []struct {
+				ID     string         `json:"id"`
+				Values map[string]any `json:"values"`
+			} `json:"local"`
+		}
 		if err := json.Unmarshal(source.Data, &settings); err != nil {
 			t.Fatalf("%s: %v", source.Name, err)
 		}
@@ -170,6 +176,21 @@ func TestDefaultSettingsSourcesAreValid(t *testing.T) {
 	}
 	if totalLocal == 0 {
 		t.Fatal("default settings local entries are empty")
+	}
+}
+
+func TestUserColorFromFlagsParsesQuotedShellFields(t *testing.T) {
+	want, ok := userColorFromFlags("--set-user-color=12,34,56")
+	if !ok {
+		t.Fatal("plain user color flag was not parsed")
+	}
+
+	got, ok := userColorFromFlags(`--some-flag "--set-user-color=12,34,56"`)
+	if !ok {
+		t.Fatal("quoted user color flag was not parsed")
+	}
+	if got != want {
+		t.Fatalf("quoted user color = %d, want %d", got, want)
 	}
 }
 

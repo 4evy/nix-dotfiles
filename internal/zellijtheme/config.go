@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/userdirs"
+	"github.com/4evy/dotfiles/internal/common/userdirs"
 	"github.com/pelletier/go-toml/v2"
 )
 

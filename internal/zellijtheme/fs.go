@@ -1,9 +1,19 @@
 package zellijtheme
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 )
+
+func HomeDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return "", errors.New("HOME is not set")
+	}
+	return home, nil
+}
 
 func expandPath(path string) string {
 	if path == "" {

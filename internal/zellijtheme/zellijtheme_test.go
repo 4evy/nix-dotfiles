@@ -64,6 +64,38 @@ func TestStripConfigArgs(t *testing.T) {
 	}
 }
 
+func TestAppendZellijThemeOptions(t *testing.T) {
+	got := appendThemeOptions([]string{"options", "--default-layout", "compact"}, nil, Latte)
+	joined := strings.Join(got, " ")
+	for _, want := range []string{
+		"--theme catppuccin-latte-pink",
+		"--theme-dark catppuccin-frappe-pink",
+		"--theme-light catppuccin-latte-pink",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("theme args %q missing %q", joined, want)
+		}
+	}
+}
+
+func TestAppendZellijThemeOptionsPreservesOverrides(t *testing.T) {
+	got := appendThemeOptions(
+		[]string{"options", "--theme=custom-dark"},
+		[]string{"--theme-light", "custom-light"},
+		Frappe,
+	)
+	joined := strings.Join(got, " ")
+	if strings.Contains(joined, "--theme catppuccin-frappe-pink") {
+		t.Fatalf("theme override was not preserved: %q", joined)
+	}
+	if strings.Contains(joined, "--theme-light catppuccin-latte-pink") {
+		t.Fatalf("theme-light override was not preserved: %q", joined)
+	}
+	if !strings.Contains(joined, "--theme-dark catppuccin-frappe-pink") {
+		t.Fatalf("theme-dark default was not added: %q", joined)
+	}
+}
+
 func TestTerminalThemeReport(t *testing.T) {
 	if got, ok := ParseTerminalThemeReport([]byte("\x1b[?997;1n")); !ok || got != Dark {
 		t.Fatalf("dark report = %v, %v", got, ok)
@@ -74,15 +106,30 @@ func TestTerminalThemeReport(t *testing.T) {
 		got != Light {
 		t.Fatalf("light osc11 = %v, %v", got, ok)
 	}
+	if got, ok := ParseTerminalThemeReport(
+		[]byte("prefix\x1b]11;rgb:3030/3434/4646\x1b\\suffix"),
+	); !ok ||
+		got != Dark {
+		t.Fatalf("dark osc11 = %v, %v", got, ok)
+	}
 }
 
 func TestThemeModeFromGnomeDefaults(t *testing.T) {
 	for _, text := range []string{"'default'", "'Adwaita'"} {
-		if got, ok := themeModeFromText(text); !ok || got != Light {
-			t.Fatalf("%q = %v, %v, want light", text, got, ok)
+		if got, ok := themeModeFromText(text); ok {
+			t.Fatalf("%q = %v, want no detected mode", text, got)
 		}
 	}
 	if got, ok := themeModeFromText("'Adwaita-dark'"); !ok || got != Dark {
 		t.Fatalf("Adwaita-dark = %v, %v, want dark", got, ok)
+	}
+}
+
+func TestThemeModeFromCatppuccinNames(t *testing.T) {
+	if got, ok := themeModeFromText("catppuccin-frappe-pink"); !ok || got != Dark {
+		t.Fatalf("frappe = %v, %v, want dark", got, ok)
+	}
+	if got, ok := themeModeFromText("catppuccin-latte-pink"); !ok || got != Light {
+		t.Fatalf("latte = %v, %v, want light", got, ok)
 	}
 }

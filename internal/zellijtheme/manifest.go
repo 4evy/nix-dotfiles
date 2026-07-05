@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/envx"
-	"github.com/FlameFlag/nix-dotfiles/internal/common/userdirs"
+	"github.com/4evy/dotfiles/internal/common/envx"
+	"github.com/4evy/dotfiles/internal/common/userdirs"
 	"github.com/pelletier/go-toml/v2"
 )
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/envx"
+	"github.com/4evy/dotfiles/internal/common/envx"
 )
 
 type environment struct {
@@ -28,6 +28,8 @@ type Browser struct {
 	ExternalDirs      func(mode string) []string
 	DefaultProfileDir func(mode string) string
 	PreferencePatches []PreferencePatch
+	LocalStatePatches []PreferencePatch
+	VariationPatches  []PreferencePatch
 	ExtensionIDs      ExtensionIDs
 }
 

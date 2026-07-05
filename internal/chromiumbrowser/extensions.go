@@ -4,16 +4,18 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/chromiumbrowser/extensions"
-	"github.com/FlameFlag/nix-dotfiles/internal/common/archiveutil"
+	"github.com/4evy/dotfiles/internal/chromiumbrowser/extensions"
+	"github.com/4evy/dotfiles/internal/common/archiveutil"
+	"github.com/4evy/dotfiles/internal/common/httpx"
 )
 
 func (browser Browser) installExtensions(options *InstallOptions) error {
 	result, err := extensions.Install(extensions.Options{
-		Root:         options.Root,
-		ExternalDirs: browser.ExternalDirs(options.Mode),
-		Download:     downloadFile,
-		Resolve:      resolveDownloadURL,
+		Root:          options.Root,
+		ExternalDirs:  browser.ExternalDirs(options.Mode),
+		Download:      downloadFile,
+		Resolve:       resolveDownloadURL,
+		BundlePatches: options.BundlePatches,
 		Unzip: func(zipPath, dst string) error {
 			return archiveutil.ExtractZipFile(context.Background(), zipPath, dst)
 		},
@@ -46,4 +48,12 @@ func unpackedExtensionIDAliases(root string) (map[string]string, error) {
 		aliases[extension.ID] = extensions.UnpackedExtensionID(path)
 	}
 	return aliases, nil
+}
+
+func downloadFile(path, url string) error {
+	return (&httpx.Client{}).DownloadFile(url, path)
+}
+
+func resolveDownloadURL(rawURL string) (string, error) {
+	return (&httpx.Client{}).ResolveURL(rawURL)
 }

@@ -1,5 +1,3 @@
-//go:build !windows
-
 package zellijtheme
 
 import (
@@ -28,7 +26,7 @@ func detectTerminalTheme(timeout time.Duration) (TerminalThemeMode, bool) {
 	}
 	defer sttyRun(tty, strings.TrimSpace(string(state)))
 
-	if _, err := tty.Write([]byte("\x1b[?997n\x1b]11;?\a")); err != nil {
+	if _, err := tty.Write([]byte("\x1b]11;?\a")); err != nil {
 		return Dark, false
 	}
 

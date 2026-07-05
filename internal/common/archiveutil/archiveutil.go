@@ -1,9 +1,6 @@
 package archiveutil
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -13,64 +10,34 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ulikunitz/xz"
+	"github.com/mholt/archives"
 )
 
 func ExtractZipFile(ctx context.Context, zipPath, dst string) error {
-	reader, err := zip.OpenReader(zipPath)
+	file, err := os.Open(zipPath)
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer file.Close()
 
-	if err := os.MkdirAll(dst, 0o755); err != nil {
-		return err
-	}
-	root, err := os.OpenRoot(dst)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
-	for _, file := range reader.File {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		source, err := file.Open()
-		if err != nil {
-			return err
-		}
-		err = extractEntry(root, file.Name, file.Mode(), source)
-		if closeErr := source.Close(); err == nil {
-			err = closeErr
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return extractArchive(ctx, archives.Zip{}, file, dst)
 }
 
 func ExtractTarGz(ctx context.Context, source io.Reader, dst string) error {
-	gzipReader, err := gzip.NewReader(source)
-	if err != nil {
-		return err
-	}
-	defer gzipReader.Close()
-
-	return extractTar(ctx, gzipReader, dst)
+	return extractArchive(ctx, archives.CompressedArchive{
+		Compression: archives.Gz{},
+		Extraction:  archives.Tar{},
+	}, source, dst)
 }
 
 func ExtractTarXz(ctx context.Context, source io.Reader, dst string) error {
-	xzReader, err := xz.NewReader(source)
-	if err != nil {
-		return err
-	}
-	return extractTar(ctx, xzReader, dst)
+	return extractArchive(ctx, archives.CompressedArchive{
+		Compression: archives.Xz{},
+		Extraction:  archives.Tar{},
+	}, source, dst)
 }
 
-func extractTar(ctx context.Context, source io.Reader, dst string) error {
+func extractArchive(ctx context.Context, extractor archives.Extractor, source io.Reader, dst string) error {
 	if err := os.MkdirAll(dst, 0o755); err != nil {
 		return err
 	}
@@ -79,27 +46,24 @@ func extractTar(ctx context.Context, source io.Reader, dst string) error {
 		return err
 	}
 	defer root.Close()
-	tarReader := tar.NewReader(source)
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeDir {
-			continue
-		}
-		if err := extractEntry(root, header.Name, header.FileInfo().Mode(), tarReader); err != nil {
-			return err
-		}
+	return extractor.Extract(ctx, source, func(ctx context.Context, file archives.FileInfo) error {
+		return extractArchiveFile(root, file)
+	})
+}
+
+func extractArchiveFile(root *os.Root, file archives.FileInfo) error {
+	if !file.Mode().IsRegular() && !file.IsDir() {
+		return nil
 	}
+	if file.IsDir() {
+		return extractEntry(root, file.NameInArchive, file.Mode(), nil)
+	}
+	source, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	return extractEntry(root, file.NameInArchive, file.Mode(), source)
 }
 
 func extractEntry(root *os.Root, name string, mode fs.FileMode, source io.Reader) error {

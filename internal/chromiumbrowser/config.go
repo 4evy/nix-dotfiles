@@ -3,9 +3,10 @@ package chromiumbrowser
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/userdirs"
+	"github.com/4evy/dotfiles/internal/common/userdirs"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -42,13 +43,20 @@ type ModePaths struct {
 }
 
 type PreferenceDefaultsConfig struct {
-	Values       []PreferenceValueConfig       `toml:"values"`
-	Accelerators []PreferenceAcceleratorConfig `toml:"accelerators"`
+	Values           []PreferenceValueConfig       `toml:"values"`
+	LocalStateValues []PreferenceValueConfig       `toml:"local_state_values"`
+	VariationValues  []PreferenceValueConfig       `toml:"variation_values"`
+	Accelerators     []PreferenceAcceleratorConfig `toml:"accelerators"`
+	Cookies          CookiePreferenceConfig        `toml:"cookies"`
 }
 
 type PreferenceValueConfig struct {
 	Path  string `toml:"path"`
 	Value any    `toml:"value"`
+}
+
+type CookiePreferenceConfig struct {
+	Allow []string `toml:"allow"`
 }
 
 type PreferenceAcceleratorConfig struct {
@@ -75,7 +83,7 @@ func (config Config) Browser() Browser {
 		ExecutableName:    config.ExecutableName,
 		AliasName:         config.AliasName,
 		LinuxDesktopID:    config.Linux.DesktopID,
-		LinuxWrapperFlags: slicesClone(config.Linux.WrapperFlags),
+		LinuxWrapperFlags: slices.Clone(config.Linux.WrapperFlags),
 		LinuxLauncherName: config.Linux.LauncherName,
 		LinuxDesktopName:  config.Linux.DesktopName,
 		LinuxDesktopExec:  config.Linux.DesktopExec,
@@ -89,6 +97,12 @@ func (config Config) Browser() Browser {
 	}
 	if config.Preferences.HasDefaults() {
 		browser.PreferencePatches = []PreferencePatch{config.Preferences.Patch}
+	}
+	if config.Preferences.HasLocalStateDefaults() {
+		browser.LocalStatePatches = []PreferencePatch{config.Preferences.PatchLocalState}
+	}
+	if config.Preferences.HasVariationDefaults() {
+		browser.VariationPatches = []PreferencePatch{config.Preferences.PatchVariations}
 	}
 	return browser
 }
@@ -110,7 +124,17 @@ func (config Config) ExternalExtensionDirs(mode string) []string {
 }
 
 func (config PreferenceDefaultsConfig) HasDefaults() bool {
-	return len(config.Values) > 0 || len(config.Accelerators) > 0
+	return len(config.Values) > 0 ||
+		len(config.Accelerators) > 0 ||
+		len(config.Cookies.Allow) > 0
+}
+
+func (config PreferenceDefaultsConfig) HasLocalStateDefaults() bool {
+	return len(config.LocalStateValues) > 0
+}
+
+func (config PreferenceDefaultsConfig) HasVariationDefaults() bool {
+	return len(config.VariationValues) > 0
 }
 
 func (config PreferenceDefaultsConfig) Patch(preferences map[string]any) {
@@ -120,6 +144,19 @@ func (config PreferenceDefaultsConfig) Patch(preferences map[string]any) {
 	for _, accelerator := range config.Accelerators {
 		customAccelerators := NestedObject(preferences, accelerator.Path)
 		EnsureAcceleratorAdded(customAccelerators, accelerator.CommandID, accelerator.Accelerator)
+	}
+	SetCookieAllowlist(preferences, config.Cookies.Allow)
+}
+
+func (config PreferenceDefaultsConfig) PatchLocalState(localState map[string]any) {
+	for _, value := range config.LocalStateValues {
+		SetNestedValue(localState, value.Path, value.Value)
+	}
+}
+
+func (config PreferenceDefaultsConfig) PatchVariations(variations map[string]any) {
+	for _, value := range config.VariationValues {
+		variations[value.Path] = value.Value
 	}
 }
 
@@ -150,9 +187,24 @@ func (config Config) validate(name string) error {
 			return fmt.Errorf("%s Chromium browser config contains a preference value without a path", name)
 		}
 	}
+	for _, value := range config.Preferences.LocalStateValues {
+		if value.Path == "" {
+			return fmt.Errorf("%s Chromium browser config contains a local state value without a path", name)
+		}
+	}
+	for _, value := range config.Preferences.VariationValues {
+		if value.Path == "" {
+			return fmt.Errorf("%s Chromium browser config contains a variation value without a path", name)
+		}
+	}
 	for _, accelerator := range config.Preferences.Accelerators {
 		if accelerator.Path == "" || accelerator.CommandID == "" || accelerator.Accelerator == "" {
 			return fmt.Errorf("%s Chromium browser config contains an incomplete preference accelerator", name)
+		}
+	}
+	for _, pattern := range config.Preferences.Cookies.Allow {
+		if strings.TrimSpace(pattern) == "" {
+			return fmt.Errorf("%s Chromium browser config contains an empty cookie allow pattern", name)
 		}
 	}
 	return nil
@@ -168,11 +220,4 @@ func expandPathTemplate(path string) string {
 		"${config_home}", userdirs.ConfigHome(home),
 		"${data_home}", userdirs.DataHome(home),
 	).Replace(path))
-}
-
-func slicesClone[T any](values []T) []T {
-	if values == nil {
-		return nil
-	}
-	return append([]T{}, values...)
 }

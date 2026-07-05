@@ -1,7 +1,4 @@
-javascript_runtimes = [
-  "node",
-  "bun",
-]
+javascript_runtimes = ["node", "bun"]
 
 javascript_runtime_paths = [
   "/usr/bin/node",
@@ -9,7 +6,4 @@ javascript_runtime_paths = [
   "/run/current-system/sw/bin/node",
 ]
 
-javascript_runtime_home_paths = [
-  ".cache/.bun/bin/bun",
-  ".bun/bin/bun",
-]
+javascript_runtime_home_paths = [".cache/.bun/bin/bun", ".bun/bin/bun"]

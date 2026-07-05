@@ -1,0 +1,97 @@
+[browser]
+name = "Helium"
+log_prefix = "helium-browser"
+executable_name = "helium-browser"
+alias_name = "helium"
+
+[browser.linux]
+desktop_id = "helium-browser"
+launcher_name = "helium-wrapper"
+desktop_name = "helium.desktop"
+desktop_exec = "helium"
+icon_name = "helium.png"
+icon_source = "product_logo_256.png"
+
+[browser.macos]
+app_dir = "/Applications/Helium.app"
+launcher_path = "Contents/MacOS/Helium"
+
+[browser.paths.macos]
+profile_dir = "${home}/Library/Application Support/net.imput.helium/Default"
+external_extension_dirs = [
+  "${home}/Library/Application Support/net.imput.helium/External Extensions",
+  "${home}/Library/Application Support/Helium/External Extensions",
+]
+
+[browser.paths.linux]
+profile_dir = "${config_home}/net.imput.helium/Default"
+external_extension_dirs = [
+  "${config_home}/net.imput.helium/External Extensions",
+]
+
+[browser.extensions]
+refined_github_id = "hlepfoohegkhhmjieoechaddaejaokhf"
+
+[[browser.preferences.values]]
+path = "helium.completed_onboarding"
+value = true
+
+[[browser.preferences.values]]
+path = "helium.services.user_consented"
+value = true
+
+[[browser.preferences.values]]
+path = "helium.services.schema_version"
+value = 1
+
+[[browser.preferences.values]]
+path = "helium.services.enabled"
+value = true
+
+[[browser.preferences.values]]
+path = "helium.services.ext_proxy"
+value = true
+
+[[browser.preferences.values]]
+path = "helium.services.bangs"
+value = true
+
+[[browser.preferences.values]]
+path = "helium.services.spellcheck_files"
+value = true
+
+[[browser.preferences.values]]
+path = "helium.services.browser_updates"
+value = true
+
+[[browser.preferences.values]]
+path = "helium.services.ublock_assets"
+value = true
+
+[[browser.preferences.values]]
+path = "profile.default_content_setting_values.cookies"
+value = 4
+
+[[browser.preferences.local_state_values]]
+path = "helium.browser.default_browser_infobar_rejected"
+value = true
+
+[[browser.preferences.local_state_values]]
+path = "hardware_acceleration_mode_previous"
+value = true
+
+[[browser.preferences.local_state_values]]
+path = "variations_crash_streak"
+value = 0
+
+[[browser.preferences.local_state_values]]
+path = "user_experience_metrics.stability.exited_cleanly"
+value = true
+
+[[browser.preferences.variation_values]]
+path = "user_experience_metrics.stability.exited_cleanly"
+value = true
+
+[[browser.preferences.variation_values]]
+path = "variations_crash_streak"
+value = 0

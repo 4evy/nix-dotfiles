@@ -5,14 +5,13 @@ import (
 )
 
 type ApplyOptions struct {
-	ProfileDir           string
-	Settings             []string
-	CookieAutoDeleteTOML []string
-	SettingsSource       []SettingsSource
-	ExtensionIDAliases   map[string]string
-	GitHubToken          bool
-	TokenFunc            func() string
-	ExtensionIDs         ExtensionIDs
+	ProfileDir         string
+	Settings           []string
+	SettingsSource     []SettingsSource
+	ExtensionIDAliases map[string]string
+	GitHubToken        bool
+	TokenFunc          func() string
+	ExtensionIDs       ExtensionIDs
 }
 
 type SettingsSource struct {
@@ -21,14 +20,10 @@ type SettingsSource struct {
 }
 
 type ExtensionIDs struct {
-	CookieAutoDelete string `toml:"cookie_auto_delete_id"`
-	RefinedGitHub    string `toml:"refined_github_id"`
+	RefinedGitHub string `toml:"refined_github_id"`
 }
 
 func (ids ExtensionIDs) WithFallback(fallback ExtensionIDs) ExtensionIDs {
-	if ids.CookieAutoDelete == "" {
-		ids.CookieAutoDelete = fallback.CookieAutoDelete
-	}
 	if ids.RefinedGitHub == "" {
 		ids.RefinedGitHub = fallback.RefinedGitHub
 	}
@@ -40,6 +35,7 @@ func (browser Browser) ApplyProfileSettings(options ApplyOptions) error {
 	if err != nil {
 		return err
 	}
+	options.ExtensionIDs = options.ExtensionIDs.WithFallback(normalized.ExtensionIDs)
 
 	err = normalized.ApplyExtensionSettings(options)
 	if err != nil && !isStorageTemporarilyUnavailable(err) {
@@ -52,7 +48,13 @@ func (browser Browser) ApplyProfileSettings(options ApplyOptions) error {
 			err,
 		)
 	}
-	return normalized.ApplyBrowserPreferenceSettings(options.ProfileDir)
+	if err := normalized.ApplyBrowserPreferenceSettings(options.ProfileDir); err != nil {
+		return err
+	}
+	if err := normalized.ApplyBrowserLocalStateSettings(options.ProfileDir); err != nil {
+		return err
+	}
+	return normalized.ApplyBrowserVariationSettings(options.ProfileDir)
 }
 
 func (browser Browser) ApplyExtensionSettings(options ApplyOptions) error {

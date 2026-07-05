@@ -9,24 +9,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/FlameFlag/nix-dotfiles/internal/common/fileutil"
-	"github.com/FlameFlag/nix-dotfiles/internal/common/userdirs"
-	"github.com/charmbracelet/log"
-	"github.com/otiai10/copy"
+	"github.com/4evy/dotfiles/internal/common/fileutil"
+	"github.com/4evy/dotfiles/internal/common/userdirs"
 )
 
 func (browser Browser) installLinux(options *InstallOptions) error {
-	nixos, err := isNixOS()
-	if err != nil {
-		return err
-	}
-	if nixos {
-		log.Info(
-			browser.LogPrefix + ": NixOS host detected; install is managed by the NixOS system closure",
-		)
-		return nil
-	}
-
 	appDir := browser.defaultAppDir(options.Root)
 	if options.AppDir != "" {
 		appDir = options.AppDir
@@ -61,7 +48,7 @@ func (browser Browser) installLinux(options *InstallOptions) error {
 	if err := browser.applyInstallSettings(options); err != nil {
 		return err
 	}
-	linuxWrapperFlags := append([]string{}, browser.LinuxWrapperFlags...)
+	linuxWrapperFlags := slices.Clone(browser.LinuxWrapperFlags)
 	if browser.LinuxDesktopID != "" {
 		linuxWrapperFlags = append(linuxWrapperFlags, "--class="+browser.LinuxDesktopID)
 	}
@@ -92,7 +79,7 @@ func (browser Browser) installLinux(options *InstallOptions) error {
 	}
 	if err == nil {
 		executable := filepath.Join(options.BinDir, browser.ExecutableName)
-		text := linuxDesktopEntry(
+		text := LinuxDesktopEntry(
 			string(desktopData),
 			executable,
 			browser.LinuxDesktopExec,
@@ -113,7 +100,7 @@ func (browser Browser) installLinux(options *InstallOptions) error {
 	if _, err := os.Stat(iconSource); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	} else if err == nil {
-		if err := copy.Copy(
+		if err := fileutil.CopyPath(
 			iconSource,
 			filepath.Join(dataHome, "icons/hicolor/256x256/apps", browser.LinuxIconName),
 		); err != nil {
@@ -123,7 +110,7 @@ func (browser Browser) installLinux(options *InstallOptions) error {
 	return nil
 }
 
-func linuxDesktopEntry(text, executable, sourceExec, startupWMClass string) string {
+func LinuxDesktopEntry(text, executable, sourceExec, startupWMClass string) string {
 	text = strings.ReplaceAll(text, "Exec="+sourceExec+" %U", "Exec="+executable+" %U")
 	text = strings.ReplaceAll(
 		text,
@@ -170,4 +157,11 @@ func updateDesktopDatabase(applicationsDir string) error {
 		return err
 	}
 	return run("update-desktop-database", applicationsDir)
+}
+
+func run(name string, args ...string) error {
+	command := exec.Command(name, args...)
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	return command.Run()
 }
