@@ -6,8 +6,11 @@ Thumbs.db
 
 .devenv/
 .direnv/
+.ansible/
 .venv/
 .cache/
+__pycache__/
+*.py[cod]
 .docker-cache/
 fallow/
 **/fallow/
@@ -30,5 +33,9 @@ node_modules/
 **/target/
 lcov.info
 
-# Go
+# Generated outputs
+build/
 dist/
+*.egg-info/
+.dotfiles-gnome-extension/
+tmp/

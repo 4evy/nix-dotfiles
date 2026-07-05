@@ -1,0 +1,26 @@
+---
+extends: default
+
+ignore: |
+  .ansible/
+  .cache/
+  .devenv/
+  .direnv/
+  ansible.cfg
+  node_modules/
+  result
+  secrets/
+
+rules:
+  braces:
+    max-spaces-inside: 1
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  document-start: disable
+  line-length: disable
+  octal-values:
+    forbid-explicit-octal: true
+    forbid-implicit-octal: true
+  truthy:
+    check-keys: false

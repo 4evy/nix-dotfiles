@@ -1,0 +1,29 @@
+{
+  "recommendations": [
+    "biomejs.biome",
+    "charliermarsh.ruff",
+    "christian-kohler.path-intellisense",
+    "davidanson.vscode-markdownlint",
+    "dbaeumer.vscode-eslint",
+    "editorconfig.editorconfig",
+    "esbenp.prettier-vscode",
+    "golang.go",
+    "jnoortheen.nix-ide",
+    "kdl-org.kdl",
+    "mads-hartmann.bash-ide-vscode",
+    "mikestead.dotenv",
+    "ms-azuretools.vscode-containers",
+    "ms-azuretools.vscode-docker",
+    "ms-python.debugpy",
+    "ms-python.python",
+    "ms-vscode.vscode-typescript-next",
+    "nefrob.vscode-just-syntax",
+    "oven.bun-vscode",
+    "redhat.ansible",
+    "redhat.vscode-xml",
+    "redhat.vscode-yaml",
+    "sumneko.lua",
+    "tamasfe.even-better-toml",
+    "timonwong.shellcheck"
+  ]
+}

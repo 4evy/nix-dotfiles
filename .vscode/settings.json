@@ -1,20 +1,20 @@
 {
-  "window.autoDetectColorScheme": true,
-  "workbench.preferredDarkColorTheme": "Catppuccin Frappé",
-  "workbench.preferredLightColorTheme": "Catppuccin Latte",
-  "workbench.colorTheme": "Catppuccin Frappé",
-  "workbench.iconTheme": "catppuccin-frappe",
   "files.associations": {
+    ".envrc": "shellscript",
+    "Brewfile": "ruby",
+    "Containerfile": "dockerfile",
+    "Justfile": "just",
     "*.bash.tmpl": "shellscript",
     "*.fish.tmpl": "fish",
     "*.json.tmpl": "jsonc",
     "*.kdl.tmpl": "kdl",
     "*.lua.tmpl": "lua",
-    "*.nix.tmpl": "nix",
+    "*.ron.tmpl": "rust",
     "*.sh.tmpl": "shellscript",
     ".*.toml.tmpl": "toml",
     "**/.chezmoiexternal.toml.tmpl": "toml",
     "*.toml.tmpl": "toml",
+    "*.tmTheme.tmpl": "xml",
     "*.yaml.tmpl": "yaml",
     "*.yml.tmpl": "yaml",
     "*.zsh.tmpl": "shellscript",
@@ -27,6 +27,31 @@
     "**/dot_ssh/config.tmpl": "ssh_config",
     "**/dot_zshenv.tmpl": "shellscript",
     "**/dot_zshrc.tmpl": "shellscript"
+  },
+  "files.trimTrailingWhitespace": true,
+  "files.trimFinalNewlines": true,
+  "files.insertFinalNewline": true,
+  "search.exclude": {
+    "**/.ansible": true,
+    "**/.cache": true,
+    "**/.devenv": true,
+    "**/.direnv": true,
+    "**/.jj": true,
+    "**/dist": true,
+    "**/node_modules": true,
+    "result": true,
+    "secrets": true
+  },
+  "files.watcherExclude": {
+    "**/.ansible/**": true,
+    "**/.cache/**": true,
+    "**/.devenv/**": true,
+    "**/.direnv/**": true,
+    "**/.jj/**": true,
+    "**/dist/**": true,
+    "**/node_modules/**": true,
+    "result/**": true,
+    "secrets/**": true
   },
   "shellcheck.ignorePatterns": {
     "**/*.csh": true,
@@ -56,7 +81,66 @@
     "**/dot_bashrc.tmpl": true,
     "**/dot_zshrc.tmpl": true
   },
+  "shellcheck.customArgs": ["--source-path=SCRIPTDIR"],
   "bashIde.shellcheckPath": "",
+  "git.mergeEditor": true,
+  "git.branchProtection": ["main", "master"],
+  "git.branchProtectionPrompt": "alwaysCommitToNewBranch",
+  "git.branchRandomName.enable": true,
+  "js/ts.experimental.useTsgo": true,
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+  "python.languageServer": "None",
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "ty.importStrategy": "fromEnvironment",
+  "ty.path": ["ty"],
+  "ruff.importStrategy": "fromEnvironment",
+  "ruff.path": ["ruff"],
+  "ruff.nativeServer": "on",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "[go]": {
+    "editor.defaultFormatter": "golang.go",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "[nix]": {
+    "editor.defaultFormatter": "jnoortheen.nix-ide",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features",
     "editor.formatOnSave": true
@@ -65,4 +149,20 @@
     "editor.defaultFormatter": "vscode.json-language-features",
     "editor.formatOnSave": true
   },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.formatOnSave": true
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml",
+    "editor.formatOnSave": true
+  },
+  "[lua]": {
+    "editor.defaultFormatter": "sumneko.lua",
+    "editor.formatOnSave": true
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  }
 }

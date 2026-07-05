@@ -1,0 +1,97 @@
+# Include data/config languages in GitHub language statistics. Linguist omits
+# these from the language breakdown by default, but this repo treats them as
+# first-class source for editor, OS, provisioning, and application behavior.
+*.json linguist-detectable
+*.jsonc linguist-detectable
+*.ini linguist-language=INI linguist-detectable
+*.kdl linguist-detectable
+*.plist linguist-detectable
+*.tmTheme linguist-detectable
+*.toml linguist-detectable
+*.xml linguist-detectable
+*.yaml linguist-detectable
+*.yml linguist-detectable
+.gitattributes linguist-detectable -linguist-vendored
+.gitignore linguist-detectable -linguist-vendored
+.dockerignore linguist-detectable
+go.mod linguist-detectable
+
+# Classify chezmoi templates and extension-less scripts by their rendered
+# language so they contribute alongside the matching source files.
+*.bash.tmpl linguist-language=Shell linguist-detectable
+*.conf.tmpl linguist-language=INI linguist-detectable
+*.gitconfig.tmpl linguist-language=gitconfig linguist-detectable
+# Linguist has no HJSON entry; JSON5 is the closest supported data syntax.
+*.hjson.tmpl linguist-language=JSON5 linguist-detectable
+*.json.tmpl linguist-language=JSON linguist-detectable
+*.kdl.tmpl linguist-language=KDL linguist-detectable
+*.nix.tmpl linguist-language=Nix
+*.ron.tmpl linguist-language=RON linguist-detectable
+*.sh.tmpl linguist-language=Shell linguist-detectable
+*.theme.tmpl linguist-language=INI linguist-detectable
+*.tmTheme.tmpl linguist-language=XML-Property-List linguist-detectable
+*.toml.tmpl linguist-language=TOML linguist-detectable
+*.yaml.tmpl linguist-language=YAML linguist-detectable
+*.yml.tmpl linguist-language=YAML linguist-detectable
+*.zsh.tmpl linguist-language=Shell linguist-detectable
+dotfiles/.chezmoiscripts/* linguist-language=Shell
+dotfiles/.chezmoitemplates/*.conf.tmpl linguist-language=INI linguist-detectable
+dotfiles/.chezmoitemplates/catppuccin_rgb linguist-language=Go-Template linguist-detectable
+dotfiles/Library/Application[[:space:]]Support/com.mitchellh.ghostty/config.tmpl linguist-language=INI linguist-detectable
+dotfiles/dot_bash_profile.tmpl linguist-language=Shell linguist-detectable
+dotfiles/dot_bashenv.tmpl linguist-language=Shell linguist-detectable
+dotfiles/dot_bashrc.tmpl linguist-language=Shell linguist-detectable
+dotfiles/dot_config/ghostty/config.tmpl linguist-language=INI linguist-detectable
+dotfiles/dot_config/ghostty/executable_zellij-theme-run.tmpl linguist-language=Shell
+dotfiles/dot_gitconfig.tmpl linguist-language=gitconfig linguist-detectable
+dotfiles/dot_gitignore_global linguist-language=Ignore-List linguist-detectable
+dotfiles/dot_local/bin/executable_* linguist-language=Shell
+dotfiles/dot_local/share/applications/*.desktop.tmpl linguist-language=desktop linguist-detectable
+dotfiles/dot_ssh/config.tmpl linguist-language=sshconfig linguist-detectable
+dotfiles/dot_zshenv.tmpl linguist-language=Shell linguist-detectable
+dotfiles/dot_zshrc.tmpl linguist-language=Shell linguist-detectable
+
+# Cover config formats whose extensions are either too generic or unknown to
+# Linguist, while still using known Linguist language names where available.
+.ansible-lint linguist-language=YAML linguist-detectable
+.shellcheckrc linguist-language=Shell
+.yamllint linguist-language=YAML linguist-detectable
+dotfiles/.chezmoiignore linguist-language=Ignore-List linguist-detectable
+dotfiles/.chezmoiremove linguist-language=Ignore-List linguist-detectable
+*.cfg linguist-language=INI linguist-detectable
+*.conf linguist-language=INI linguist-detectable
+*.fc linguist-language=sepolicy linguist-detectable
+*.if linguist-language=sepolicy linguist-detectable
+*.path linguist-language=INI linguist-detectable
+*.plist.in linguist-language=XML-Property-List linguist-detectable
+*.repo linguist-language=INI linguist-detectable
+*.rules linguist-language=INI linguist-detectable
+*.service linguist-language=INI linguist-detectable
+*.desktop linguist-detectable
+*.te linguist-detectable
+*.theme linguist-language=INI linguist-detectable
+Brewfile linguist-detectable
+Containerfile linguist-language=Dockerfile linguist-detectable
+# Linguist does not have a Kanata language entry; Kanata config uses
+# s-expression syntax, so Scheme is the closest supported highlighter.
+dotfiles/dot_config/kanata/*.kbd linguist-language=Scheme
+spectrum/repos/*.repo.in linguist-language=INI linguist-detectable
+
+# GitHub and VS Code configuration are repo-owned source here, but Linguist
+# treats these directories as vendored by default.
+.github/workflows/*.yaml -linguist-vendored linguist-detectable
+.github/workflows/*.yml -linguist-vendored linguist-detectable
+.vscode/*.json -linguist-vendored linguist-detectable
+
+# Linguist vendors TypeScript declaration files globally. These declarations
+# describe local extension runtimes and should count with the package sources.
+packages/hyper-window-tiling/src/**/*.d.ts -linguist-vendored
+
+# These files are checked in generated/runtime artifacts built from package
+# sources or dependency resolvers.
+flake.lock linguist-generated
+go.sum linguist-generated
+package-lock.json linguist-generated
+packages/hyper-window-tiling/bun.lock linguist-generated
+packages/**/dist/** linguist-generated
+uv.lock linguist-generated
