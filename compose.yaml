@@ -1,24 +1,17 @@
-x-dotfiles-cache-from: &dotfiles-cache-from
-  - type=local,src=.docker-cache
-
-x-dotfiles-cache-to: &dotfiles-cache-to
-  - type=local,dest=.docker-cache,mode=max
+x-dotfiles-build-args: &dotfiles-build-args
+  TEST_USER: dotfiles
+  TEST_UID: 1000
+  TEST_GID: 1000
 
 x-dotfiles-build: &dotfiles-build
   context: .
   dockerfile: Dockerfile
   pull: true
   target: dotfiles-test
-  args:
-    TEST_USER: dotfiles
-    TEST_UID: 1000
-    TEST_GID: 1000
-  cache_from: *dotfiles-cache-from
-  cache_to: *dotfiles-cache-to
+  args: *dotfiles-build-args
 
 x-dotfiles-service: &dotfiles-service
   init: true
-  platform: linux/amd64
   stdin_open: true
   tty: true
   working_dir: /home/dotfiles
@@ -27,58 +20,24 @@ x-dotfiles-service: &dotfiles-service
     - --version
 
 services:
-  alpine:
+  fedora:
     <<: *dotfiles-service
-    image: nix-dotfiles:alpine-test
+    image: dotfiles:fedora-test
     build:
       <<: *dotfiles-build
       args:
-        TEST_USER: dotfiles
-        TEST_UID: 1000
-        TEST_GID: 1000
-        BASE_IMAGE: alpine:3.23
+        <<: *dotfiles-build-args
 
-  fedora-44:
-    <<: *dotfiles-service
-    image: nix-dotfiles:fedora-44-test
-    build:
-      <<: *dotfiles-build
-      args:
-        TEST_USER: dotfiles
-        TEST_UID: 1000
-        TEST_GID: 1000
-        BASE_IMAGE: fedora:44
-
-  alpine-shell:
+  fedora-shell:
     <<: *dotfiles-service
     profiles:
       - shell
-    image: nix-dotfiles:alpine-test
+    image: dotfiles:fedora-test
     build:
       <<: *dotfiles-build
       args:
-        TEST_USER: dotfiles
-        TEST_UID: 1000
-        TEST_GID: 1000
-        BASE_IMAGE: alpine:3.23
-    working_dir: /workspace/nix-dotfiles
-    command:
-      - zsh
-      - -l
-
-  fedora-44-shell:
-    <<: *dotfiles-service
-    profiles:
-      - shell
-    image: nix-dotfiles:fedora-44-test
-    build:
-      <<: *dotfiles-build
-      args:
-        TEST_USER: dotfiles
-        TEST_UID: 1000
-        TEST_GID: 1000
-        BASE_IMAGE: fedora:44
-    working_dir: /workspace/nix-dotfiles
+        <<: *dotfiles-build-args
+    working_dir: /workspace/dotfiles
     command:
       - zsh
       - -l

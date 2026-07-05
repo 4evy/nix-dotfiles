@@ -4,6 +4,9 @@
 
 !Dockerfile
 !.dockerignore
+!.ansible-lint
+!.yamllint
+!ansible.cfg
 !go.mod
 !go.sum
 !pyproject.toml
@@ -12,43 +15,25 @@
 !cmd/
 !cmd/chezmoi-support/
 !cmd/chezmoi-support/**
-
 !internal/
 !internal/**
 
-!crates/
-!crates/**
+!containers/
+!containers/**
+
+!ansible/
+!ansible/**
 
 !dotfiles/
 !dotfiles/**
-
-!modules/
-!modules/cross/
-!modules/cross/nixcord/
-!modules/cross/nixcord/default.nix
-
-!scripts/
-!scripts/render-equicord-settings.sh
 
 !spectrum/
 !spectrum/**
 
 !packages/
 packages/*
-!packages/gh-hide-comment/
-!packages/gh-hide-comment/**
-!packages/http-fixture/
-!packages/http-fixture/**
-!packages/lenovo-con-mode/
-!packages/lenovo-con-mode/**
-!packages/lsp-diagnostic-filter/
-!packages/lsp-diagnostic-filter/**
-!packages/scm-fmt/
-!packages/scm-fmt/**
-!packages/system-run-mcp/
-!packages/system-run-mcp/**
-!packages/zellij-theme-tools/
-!packages/zellij-theme-tools/**
+!packages/scripts/
+!packages/scripts/**
 
 # Never send local generated state if it appears under an included path.
 **/.DS_Store
@@ -56,4 +41,5 @@ packages/*
 **/*.pyc
 **/target/
 .docker-cache/
+.git/
 *.log

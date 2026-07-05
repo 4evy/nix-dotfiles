@@ -1,0 +1,30 @@
+FROM registry.fedoraproject.org/fedora:latest
+
+RUN dnf -y install \
+      curl \
+      shadow-utils \
+      sudo \
+      systemd \
+      xz \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+RUN bash -o pipefail -c 'curl -sSfL https://artifacts.nixos.org/nix-installer | sh -s -- install linux \
+      --extra-conf "sandbox = false" \
+      --enable-flakes \
+      --no-start-daemon \
+      --no-confirm'
+
+ENV PATH="/nix/var/nix/profiles/default/bin:${PATH}"
+
+RUN nix profile add \
+      nixpkgs#deadnix \
+      nixpkgs#nh \
+      nixpkgs#nil \
+      nixpkgs#nix-ld \
+      nixpkgs#nix-output-monitor \
+      nixpkgs#nix-tree \
+      nixpkgs#nixd \
+      nixpkgs#nixfmt
+
+CMD ["/usr/sbin/init"]
