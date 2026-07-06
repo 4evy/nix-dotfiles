@@ -56,7 +56,7 @@ doctor profile="setup":
         commands=(bootc sudo)
         ;;
       build)
-        commands=("${podman_command%% *}" sudo)
+        commands=(git "${podman_command%% *}" sudo)
         ;;
       setup)
         commands=(bash curl git sudo)
@@ -145,6 +145,10 @@ build target=local_ref no_cache=build_no_cache: (doctor 'build')
     base_image={{ quote(base_image) }}
     image_name={{ quote(image_name) }}
     local_tag={{ quote(local_tag) }}
+    image_created=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    image_revision=$(git rev-parse HEAD 2>/dev/null || printf '%s' unknown)
+    image_version=$(git describe --tags --always --dirty 2>/dev/null || printf '%s' "$local_tag")
+
     build_args=(
       --pull=newer \
       --tag "$target" \
@@ -154,6 +158,9 @@ build target=local_ref no_cache=build_no_cache: (doctor 'build')
       --build-arg "IMAGE_NAME=$image_name" \
       --build-arg "IMAGE_TAG=$local_tag" \
       --build-arg "IMAGE_REF=ostree-image:docker://$target" \
+      --build-arg "IMAGE_CREATED=$image_created" \
+      --build-arg "IMAGE_REVISION=$image_revision" \
+      --build-arg "IMAGE_VERSION=$image_version" \
       --file spectrum/Containerfile \
       .
     )
