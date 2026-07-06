@@ -9,7 +9,5 @@ source -p "$script_dir/../lib" entrypoint.sh
 source_host_lib host
 
 require_arg_count 0 0 "$@"
-require_command uv
 
-uv_path=$(command -v uv)
-run_host_bash_file "$script_dir/kmscon.host.sh" "$DOTFILES_REPO_ROOT" "$DOTFILES_HOST_SCRIPT_ROOT" "$uv_path"
+run_host_bash_file "$script_dir/kmscon.host.sh" "$DOTFILES_REPO_ROOT" "$DOTFILES_HOST_SCRIPT_ROOT"

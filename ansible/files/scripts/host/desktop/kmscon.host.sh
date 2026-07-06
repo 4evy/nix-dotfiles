@@ -8,20 +8,21 @@ fi
 
 repo_root=${1:?repo root is required}
 host_script_root=${2:?host script root is required}
-uv_path=${3:?uv path is required}
+python=/usr/bin/python3
 
 require_file /usr/lib/systemd/system/kmsconvt@.service
+require_file "$python"
 require_file "$repo_root/dotfiles/.chezmoitemplates/catppuccin_palette.json"
 require_file "$host_script_root/desktop/kmscon-theme-config.py"
 require_command infocmp ln mv rm systemctl
 
 infocmp kmscon >/dev/null || die "kmscon terminfo is not installed"
-[[ -x $uv_path ]] || die "uv is not executable: $uv_path"
+[[ -x $python ]] || die "python is not executable: $python"
 
 ensure_dir_mode 0755 /etc/default /etc/kmscon /etc/systemd/system /etc/systemd/system/kmsconvt@.service.d /usr/local/libexec/dotfiles /usr/local/share/dotfiles
-install_file_if_changed "$uv_path" /usr/local/libexec/dotfiles/uv 0755
 install_file_if_changed "$host_script_root/desktop/kmscon-theme-config.py" /usr/local/libexec/dotfiles/kmscon-theme-config 0755
 install_file_if_changed "$repo_root/dotfiles/.chezmoitemplates/catppuccin_palette.json" /usr/local/share/dotfiles/catppuccin_palette.json 0644
+rm -f -- /usr/local/libexec/dotfiles/uv
 
 if [[ ! -e /etc/default/kmscon-dotfiles ]]; then
 	cat <<'EOF' | write_stdin_if_changed /etc/default/kmscon-dotfiles 0644
@@ -37,12 +38,12 @@ set -a
 # shellcheck disable=SC1091
 [[ ! -f /etc/default/kmscon-dotfiles ]] || source /etc/default/kmscon-dotfiles
 set +a
-/usr/local/libexec/dotfiles/uv run --script /usr/local/libexec/dotfiles/kmscon-theme-config /usr/local/share/dotfiles/catppuccin_palette.json /etc/kmscon/kmscon.conf
+"$python" /usr/local/libexec/dotfiles/kmscon-theme-config /usr/local/share/dotfiles/catppuccin_palette.json /etc/kmscon/kmscon.conf
 
 cat <<EOF | write_stdin_if_changed /etc/systemd/system/kmsconvt@.service.d/10-dotfiles-theme.conf 0644
 [Service]
 EnvironmentFile=-/etc/default/kmscon-dotfiles
-ExecStartPre=/usr/local/libexec/dotfiles/uv run --script /usr/local/libexec/dotfiles/kmscon-theme-config /usr/local/share/dotfiles/catppuccin_palette.json /etc/kmscon/kmscon.conf
+ExecStartPre=-$python /usr/local/libexec/dotfiles/kmscon-theme-config /usr/local/share/dotfiles/catppuccin_palette.json /etc/kmscon/kmscon.conf
 EOF
 
 cat <<'EOF' | write_stdin_if_changed /etc/systemd/system/kmscon-theme-refresh.service 0644
@@ -53,7 +54,7 @@ Documentation=https://github.com/kmscon/kmscon
 [Service]
 Type=oneshot
 EnvironmentFile=-/etc/default/kmscon-dotfiles
-ExecStart=/usr/local/libexec/dotfiles/uv run --script /usr/local/libexec/dotfiles/kmscon-theme-config /usr/local/share/dotfiles/catppuccin_palette.json /etc/kmscon/kmscon.conf
+ExecStart=-/usr/bin/python3 /usr/local/libexec/dotfiles/kmscon-theme-config /usr/local/share/dotfiles/catppuccin_palette.json /etc/kmscon/kmscon.conf
 ExecStartPost=/usr/bin/bash -c 'for unit in kmsconvt@tty{1..6}.service; do tty=${unit#*@}; tty=${tty%.service}; if ! /usr/bin/loginctl list-sessions --no-legend | /usr/bin/awk -v tty="$tty" "$5 == tty { found=1 } END { exit found ? 0 : 1 }"; then /usr/bin/systemctl try-restart "$unit"; fi; done'
 EOF
 
