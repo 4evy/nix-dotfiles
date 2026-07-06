@@ -60,6 +60,13 @@ fi
 check_system_service_active kanata-main.service
 check_user_service_active toshy-config.service
 
+if systemctl cat kanata-main.service 2>/dev/null |
+	grep -Fq 'PrivateUsers=true'; then
+	fail "kanata-main.service uses PrivateUsers=true, which can hide input/uinput supplemental groups"
+else
+	ok "kanata-main.service does not isolate host input/uinput groups with PrivateUsers"
+fi
+
 if [[ -f $repo_kanata_config && -f $host_kanata_config ]]; then
 	if cmp -s "$repo_kanata_config" "$host_kanata_config"; then
 		ok "$host_kanata_config matches the dotfiles Kanata config"
@@ -87,8 +94,10 @@ fi
 toshy_config="${XDG_CONFIG_HOME:-$HOME/.config}/toshy/toshy_config.py"
 if [[ -f $toshy_config ]]; then
 	if grep -Fq 'SLICE_MARK_START: keymapper_api' "$toshy_config" &&
+		grep -Fq 'SLICE_MARK_START: kbtype_override' "$toshy_config" &&
 		grep -Fq 'DOTFILES_TOSHY_ONLY_DEVICES' "$toshy_config" &&
-		grep -Fq '/run/kanata-main/main' "$toshy_config"; then
+		grep -Fq '/run/kanata-main/main' "$toshy_config" &&
+		grep -Fq 'dotfiles-kanata-main' "$toshy_config"; then
 		ok "Toshy config includes dotfiles Kanata device slice"
 	else
 		fail "Toshy config does not include the dotfiles Kanata device slice"
@@ -118,10 +127,21 @@ else
 fi
 
 if systemctl --user cat toshy-kanata-device.path 2>/dev/null |
-	grep -Fxq 'PathChanged=/run/kanata-main'; then
+	grep -Fxq 'PathChanged=/run/kanata-main/main'; then
 	ok "toshy-kanata-device.path watches the Kanata virtual device"
 else
 	fail "toshy-kanata-device.path is missing the Kanata virtual device watch"
+fi
+
+if systemctl --user cat toshy-kanata-device.service 2>/dev/null |
+	grep -Fq 'reset-failed toshy-config.service' &&
+	systemctl --user cat toshy-kanata-device.service 2>/dev/null |
+	grep -Fq '[ -e /run/kanata-main/main ]' &&
+	systemctl --user cat toshy-kanata-device.service 2>/dev/null |
+	grep -Fq 'restart toshy-config.service'; then
+	ok "toshy-kanata-device.service can recover a failed Toshy service"
+else
+	fail "toshy-kanata-device.service does not recover failed Toshy starts"
 fi
 
 if systemctl cat input-remapper.service >/dev/null 2>&1; then

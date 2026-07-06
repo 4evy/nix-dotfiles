@@ -24,7 +24,6 @@ LockPersonality=true
 MemoryDenyWriteExecute=true
 NoNewPrivileges=true
 PrivateNetwork=true
-PrivateUsers=true
 ProcSubset=pid
 ProtectClock=true
 ProtectControlGroups=true

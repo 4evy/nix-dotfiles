@@ -20,6 +20,10 @@ if [[ ! -d $slice_dir ]]; then
 	printf "%s\n" "toshy-kanata-chain: Toshy slice directory was not found at $slice_dir" >&2
 	exit 1
 fi
+if [[ ! -f $dropin_source ]]; then
+	printf "%s\n" "toshy-kanata-chain: Toshy Kanata drop-in was not found at $dropin_source" >&2
+	exit 1
+fi
 if [[ ! -f $path_unit_source ]]; then
 	printf "%s\n" "toshy-kanata-chain: Toshy Kanata path unit was not found at $path_unit_source" >&2
 	exit 1
@@ -35,8 +39,10 @@ service_dropin_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/toshy-config.
 
 ensure_dirs "$config_dir" "$service_dir" "$service_dropin_dir"
 python3 "$slice_merger" "$config_path" "$slice_dir"
+python3 -m py_compile "$config_path"
 install_file_if_changed "$dropin_source" "$service_dropin_dir/10-dotfiles.conf"
 install_file_if_changed "$path_unit_source" "$service_dir/toshy-kanata-device.path"
 install_file_if_changed "$refresh_unit_source" "$service_dir/toshy-kanata-device.service"
 systemctl --user daemon-reload || true
 systemctl --user enable --now toshy-kanata-device.path || true
+systemctl --user start toshy-kanata-device.service || true

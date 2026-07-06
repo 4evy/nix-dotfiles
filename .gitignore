@@ -27,6 +27,8 @@ result
 !/packages/
 !/packages/**
 /packages/**/.DS_Store
+**/__pycache__/
+**/*.py[cod]
 node_modules/
 **/node_modules/
 

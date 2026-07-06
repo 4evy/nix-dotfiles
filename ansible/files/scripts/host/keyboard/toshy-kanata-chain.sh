@@ -24,6 +24,7 @@ config_path=$(run_host_user_bash "printf \"%s\n\" \"\${XDG_CONFIG_HOME:-\$HOME/.
 require_file "$toshy_automation"
 require_file "$toshy_slice_merger"
 require_file "$toshy_slice_dir/keymapper_api.py"
+require_file "$toshy_slice_dir/kbtype_override.py"
 require_file "$toshy_slice_dir/barebones_user_cfg.py"
 
 ensure_dir "$toshy_root"
