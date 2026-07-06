@@ -44,10 +44,7 @@ _dotfiles_path_prepend_once() {
 _dotfiles_path_entries=(
 	"$HOME/.pi/agent/bin"
 	"$HOME/.local/share/dotfiles/helix-tip/bin"
-	{{- if eq .chezmoi.os "linux" }}
-	/home/linuxbrew/.linuxbrew/bin
-	/home/linuxbrew/.linuxbrew/sbin
-	{{- else if eq .chezmoi.os "darwin" }}
+	{{- if eq .chezmoi.os "darwin" }}
 	{{- if eq .chezmoi.arch "arm64" }}
 	/opt/homebrew/opt/coreutils/libexec/gnubin
 	/opt/homebrew/opt/findutils/libexec/gnubin
@@ -85,6 +82,8 @@ _dotfiles_path_entries=(
 	"$HOME/.go/bin"
 	"$HOME/.yarn/bin"
 	{{- if eq .chezmoi.os "linux" }}
+	"$HOME/.nix-profile/bin"
+	/nix/var/nix/profiles/default/bin
 	/usr/local/bin
 	/usr/bin
 	/bin
@@ -109,7 +108,7 @@ unset -f _dotfiles_path_prepend_once
 export PATH
 
 # Shared env handoff
-#   Homebrew, SSH agent, and shared defaults live next door
+#   Homebrew metadata, SSH agent, and shared defaults live next door
 
 if [[ -r "$HOME/.config/shell/environment.sh" ]]; then
 	# shellcheck source=/dev/null

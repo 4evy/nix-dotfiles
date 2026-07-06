@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-default_runner_path='/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin:/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/etc/profiles/per-user/root/bin'
+default_runner_path='/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/opt/homebrew/bin:/opt/homebrew/sbin:/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/etc/profiles/per-user/root/bin'
 
 die() {
 	printf 'system-runner: %s\n' "$*" >&2

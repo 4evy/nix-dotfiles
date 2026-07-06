@@ -251,24 +251,28 @@ tk() (
 )
 
 # B1 / host runner
-#      container shell asks the host; native shell uses sudo -n and stays honest
+#      uses sudo -n and stays honest
 
 _dotfiles_system_runner() {
 	local runner="$HOME/.local/bin/system-runner"
+	local env_args=(
+		--env "PATH=$PATH"
+		--env "HOME=$HOME"
+	)
 
 	if [[ ! -x "$runner" ]]; then
 		printf '%s\n' "system-runner is not installed" >&2
 		return 127
 	fi
 
-	if [[ -f /.dockerenv || -f /run/.containerenv ]]; then
-		if command -v distrobox-host-exec >/dev/null 2>&1; then
-			distrobox-host-exec sudo -n "$runner" "$@"
-			return
-		fi
-	fi
+	[[ -z ${XDG_CONFIG_HOME-} ]] || env_args+=(--env "XDG_CONFIG_HOME=$XDG_CONFIG_HOME")
+	[[ -z ${XDG_DATA_HOME-} ]] || env_args+=(--env "XDG_DATA_HOME=$XDG_DATA_HOME")
+	[[ -z ${XDG_CACHE_HOME-} ]] || env_args+=(--env "XDG_CACHE_HOME=$XDG_CACHE_HOME")
+	[[ -z ${XDG_STATE_HOME-} ]] || env_args+=(--env "XDG_STATE_HOME=$XDG_STATE_HOME")
+	[[ -z ${TERM-} ]] || env_args+=(--env "TERM=$TERM")
+	[[ -z ${COLORTERM-} ]] || env_args+=(--env "COLORTERM=$COLORTERM")
 
-	sudo -n "$runner" "$@"
+	sudo -n "$runner" "${env_args[@]}" -- "$@"
 }
 
 free() {

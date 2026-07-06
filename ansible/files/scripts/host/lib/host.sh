@@ -114,15 +114,14 @@ run_host() {
 	require_executable "$runner"
 
 	if [[ -f /.dockerenv || -f /run/.containerenv ]]; then
-		require_command distrobox-host-exec
-		distrobox-host-exec sudo -n "$runner" "$@"
+		die 'run_host is not supported from containers'
+	fi
+
+	if ((EUID == 0)); then
+		"$@"
 	else
-		if ((EUID == 0)); then
-			"$@"
-		else
-			require_command sudo
-			sudo -n "$runner" "$@"
-		fi
+		require_command sudo
+		sudo -n "$runner" "$@"
 	fi
 }
 
@@ -132,11 +131,10 @@ run_host_user() {
 	fi
 
 	if [[ -f /.dockerenv || -f /run/.containerenv ]]; then
-		require_command distrobox-host-exec
-		distrobox-host-exec "$@"
-	else
-		"$@"
+		die 'run_host_user is not supported from containers'
 	fi
+
+	"$@"
 }
 
 host_has_command() {

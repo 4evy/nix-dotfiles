@@ -29,6 +29,42 @@ fi
 
 [[ $- != *i* ]] && return
 
+{{- if eq .chezmoi.os "linux" }}
+_dotfiles_path_append_once() {
+	local candidate
+
+	for candidate; do
+		[[ -n "$candidate" ]] || continue
+		case ":${PATH:-}:" in
+			*":$candidate:"*) ;;
+			*) PATH="${PATH:+$PATH:}$candidate" ;;
+		esac
+	done
+}
+
+_dotfiles_brew_prefix="${HOMEBREW_PREFIX:-}"
+if [[ -z "$_dotfiles_brew_prefix" ]]; then
+	if [[ -d /home/linuxbrew/.linuxbrew ]]; then
+		_dotfiles_brew_prefix=/home/linuxbrew/.linuxbrew
+	elif [[ -d "$HOME/.linuxbrew" ]]; then
+		_dotfiles_brew_prefix="$HOME/.linuxbrew"
+	fi
+fi
+if [[ -n "$_dotfiles_brew_prefix" ]]; then
+	export HOMEBREW_PREFIX="$_dotfiles_brew_prefix"
+	export HOMEBREW_CELLAR="$HOMEBREW_PREFIX/Cellar"
+	if [[ "$HOMEBREW_PREFIX" == /home/linuxbrew/.linuxbrew ]]; then
+		export HOMEBREW_REPOSITORY="$HOMEBREW_PREFIX/Homebrew"
+	else
+		export HOMEBREW_REPOSITORY="$HOMEBREW_PREFIX"
+	fi
+	_dotfiles_path_append_once "$HOMEBREW_PREFIX/bin" "$HOMEBREW_PREFIX/sbin"
+	export PATH
+fi
+unset _dotfiles_brew_prefix
+unset -f _dotfiles_path_append_once
+{{- end }}
+
 # ✦ 02 / tiny Bash manners
 #      shopt keeps glob and array expansion behavior predictable.
 shopt -s array_expand_once globskipdots

@@ -8,7 +8,7 @@ readonly HOME_DIR={{ .chezmoi.homeDir | quote }}
 {{- if eq .chezmoi.os "darwin" }}
 PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin"
 {{- else }}
-PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/run/wrappers/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin"
+PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin:/run/wrappers/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin"
 {{- end }}
 export PATH
 
@@ -34,7 +34,7 @@ main() {
 	local zellij_bin=''
 	if zellij_bin="$(command -v zellij 2>/dev/null)"; then
 		local shell
-		for shell in {{ if eq .chezmoi.os "darwin" }}/opt/homebrew/bin/zsh {{ else }}/home/linuxbrew/.linuxbrew/bin/zsh {{ end }}/usr/bin/zsh /bin/zsh; do
+		for shell in {{ if eq .chezmoi.os "darwin" }}/opt/homebrew/bin/zsh {{ else }}/usr/bin/zsh /bin/zsh /home/linuxbrew/.linuxbrew/bin/zsh {{ end }}; do
 			if [[ -x "${shell}" ]]; then
 				export SHELL="${shell}"
 				break
@@ -53,7 +53,7 @@ main() {
 	fi
 
 	local shell
-	for shell in {{ if eq .chezmoi.os "darwin" }}/opt/homebrew/bin/zsh {{ else }}/home/linuxbrew/.linuxbrew/bin/zsh {{ end }}/usr/bin/zsh /bin/zsh; do
+	for shell in {{ if eq .chezmoi.os "darwin" }}/opt/homebrew/bin/zsh {{ else }}/usr/bin/zsh /bin/zsh /home/linuxbrew/.linuxbrew/bin/zsh {{ end }}; do
 		if [[ -x "${shell}" ]]; then
 			export SHELL="${shell}"
 			exec "${shell}" -l

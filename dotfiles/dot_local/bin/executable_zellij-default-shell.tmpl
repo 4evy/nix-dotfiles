@@ -6,7 +6,7 @@ readonly HOME_DIR={{ .chezmoi.homeDir | quote }}
 {{- if eq .chezmoi.os "darwin" }}
 PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin"
 {{- else }}
-PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/run/wrappers/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin"
+PATH="${HOME_DIR}/.local/share/dotfiles/helix-tip/bin:${HOME_DIR}/.local/bin:${HOME_DIR}/.cargo/bin:${HOME_DIR}/.bun/bin:${HOME_DIR}/.bun/install/global/node_modules/.bin:${HOME_DIR}/.cache/.bun/bin:/run/wrappers/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin"
 {{- end }}
 export PATH
 
@@ -41,10 +41,10 @@ for shell in \
 	/bin/bash; do
 {{- else }}
 for shell in \
-	/home/linuxbrew/.linuxbrew/bin/zsh \
 	/usr/bin/zsh \
 	/bin/zsh \
 	"${SHELL:-}" \
+	/home/linuxbrew/.linuxbrew/bin/zsh \
 	/home/linuxbrew/.linuxbrew/bin/bash \
 	/usr/bin/bash \
 	/bin/bash; do

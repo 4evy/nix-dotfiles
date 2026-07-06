@@ -19,7 +19,7 @@ nix_installer_url := "https://install.determinate.systems/nix"
 nix_bin_dir := "/nix/var/nix/profiles/default/bin"
 nix_bin := "/nix/var/nix/profiles/default/bin/nix"
 nix_profile_tools := "deadnix:deadnix nh:nh nil:nil nom:nix-output-monitor nix-tree:nix-tree nixd:nixd nixfmt:nixfmt"
-export PATH := homebrew_path + ":" + env("PATH", "")
+export PATH := env("PATH", "") + ":" + homebrew_path
 
 alias a := apply
 alias b := build
