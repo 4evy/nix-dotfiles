@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import grp
 import sys
 
 import spectrum_build.features.kmscon as kmscon
+from spectrum_build.core.common import fail
 from spectrum_build.image.boot import report_boot_artifacts
 from spectrum_build.image.cleanup import cleanup_paths
 from spectrum_build.core.context import BuildContext
@@ -21,6 +23,34 @@ from spectrum_build.image.services import (
     enable_required_units,
 )
 from spectrum_build.core.steps import BuildStep
+
+
+ONEPASSWORD_GROUPS = {
+    "onepassword-mcp": 954,
+    "onepassword-cli": 955,
+    "onepassword": 956,
+}
+
+
+def ensure_1password_groups(context: BuildContext) -> None:
+    for name, gid in ONEPASSWORD_GROUPS.items():
+        try:
+            current_group = grp.getgrnam(name)
+        except KeyError:
+            current_group = None
+
+        try:
+            gid_group = grp.getgrgid(gid)
+        except KeyError:
+            gid_group = None
+
+        if gid_group is not None and gid_group.gr_name != name:
+            fail(f"GID {gid} is already used by group: {gid_group.gr_name}")
+
+        if current_group is None:
+            context.runner.run(["groupadd", "--system", "--gid", str(gid), name])
+        elif current_group.gr_gid != gid:
+            context.runner.run(["groupmod", "--gid", str(gid), name])
 
 
 def install_package_manifest(context: BuildContext) -> None:
@@ -48,6 +78,7 @@ def clean_dnf_metadata(context: BuildContext) -> None:
 BUILD_STEPS = (
     BuildStep("validate package manifest", lambda _: validate_package_groups()),
     BuildStep("install repositories", install_repositories),
+    BuildStep("ensure 1Password helper groups", ensure_1password_groups),
     BuildStep("install package manifest", install_package_manifest),
     BuildStep("install GitHub release RPMs", install_release_rpms),
     BuildStep("install Discord RPM", install_discord),
