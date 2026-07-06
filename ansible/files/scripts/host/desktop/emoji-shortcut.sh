@@ -52,7 +52,7 @@ gsettings set org.freedesktop.ibus.panel.emoji hotkey "['<Super>period', '<Super
 service_file=${HOME}/.config/systemd/user/carmenta-prewarm.service
 if command -v systemctl >/dev/null 2>&1 && [[ -f $service_file ]]; then
 	systemctl --user daemon-reload
-	systemctl --user enable --now carmenta-prewarm.service >/dev/null 2>&1 || true
+	systemctl --user enable carmenta-prewarm.service >/dev/null 2>&1 || true
 fi
 
 printf '%s\n' 'emoji-picker-shortcut: bound Ctrl+. to Carmenta'
