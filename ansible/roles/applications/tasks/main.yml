@@ -107,6 +107,7 @@
       - bash
       - "{{ dotfiles_ansible_scripts_dir }}/apps/install-helium-linux.sh"
       - "{{ dotfiles_cache_dir }}/helium-browser"
+      - "{{ dotfiles_data_dir }}/helium-browser"
       - "{{ dotfiles_bin_dir }}"
       - "{{ dotfiles_cache_dir }}/helium-browser/installer-bin"
       - "{{ dotfiles_repo_root }}/secrets/secrets.yaml"
@@ -166,7 +167,7 @@
       abi <abi/4.0>,
       include <tunables/global>
 
-      profile dotfiles-helium-browser "{{ dotfiles_cache_dir }}/helium-browser/app/helium" flags=(default_allow) {
+      profile dotfiles-helium-browser "{{ dotfiles_data_dir }}/helium-browser/app/helium" flags=(default_allow) {
         userns,
         include if exists <local/dotfiles-helium-browser>
       }
