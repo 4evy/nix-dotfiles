@@ -266,7 +266,9 @@ switch target=local_ref: (build target)
     if sudo bootc switch --transport containers-storage "$target" \
       > >(tee "$switch_log") \
       2> >(tee -a "$switch_log" >&2); then
-      exit 0
+      switch_status=0
+    else
+      switch_status=$?
     fi
 
     if grep -Fxq 'Image specification is unchanged.' "$switch_log"; then
@@ -275,7 +277,7 @@ switch target=local_ref: (build target)
       exit 0
     fi
 
-    exit 1
+    exit "$switch_status"
 
 # Rebuild the local Spectrum image and stage it as an upgrade.
 [arg('target', help='Local image reference to rebuild before upgrade')]
