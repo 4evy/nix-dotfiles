@@ -8,6 +8,7 @@ from spectrum_build.image.cleanup import cleanup_paths
 from spectrum_build.core.context import BuildContext
 from spectrum_build.features.external_rpms import install_discord, install_release_rpms
 from spectrum_build.image.metadata import validate_image, write_image_metadata
+from spectrum_build.image.shell import align_shell_defaults
 from spectrum_build.manifests.packages import (
     OPTIONAL_PACKAGES,
     REQUIRED_PACKAGES,
@@ -34,6 +35,7 @@ def install_package_manifest(context: BuildContext) -> None:
 
 def configure_system(context: BuildContext) -> None:
     disable_authselect_feature("with-fingerprint", context.runner)
+    align_shell_defaults()
     install_rootfs_files(context.config.context_dir)
     enable_required_units(context.runner)
 

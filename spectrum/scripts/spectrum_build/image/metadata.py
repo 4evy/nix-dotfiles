@@ -19,6 +19,7 @@ from spectrum_build.image.platform_info import (
 )
 from spectrum_build.image.rootfs import validate_rootfs_files
 from spectrum_build.image.services import validate_required_units
+from spectrum_build.image.shell import validate_shell_defaults
 
 
 IMAGE_INFO = Path("/usr/share/ublue-os/image-info.json")
@@ -73,3 +74,4 @@ def validate_image(context_dir: Path, image_name: str, runner: CommandRunner) ->
 
     validate_rootfs_files(context_dir)
     validate_required_units(runner)
+    validate_shell_defaults()

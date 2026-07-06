@@ -1,0 +1,12 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+if [[ ! -x /usr/bin/xdg-open ]]; then
+	printf '%s\n' "open: /usr/bin/xdg-open is unavailable" >&2
+	exit 127
+fi
+
+PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin${PATH:+:$PATH}"
+export PATH
+
+exec /usr/bin/xdg-open "$@"
