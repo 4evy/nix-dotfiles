@@ -230,10 +230,7 @@ def validate_shell_defaults(root: Path = Path("/")) -> None:
             continue
 
         content = path.read_text(encoding="utf-8")
-        if (
-            "brew shellenv fish | source" in content
-            and FISH_BREW_APPEND not in content
-        ):
+        if "brew shellenv fish | source" in content and FISH_BREW_APPEND not in content:
             fail(f"fish Homebrew setup is not append-only: {path}")
 
     for path in (

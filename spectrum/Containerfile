@@ -54,7 +54,7 @@ RUN --mount=type=bind,from=ctx,source=/image,target=/ctx \
     --mount=type=tmpfs,target=/tmp \
     --mount=type=secret,id=github_token,required=false \
     mkdir -p /var/roothome && \
-    dnf5 -y install --setopt=install_weak_deps=False uv && \
+    dnf5 -y install --setopt=install_weak_deps=False uv python3-libdnf5 && \
     cp -a /ctx /tmp/spectrum-src && \
     GITHUB_TOKEN="$(cat /run/secrets/github_token 2>/dev/null || true)" \
     UV_CACHE_DIR=/tmp/uv-cache \

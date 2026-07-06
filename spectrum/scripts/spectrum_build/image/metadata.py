@@ -39,8 +39,8 @@ def write_image_metadata(image: ImageConfig) -> None:
     for key, value in {
         "VARIANT_ID": image.name,
         "IMAGE_ID": image.name,
-        "IMAGE_VERSION": image.version,
-        "OSTREE_VERSION": image.version,
+        "IMAGE_VERSION": image.resolved_version,
+        "OSTREE_VERSION": image.resolved_version,
     }.items():
         set_os_release_value(key, value)
 
