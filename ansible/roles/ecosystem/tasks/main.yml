@@ -4,3 +4,10 @@
   tags:
     - ecosystem
     - bun
+
+- name: Install Nix ecosystem tools
+  ansible.builtin.import_tasks: nix.yml
+  when: common_is_linux
+  tags:
+    - ecosystem
+    - nix

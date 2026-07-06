@@ -1,28 +1,10 @@
 #!/bin/sh
 set -eu
 
-container_name=${VSCODE_NIX_CONTAINER:-nix}
-formatter_path=${VSCODE_NIXFMT_PATH:-/nix/var/nix/profiles/default/bin/nixfmt}
-workdir=$(pwd -P)
-
-if [ "${CONTAINER_ID:-}" = "$container_name" ]; then
-	if [ "$#" -eq 0 ]; then
-		set -- -
-	fi
-	exec "$formatter_path" "$@"
-fi
-
-if ! podman container exists "$container_name"; then
-	printf '%s\n' "vscode-nixfmt: podman container '$container_name' does not exist" >&2
-	exit 127
-fi
-
-if [ "$(podman inspect --format '{{.State.Running}}' "$container_name")" != "true" ]; then
-	podman start "$container_name" >/dev/null
-fi
+formatter=${VSCODE_NIXFMT_PATH:-nixfmt}
 
 if [ "$#" -eq 0 ]; then
 	set -- -
 fi
 
-exec podman exec -i --workdir "$workdir" "$container_name" "$formatter_path" "$@"
+exec "$formatter" "$@"

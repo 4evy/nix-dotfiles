@@ -4,3 +4,22 @@ ecosystem_bun_global_packages:
     bin: codex
   - package: "@earendil-works/pi-coding-agent"
     bin: pi
+
+ecosystem_nix_installer_url: https://install.determinate.systems/nix
+ecosystem_nix_bin: /nix/var/nix/profiles/default/bin/nix
+ecosystem_nix_path: "{{ ecosystem_nix_bin | dirname }}:{{ dotfiles_home_dir }}/.nix-profile/bin:{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
+ecosystem_nix_profile_packages:
+  - package: deadnix
+    bin: deadnix
+  - package: nh
+    bin: nh
+  - package: nil
+    bin: nil
+  - package: nix-output-monitor
+    bin: nom
+  - package: nix-tree
+    bin: nix-tree
+  - package: nixd
+    bin: nixd
+  - package: nixfmt
+    bin: nixfmt

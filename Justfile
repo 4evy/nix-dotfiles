@@ -15,10 +15,10 @@ go_dirs := "cmd internal"
 ansible_playbooks := "ansible/playbooks/bootstrap.yml ansible/playbooks/userland.yml ansible/playbooks/host.yml ansible/playbooks/site.yml"
 podman := env("PODMAN", "podman")
 homebrew_path := "/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin"
-nix_name := "nix"
-nix_image := "localhost/nix-distrobox:latest"
-nix_manifest := "containers/nix/distrobox.ini"
-nix_export_bins := "deadnix nh nil nix nix-build nix-channel nix-collect-garbage nix-copy-closure nix-env nix-hash nix-instantiate nix-prefetch-url nix-shell nix-store nix-tree nixd nixfmt nom"
+nix_installer_url := "https://install.determinate.systems/nix"
+nix_bin_dir := "/nix/var/nix/profiles/default/bin"
+nix_bin := "/nix/var/nix/profiles/default/bin/nix"
+nix_profile_tools := "deadnix:deadnix nh:nh nil:nil nom:nix-output-monitor nix-tree:nix-tree nixd:nixd nixfmt:nixfmt"
 export PATH := homebrew_path + ":" + env("PATH", "")
 
 alias a := apply
@@ -29,7 +29,6 @@ alias ck := check
 alias f := fmt
 alias i := install
 alias l := lint
-alias ni := nix-in
 alias nx := nix
 alias r := reboot
 alias s := setup
@@ -93,7 +92,7 @@ doctor profile="setup":
         commands=("${compose_command%% *}")
         ;;
       nix)
-        commands=(distrobox "${podman_command%% *}")
+        commands=(bash curl sudo)
         ;;
       watch)
         commands=(watchexec)
@@ -105,7 +104,7 @@ doctor profile="setup":
         fi
         ;;
       all)
-        commands=(bootc sudo "${podman_command%% *}" bash chezmoi curl git distrobox gofmt jq just nix-instantiate python3 prettier ruff shellcheck shfmt taplo stylua ty uv go golangci-lint ansible-playbook ansible-lint actionlint yamllint watchexec "${compose_command%% *}")
+        commands=(bootc sudo "${podman_command%% *}" bash chezmoi curl git gofmt jq just nix-instantiate python3 prettier ruff shellcheck shfmt taplo stylua ty uv go golangci-lint ansible-playbook ansible-lint actionlint yamllint watchexec "${compose_command%% *}")
         if [[ -f packages/hyper-window-tiling/package.json ]]; then
           commands+=(bun)
         fi
@@ -146,7 +145,6 @@ build target=local_ref no_cache=build_no_cache: (doctor 'build')
     base_image={{ quote(base_image) }}
     image_name={{ quote(image_name) }}
     local_tag={{ quote(local_tag) }}
-
     build_args=(
       --pull=newer \
       --tag "$target" \
@@ -289,47 +287,52 @@ smoke: (doctor 'smoke')
 smoke-shell: (doctor 'smoke')
     {{ compose }} run --rm fedora-shell
 
-[private]
-_nix-img image=nix_image: (doctor 'nix')
-    {{ podman }} build \
-      --pull=newer \
-      --tag {{ quote(image) }} \
-      --file containers/nix/Containerfile \
-      containers/nix
-
-# Build and create the Nix distrobox.
-[group('containers')]
+# Install Determinate Nix on the live host and ensure Nix profile tools exist.
+[group('setup')]
 [script]
-nix: _nix-img
-    distrobox assemble create --file "{{ nix_manifest }}" --name "{{ nix_name }}"
-    distrobox enter "{{ nix_name }}" -- bash -lc '
-      set -euo pipefail
-      missing=()
-      for spec in deadnix:deadnix nh:nh nil:nil nom:nix-output-monitor nix-tree:nix-tree nixd:nixd nixfmt:nixfmt; do
-        bin=${spec%%:*}
-        pkg=${spec#*:}
-        if [[ ! -x /nix/var/nix/profiles/default/bin/$bin && ! -x $HOME/.nix-profile/bin/$bin ]]; then
-          missing+=("nixpkgs#$pkg")
-        fi
-      done
-      if ((${#missing[@]})); then
-        nix profile add "${missing[@]}"
-      fi
-      for bin in {{ nix_export_bins }}; do
-        bin_path=/nix/var/nix/profiles/default/bin/$bin
-        if [[ ! -x "$bin_path" ]]; then
-          bin_path=$HOME/.nix-profile/bin/$bin
-        fi
-        test -x "$bin_path"
-        distrobox-export --bin "$bin_path" --export-path "$HOME/.local/bin"
-      done
-    '
-    printf '%s\n' 'Enter it with `just nix-in` or `distrobox enter {{ nix_name }}`.'
+nix: (doctor 'nix')
+    if [[ $(uname -s) != Linux ]]; then
+      printf '%s\n' 'just nix only supports Linux hosts.' >&2
+      exit 2
+    fi
 
-# Enter the Nix distrobox.
-[group('containers')]
-nix-in:
-    distrobox enter "{{ nix_name }}"
+    if [[ ! -e /nix ]] &&
+      command -v rpm-ostree >/dev/null 2>&1 &&
+      findmnt --noheadings --output SOURCE,FSTYPE,OPTIONS / | grep -Eq '(^|[[:space:]])composefs([[:space:]]|$)'; then
+      printf '%s\n' 'This composefs ostree host needs /nix in the booted image before installing Nix.' >&2
+      printf '%s\n' 'Rebuild and boot Spectrum with the /nix mountpoint, then rerun just nix.' >&2
+      exit 1
+    fi
+
+    export PATH="{{ nix_bin_dir }}:$HOME/.nix-profile/bin:$PATH"
+
+    if ! command -v nix >/dev/null 2>&1; then
+      plan=linux
+      if command -v rpm-ostree >/dev/null 2>&1; then
+        plan=ostree
+      fi
+      curl -fsSL {{ quote(nix_installer_url) }} | sh -s -- install "$plan" --no-confirm
+    fi
+
+    nix_bin={{ quote(nix_bin) }}
+    if [[ ! -x $nix_bin ]]; then
+      nix_bin=$(command -v nix)
+    fi
+
+    missing=()
+    for spec in {{ nix_profile_tools }}; do
+      bin=${spec%%:*}
+      pkg=${spec#*:}
+      if ! command -v "$bin" >/dev/null 2>&1; then
+        missing+=("nixpkgs#$pkg")
+      fi
+    done
+
+    if ((${#missing[@]})); then
+      "$nix_bin" profile install "${missing[@]}"
+    else
+      printf '%s\n' 'Nix profile tools already installed.'
+    fi
 
 # Apply chezmoi-managed dotfiles.
 [group('setup')]

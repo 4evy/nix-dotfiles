@@ -117,11 +117,11 @@ nix run .#ghidra-mcp
 sudo nixos-rebuild switch --flake .#lenovo-legion
 ```
 
-On non-Nix hosts, build the Nix distrobox and export the Nix tools:
+On non-Nix Linux hosts, install Determinate Nix on the live host and ensure the
+Nix profile tools are present:
 
 ```bash
 just nix
-just nix-in
 ```
 
 ## Commands
@@ -148,8 +148,7 @@ just apply                   # apply only chezmoi dotfiles
 
 just smoke                   # build and run Fedora smoke-test container
 just smoke-shell             # open the smoke-test container shell
-just nix                     # build/create the Nix distrobox
-just nix-in                  # enter the Nix distrobox
+just nix                     # install host Nix and Nix profile tools
 
 just fmt                     # format repo files
 just check-format            # check formatting without rewriting files

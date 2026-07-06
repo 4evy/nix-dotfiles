@@ -41,7 +41,9 @@ LABEL org.opencontainers.image.title="${IMAGE_TITLE}" \
       io.artifacthub.package.license="${IMAGE_LICENSES}" \
       io.artifacthub.package.prerelease=false
 
-RUN rm -rf /opt && mkdir /opt
+# Fedora composefs images cannot create new root-level mountpoints at runtime.
+# Keep /nix non-empty so it survives the image-to-ostree deployment path.
+RUN rm -rf /opt && mkdir /opt /nix && touch /nix/.spectrum-mountpoint
 
 RUN --mount=type=bind,from=ctx,source=/image,target=/ctx \
     --mount=type=cache,target=/var/cache/libdnf5 \

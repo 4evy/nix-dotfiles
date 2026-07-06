@@ -24,7 +24,6 @@ from spectrum_build.image.services import validate_required_units
 IMAGE_INFO = Path("/usr/share/ublue-os/image-info.json")
 VALIDATION_COMMANDS = (
     "bootc",
-    "distrobox",
     "git",
     "just",
     "podman",

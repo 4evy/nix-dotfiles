@@ -10,7 +10,6 @@ prerequisites_bootstrap_packages:
   apt:
     - bubblewrap
     - curl
-    - distrobox
     - file
     - git
     - podman
@@ -19,7 +18,6 @@ prerequisites_bootstrap_packages:
   apk:
     - bubblewrap
     - curl
-    - distrobox
     - file
     - git
     - podman
@@ -28,7 +26,6 @@ prerequisites_bootstrap_packages:
   dnf:
     - bubblewrap
     - curl
-    - distrobox
     - file
     - git
     - podman
@@ -37,7 +34,6 @@ prerequisites_bootstrap_packages:
   pacman:
     - bubblewrap
     - curl
-    - distrobox
     - file
     - git
     - podman
