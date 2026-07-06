@@ -54,10 +54,12 @@ RUN --mount=type=cache,id=dotfiles-go-mod-${TARGETPLATFORM},target=/home/dotfile
     --mount=type=cache,id=dotfiles-go-build-${TARGETPLATFORM},target=/home/dotfiles/.cache/go-build,uid=${TEST_UID},gid=${TEST_GID} \
     set -eu; \
     ansible-galaxy collection install -r ansible/requirements.yml -p .ansible/collections; \
-    ansible-playbook --syntax-check ansible/playbooks/site.yml; \
+    for playbook in ansible/playbooks/bootstrap.yml ansible/playbooks/userland.yml ansible/playbooks/host.yml ansible/playbooks/site.yml; do \
+      ansible-playbook --syntax-check "${playbook}"; \
+    done; \
     ansible-playbook ansible/playbooks/site.yml --tags local; \
-    ansible-lint --version >/dev/null; \
-    yamllint --version >/dev/null
+    ansible-lint ansible; \
+    yamllint .
 
 USER root
 RUN chown -R "${TEST_UID}:${TEST_GID}" "${TEST_HOME}" /workspace/dotfiles
