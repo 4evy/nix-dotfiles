@@ -117,4 +117,4 @@ ansible-playbook ansible/playbooks/site.yml
 
 ## License
 
-[LICENSE.txt](LICENSE.txt)
+[LICENSE](LICENSE)
