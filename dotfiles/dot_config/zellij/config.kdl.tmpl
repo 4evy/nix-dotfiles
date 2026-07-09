@@ -47,8 +47,6 @@ keybinds clear-defaults=true {
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} 7" { GoToTab 7; }
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} 8" { GoToTab 8; }
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} 9" { GoToTab 9; }
-        bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} Left" { GoToPreviousTab; }
-        bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} Right" { GoToNextTab; }
         bind "Super Alt Left" "Ctrl Alt Left" { GoToPreviousTab; }
         bind "Super Alt Right" "Ctrl Alt Right" { GoToNextTab; }
         bind "Alt C" { Copy; }
@@ -59,7 +57,6 @@ keybinds clear-defaults=true {
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} Shift Down" { MoveFocus "Down"; }
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} Shift Up" { MoveFocus "Up"; }
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} Shift Right" { MoveFocus "Right"; }
-        bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} t" { NewTab; }
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} [" { SwitchToMode "Scroll"; }
     }
     pane {
@@ -179,8 +176,6 @@ keybinds clear-defaults=true {
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} 7" { GoToTab 7; SwitchToMode "Normal"; }
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} 8" { GoToTab 8; SwitchToMode "Normal"; }
         bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} 9" { GoToTab 9; SwitchToMode "Normal"; }
-        bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} Left" { GoToPreviousTab; SwitchToMode "Normal"; }
-        bind "{{ if eq .chezmoi.os "darwin" }}Super{{ else }}Ctrl{{ end }} Right" { GoToNextTab; SwitchToMode "Normal"; }
         bind "Super Alt Left" "Ctrl Alt Left" { GoToPreviousTab; SwitchToMode "Normal"; }
         bind "Super Alt Right" "Ctrl Alt Right" { GoToNextTab; SwitchToMode "Normal"; }
     }

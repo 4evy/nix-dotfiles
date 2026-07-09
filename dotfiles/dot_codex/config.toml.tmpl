@@ -50,6 +50,9 @@ status_line = [
 status_line_use_colors = true
 
 [tui.keymap.global]
+{{- if eq .chezmoi.os "darwin" }}
+open_transcript = "ctrl-t"
+{{- end }}
 open_external_editor = "ctrl-x"
 
 [mcp_servers.ghidra]
