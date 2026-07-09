@@ -6,7 +6,7 @@
     eupkgs.url = "github:euvlok/pkgs";
 
     nixcord.inputs.nixpkgs.follows = "nixpkgs-unstable";
-    nixcord.url = "github:FlameFlag/nixcord";
+    nixcord.url = "github:4evy/nixcord";
 
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable-small";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05-small";
@@ -111,6 +111,7 @@
           appFor = program: {
             type = "app";
             inherit program;
+            meta.description = "Run a Ghidra MCP entry point";
           };
         in
         {
