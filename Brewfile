@@ -1,5 +1,6 @@
 if OS.mac?
   cask_args appdir: "/Applications"
+  tap "4evy/dotfiles", __dir__
 end
 
 # Bootstrap shell and provisioning tools
@@ -56,14 +57,20 @@ brew "git-lfs"
 brew "gitui"
 brew "golangci-lint"
 brew "gopls"
+brew "autoconf"
+brew "automake"
+brew "cmake"
 brew "just"
 brew "just-lsp"
 brew "jj"
+brew "libtool"
 brew "lld"
 brew "lua"
 brew "luacheck"
 brew "luarocks"
 brew "make"
+brew "meson"
+brew "ninja"
 brew "pinact"
 brew "gpatch"
 brew "pkgconf"
@@ -82,7 +89,7 @@ brew "zizmor"
 # Editors and terminals
 # Linux Helix tip is installed by the custom Ansible app script.
 if OS.mac?
-  brew "helix", args: ["HEAD"]
+  brew "helix"
 end
 brew "yazi"
 brew "zellij"
@@ -113,6 +120,7 @@ brew "gnupg"
 brew "netcat"
 brew "nmap"
 brew "openssh"
+brew "sshpass"
 # Linux Tailscale is a host service managed by the image and host-layer scripts.
 if OS.mac?
   brew "tailscale", restart_service: true
@@ -129,8 +137,11 @@ brew "btop"
 brew "fzf"
 brew "ghidra"
 # Linux Kanata is installed into the host layer with uinput/systemd setup.
+# macOS uses a local Ansible-installed Homebrew formula matching the former
+# nix-darwin kanata-with-cmd package.
 if OS.mac?
-  brew "kanata"
+  brew "hidapi"
+  brew "4evy/dotfiles/kanata-with-cmd"
 end
 brew "lsof"
 brew "ncdu"
