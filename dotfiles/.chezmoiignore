@@ -1,4 +1,6 @@
 .chezmoi-lib/
+.chezmoiscripts/__pycache__/
+.chezmoiscripts/__pycache__/**
 
 {{- $sopsAgeKey := joinPath .chezmoi.homeDir ".config/sops/age/keys.txt" -}}
 {{- if eq .chezmoi.os "darwin" -}}

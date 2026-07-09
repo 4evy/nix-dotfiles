@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from xwaykeyz.config_api import C, bind, keymap
+    from xwaykeyz.config_api import C, bind, keymap  # ty: ignore[unresolved-import]
 
     cnfg: Any = None
 

@@ -16,6 +16,10 @@
 #
 # loaded late on purpose: frameworks first, daily commands after
 
+# Interactive tools should keep their styling even when a parent process (for
+# example a long-running Zellij server) was started with NO_COLOR set.
+unset NO_COLOR
+
 # A1 / editor default
 #      h v vi vim ───────────────> hx, no ceremony
 
@@ -622,7 +626,7 @@ update() {
 		cd "$_dotfiles_repo_path" &&
 			_dotfiles_ansible_playbook ansible/playbooks/userland.yml "$@"
 	) || return
-	chezmoi apply --refresh-externals=always --force
+	chezmoi apply --refresh-externals=auto --force
 }
 
 rebuild() {
@@ -652,7 +656,7 @@ update() {
 		cd "$_dotfiles_repo_path" &&
 			_dotfiles_ansible_playbook ansible/playbooks/userland.yml
 	) || return
-	chezmoi apply --refresh-externals=always --force || return
+	chezmoi apply --refresh-externals=auto --force || return
 	(
 		cd "$_dotfiles_repo_path" &&
 			_dotfiles_ansible_playbook ansible/playbooks/host.yml

@@ -1,6 +1,0 @@
-#!/bin/sh
-set -eu
-
-server=${VSCODE_NIXD_PATH:-nixd}
-
-exec "$server" "$@"

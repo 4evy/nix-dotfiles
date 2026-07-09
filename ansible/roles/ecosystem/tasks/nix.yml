@@ -26,17 +26,11 @@
     - ecosystem
     - nix
 
-- name: Detect root filesystem mount
-  ansible.builtin.command:
-    argv:
-      - findmnt
-      - --noheadings
-      - --output
-      - SOURCE,FSTYPE,OPTIONS
-      - /
-  changed_when: false
-  check_mode: false
-  register: ecosystem_nix_root_mount
+- name: Gather root filesystem mount facts
+  ansible.builtin.mount_facts:
+    sources:
+      - dynamic
+    timeout: 10
   when:
     - common_has_rpm_ostree
     - ecosystem_nix_command.rc != 0
@@ -54,7 +48,7 @@
   when:
     - common_has_rpm_ostree
     - ecosystem_nix_command.rc != 0
-    - ecosystem_nix_root_mount.stdout is search('(^|\\s)composefs(\\s|$)')
+    - ansible_facts.mount_points.get('/', {}).get('fstype', '') == 'composefs'
     - not ecosystem_nix_root.stat.exists | default(false)
   tags:
     - ecosystem
@@ -71,7 +65,9 @@
   changed_when: false
   failed_when: false
   register: ecosystem_nix_system_runner_sudo
-  when: ecosystem_nix_command.rc != 0
+  when:
+    - common_is_linux
+    - ecosystem_nix_command.rc != 0
   tags:
     - ecosystem
     - nix
@@ -84,6 +80,7 @@
       installs the system-runner sudoers entry, then rerun this playbook as your
       normal user.
   when:
+    - common_is_linux
     - ecosystem_nix_command.rc != 0
     - ecosystem_nix_system_runner_sudo.rc | default(1) != 0
   tags:
@@ -100,10 +97,10 @@
     - ecosystem
     - nix
 
-- name: Download Determinate Nix installer
+- name: Download Nix installer
   ansible.builtin.get_url:
     url: "{{ ecosystem_nix_installer_url }}"
-    dest: "{{ dotfiles_cache_dir }}/installers/determinate-nix-installer.sh"
+    dest: "{{ dotfiles_cache_dir }}/installers/nix-installer.sh"
     checksum: "{{ ecosystem_nix_installer_checksum | default(omit) }}"
     mode: "0755"
   when: ecosystem_nix_command.rc != 0
@@ -111,7 +108,7 @@
     - ecosystem
     - nix
 
-- name: Install Determinate Nix
+- name: Install Determinate Nix on Linux
   ansible.builtin.command:
     argv:
       - sudo
@@ -121,14 +118,36 @@
       - NIX_INSTALLER_NO_CONFIRM=true
       - --
       - /bin/sh
-      - "{{ dotfiles_cache_dir }}/installers/determinate-nix-installer.sh"
+      - "{{ dotfiles_cache_dir }}/installers/nix-installer.sh"
       - install
       - "{{ 'ostree' if common_has_rpm_ostree else 'linux' }}"
       - --no-confirm
       - --no-modify-profile
   args:
     creates: "{{ ecosystem_nix_bin }}"
-  when: ecosystem_nix_command.rc != 0
+  when:
+    - common_is_linux
+    - ecosystem_nix_command.rc != 0
+  tags:
+    - ecosystem
+    - nix
+
+- name: Install upstream Nix with the NixOS installer on macOS
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - "{{ dotfiles_cache_dir }}/installers/nix-installer.sh"
+      - install
+      - macos
+      - --enable-flakes
+      - --no-confirm
+      - --no-modify-profile
+  args:
+    creates: "{{ ecosystem_nix_bin }}"
+  become: true
+  when:
+    - common_is_macos
+    - ecosystem_nix_command.rc != 0
   tags:
     - ecosystem
     - nix

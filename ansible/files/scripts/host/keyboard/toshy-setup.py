@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TypeGuard, cast
 
 RunCallable = Callable[..., subprocess.CompletedProcess[str]]
-ORIGINAL_RUN = cast(RunCallable, subprocess.run)
+ORIGINAL_RUN = cast("RunCallable", subprocess.run)
 SUDO_SHIM_DIR = os.environ.get("TOSHY_SUDO_SHIM_DIR")
 SUDO_NAMES = {"sudo", "sudo-rs"}
 SUDO_K_RE = re.compile(r"(^|[;&|]\s*)(?:/usr/bin/)?sudo(?:-rs)?\s+-k(?=\s*(?:[;&|]|$))")
@@ -68,8 +68,7 @@ def rewrite_sudo_argv(argv: list[str]) -> list[str] | None:
 def rewrite_sudo_shell(command: str) -> str:
     sudo = shlex.quote(SUDO)
     command = SUDO_K_RE.sub(r"\1true", command)
-    command = SUDO_CMD_RE.sub(rf"\1{sudo} -n ", command)
-    return command
+    return SUDO_CMD_RE.sub(rf"\1{sudo} -n ", command)
 
 
 def is_command_sequence(command: object) -> TypeGuard[Sequence[object]]:
@@ -154,8 +153,8 @@ def main() -> None:
 
     os.chdir(setup_dir)
     sys.path.insert(0, str(setup_dir))
-    setattr(builtins, "input", automated_input)
-    setattr(subprocess, "run", automated_run)
+    builtins.input = automated_input  # ty: ignore[invalid-assignment]
+    subprocess.run = automated_run  # ty: ignore[invalid-assignment]
     sys.argv = [str(setup_path), *args.setup_args]
     _ = runpy.run_path(str(setup_path), run_name="__main__")
 

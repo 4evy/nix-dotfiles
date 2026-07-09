@@ -66,57 +66,55 @@
     - equicord
 
 - name: Install native Ghostty tip build on Linux
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/apps/install-ghostty-tip-linux.sh"
+  evy.dotfiles.operation:
+    executable: "{{ dotfiles_bin_dir }}/dotfiles-scripts"
+    command:
+      - apps
+      - install-ghostty-tip-linux
       - "{{ dotfiles_cache_dir }}/ghostty"
       - "{{ dotfiles_home_dir }}/.local"
-  args:
+    context: "{{ dotfiles_automation_context }}"
     chdir: "{{ dotfiles_repo_root }}"
-  environment:
-    PATH: "{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
-  register: applications_ghostty_tip_install
-  changed_when: applications_ghostty_tip_install.stdout is search('^Installed native Ghostty tip ')
+    environment:
+      PATH: "{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
   when: common_is_linux
   tags:
     - apps
     - ghostty
 
-- name: Install native Helix tip build on Linux
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/apps/install-helix-tip-linux.sh"
+- name: Install native Helix tip build
+  evy.dotfiles.operation:
+    executable: "{{ dotfiles_bin_dir }}/dotfiles-scripts"
+    command:
+      - apps
+      - install-helix-tip-linux
       - "{{ dotfiles_cache_dir }}/helix"
       - "{{ dotfiles_data_dir }}/helix-tip"
-  args:
+    context: "{{ dotfiles_automation_context }}"
     chdir: "{{ dotfiles_repo_root }}"
-  environment:
-    PATH: "{{ dotfiles_home_dir }}/.cargo/bin:{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
-  register: applications_helix_tip_install
-  changed_when: applications_helix_tip_install.stdout is search('^Installed Helix tip ')
-  when: common_is_linux
+    environment:
+      PATH: "{{ dotfiles_home_dir }}/.cargo/bin:{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
+  when: common_is_linux or common_is_macos
   tags:
     - apps
     - helix
 
 - name: Install Helium on Linux
-  ansible.builtin.command:
-    argv:
-      - bash
-      - "{{ dotfiles_ansible_scripts_dir }}/apps/install-helium-linux.sh"
+  evy.dotfiles.operation:
+    executable: "{{ dotfiles_bin_dir }}/dotfiles-scripts"
+    command:
+      - apps
+      - install-helium-linux
       - "{{ dotfiles_cache_dir }}/helium-browser"
       - "{{ dotfiles_data_dir }}/helium-browser"
       - "{{ dotfiles_bin_dir }}"
       - "{{ dotfiles_cache_dir }}/helium-browser/installer-bin"
       - "{{ dotfiles_repo_root }}/secrets/secrets.yaml"
       - "{{ helium_linux_flags }}"
-  args:
+    context: "{{ dotfiles_automation_context }}"
     chdir: "{{ dotfiles_repo_root }}"
-  environment:
-    PATH: "{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
-  changed_when: true
+    environment:
+      PATH: "{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
   vars:
     helium_enabled_features:
       - TouchpadOverscrollHistoryNavigation

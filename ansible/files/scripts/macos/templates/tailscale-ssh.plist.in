@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>@LABEL@</string>
+  <string>@prerequisites_tailscale_ssh_label@</string>
   <key>ProgramArguments</key>
   <array>
-    <string>@HELPER@</string>
+    <string>@prerequisites_tailscale_ssh_helper@</string>
   </array>
   <key>RunAtLoad</key>
   <true/>

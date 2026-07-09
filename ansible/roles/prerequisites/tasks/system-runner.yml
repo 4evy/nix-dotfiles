@@ -1,14 +1,73 @@
 ---
-- name: Install system-runner bootstrap command
-  ansible.builtin.copy:
-    src: "{{ dotfiles_repo_root }}/ansible/files/scripts/local/system-runner.sh"
-    dest: "{{ dotfiles_bin_dir }}/system-runner"
-    mode: "0755"
-  changed_when: true
+- name: Inspect repository Python tool installation
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    checksum_algorithm: sha256
+  loop:
+    - "{{ dotfiles_cache_dir }}/dotfiles-python-tool.sha256"
+    - "{{ dotfiles_bin_dir }}/dotfiles-scripts"
+  register: prerequisites_dotfiles_python_tool_state
   tags:
     - bootstrap
+    - python
     - scripts
     - system-runner
+
+- name: Install repository Python tool when its locked metadata changes
+  when: >-
+    not prerequisites_dotfiles_python_tool_state.results[0].stat.exists
+    or not prerequisites_dotfiles_python_tool_state.results[1].stat.exists
+    or prerequisites_dotfiles_python_tool_state.results[0].stat.checksum | default('')
+      != prerequisites_dotfiles_python_tool_metadata | hash('sha256')
+  vars:
+    prerequisites_dotfiles_python_tool_metadata: >-
+      {{ lookup('ansible.builtin.file', dotfiles_repo_root ~ '/pyproject.toml') }}
+      {{ lookup('ansible.builtin.file', dotfiles_repo_root ~ '/uv.lock') }}
+  tags:
+    - bootstrap
+    - python
+    - scripts
+    - system-runner
+  block:
+    - name: Export locked Python runtime constraints
+      ansible.builtin.command:
+        argv:
+          - "{{ prerequisites_homebrew_prefix }}/bin/uv"
+          - export
+          - --locked
+          - --no-dev
+          - --no-emit-project
+          - --no-hashes
+          - --no-annotate
+          - --no-header
+          - --output-file
+          - "{{ dotfiles_cache_dir }}/dotfiles-python-constraints.txt"
+        chdir: "{{ dotfiles_repo_root }}"
+      environment:
+        PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
+      changed_when: false
+
+    - name: Install repository Python commands with uv
+      ansible.builtin.command:
+        argv:
+          - "{{ prerequisites_homebrew_prefix }}/bin/uv"
+          - tool
+          - install
+          - --editable
+          - --force
+          - --constraints
+          - "{{ dotfiles_cache_dir }}/dotfiles-python-constraints.txt"
+          - "{{ dotfiles_repo_root }}"
+      environment:
+        PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
+        UV_TOOL_BIN_DIR: "{{ dotfiles_bin_dir }}"
+      changed_when: true
+
+    - name: Record installed repository Python tool metadata
+      ansible.builtin.copy:
+        content: "{{ prerequisites_dotfiles_python_tool_metadata }}"
+        dest: "{{ dotfiles_cache_dir }}/dotfiles-python-tool.sha256"
+        mode: "0644"
 
 - name: Verify system-runner bootstrap command
   ansible.builtin.command:
@@ -17,6 +76,7 @@
       - --version
   environment:
     PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
+    UV_TOOL_BIN_DIR: "{{ dotfiles_bin_dir }}"
   changed_when: false
   tags:
     - bootstrap

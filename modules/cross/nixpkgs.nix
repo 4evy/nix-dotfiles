@@ -42,9 +42,10 @@
           hyper-window-tiling = final.callPackage ../../packages/hyper-window-tiling.nix { };
           hyper-window-tiling-gnome = final.hyper-window-tiling.gnome;
           hyper-window-tiling-kde = final.hyper-window-tiling.kde;
-          system-runner = final.writeShellScriptBin "system-runner" (
-            builtins.readFile ../../ansible/files/scripts/local/system-runner.sh
-          );
+          system-runner = final.writeScriptBin "system-runner" ''
+            #!${final.python3}/bin/python3
+            ${builtins.readFile ../../ansible/files/scripts/workstation/local/system_runner.py}
+          '';
           zellij-theme-tools = goWorkspacePackage {
             pname = "zellij-theme-tools";
             subPackages = [ "cmd/zellij-theme-run" ];

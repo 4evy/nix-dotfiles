@@ -12,7 +12,6 @@ import argparse
 import re
 from pathlib import Path
 
-
 MARKER_RE = re.compile(
     r"(?P<start>^###  SLICE_MARK_START: (?P<name>\w+)  ###[^\n]*\n)"
     r"(?P<body>.*?)"

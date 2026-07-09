@@ -6,7 +6,10 @@ ignore: |
   .cache/
   .devenv/
   .direnv/
+  .venv/
   ansible.cfg
+  build/
+  dist/
   node_modules/
   result
   secrets/

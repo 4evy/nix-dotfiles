@@ -5,9 +5,21 @@ ecosystem_bun_global_packages:
   - package: "@earendil-works/pi-coding-agent"
     bin: pi
 
-ecosystem_nix_installer_url: https://install.determinate.systems/nix
+ecosystem_determinate_nix_installer_url: https://install.determinate.systems/nix
+ecosystem_nixos_nix_installer_url: https://artifacts.nixos.org/nix-installer
+ecosystem_nix_installer_url: >-
+  {{
+    ecosystem_nixos_nix_installer_url
+    if common_is_macos
+    else ecosystem_determinate_nix_installer_url
+  }}
 ecosystem_nix_bin: /nix/var/nix/profiles/default/bin/nix
-ecosystem_nix_path: "{{ ecosystem_nix_bin | dirname }}:{{ dotfiles_home_dir }}/.nix-profile/bin:{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
+ecosystem_nix_paths:
+  - "{{ ecosystem_nix_bin | dirname }}"
+  - /run/current-system/sw/bin
+  - "{{ dotfiles_home_dir }}/.nix-profile/bin"
+  - "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
+ecosystem_nix_path: "{{ ecosystem_nix_paths | join(':') }}"
 ecosystem_nix_profile_packages:
   - package: deadnix
     bin: deadnix

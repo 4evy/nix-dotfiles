@@ -1,4 +1,0 @@
-{{- if eq .chezmoi.os "darwin" -}}
-#!/usr/bin/env sh
-exec "{{ joinPath .chezmoi.homeDir ".local/bin/raycast-beta-patch" }}" "$@"
-{{- end }}

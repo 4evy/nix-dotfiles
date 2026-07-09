@@ -1,0 +1,580 @@
+from __future__ import annotations
+
+import datetime as dt
+import json
+import os
+import platform
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+import psutil
+
+from workstation.console import console, error_console
+from workstation.errors import DotfilesError
+from workstation.lib.commands import output, run, which
+from workstation.lib.files import write_if_changed
+from workstation.lib.host import gsettings_available, user_config_home
+from workstation.lib.paths import find_repo_root
+
+
+def _exec(
+    path: Path | str,
+    arguments: list[str],
+    environment: dict[str, str] | None = None,
+) -> None:
+    executable = os.fspath(path)
+    os.execvpe(executable, (executable, *arguments), environment or os.environ)
+
+
+def alt_tab_license_entrypoint() -> None:
+    service = "com.lwouis.alt-tab-macos.license"
+    values = {
+        "licenseKey": "0000-0000-0000-0000-0000-0000",
+        "instanceId": "evy-instance-0",
+        "variantId": "pro_lifetime",
+    }
+    action = sys.argv[1] if len(sys.argv) == 2 else ""
+    if action == "install":
+        for account, value in values.items():
+            run(
+                (
+                    "security",
+                    "add-generic-password",
+                    "-A",
+                    "-U",
+                    "-s",
+                    service,
+                    "-a",
+                    account,
+                    "-w",
+                    value,
+                ),
+                capture=True,
+            )
+        defaults = (
+            (
+                "lastValidation",
+                "float",
+                str(int(dt.datetime.now(dt.UTC).timestamp())),
+            ),
+            ("lastValidationResult", "bool", "true"),
+            ("customerEmail", "string", "alt@evy.pink"),
+        )
+        for key, kind, value in defaults:
+            run(("defaults", "write", service, key, f"-{kind}", value))
+        error_console.print(
+            "alt-tab-license: license installed; restart AltTab to apply"
+        )
+        return
+    if action == "remove":
+        for account in values:
+            run(
+                (
+                    "security",
+                    "delete-generic-password",
+                    "-s",
+                    service,
+                    "-a",
+                    account,
+                ),
+                check=False,
+                capture=True,
+            )
+        for key in ("lastValidation", "lastValidationResult", "customerEmail"):
+            run(("defaults", "delete", service, key), check=False, capture=True)
+        error_console.print(
+            "alt-tab-license: license removed; restart AltTab to revert to trial"
+        )
+        return
+    if action == "status":
+        console.print("keychain items:")
+        for account in values:
+            value = (
+                output(
+                    (
+                        "security",
+                        "find-generic-password",
+                        "-s",
+                        service,
+                        "-a",
+                        account,
+                        "-w",
+                    ),
+                    check=False,
+                )
+                or "none"
+            )
+            console.print(f"  {account + ':':<12} {value}")
+        console.print(f"\ndefaults ({service}):")
+        for key in ("lastValidation", "lastValidationResult", "customerEmail"):
+            value = output(("defaults", "read", service, key), check=False) or "none"
+            console.print(f"  {key + ':':<22} {value}")
+        return
+    raise SystemExit("Usage: alt-tab-license <install|remove|status>")
+
+
+def _real_codex(home: Path, wrapper: Path) -> Path:
+    candidates = (
+        os.environ.get("CODEX_REAL_BIN"),
+        home / ".bun/bin/codex",
+        home / ".cache/.bun/bin/codex",
+        home / ".npm/bin/codex",
+        home / ".bun/install/global/node_modules/.bin/codex",
+        Path("/opt/homebrew/bin/codex"),
+        Path("/usr/local/bin/codex"),
+        Path("/usr/bin/codex"),
+    )
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate)
+        if path != wrapper and path.is_file() and os.access(path, os.X_OK):
+            return path
+    raise DotfilesError("codex: real Codex binary not found")
+
+
+def codex_entrypoint() -> None:
+    home = Path.home()
+    wrapper = Path(sys.argv[0]).resolve()
+    real = _real_codex(home, wrapper)
+    arguments = list(sys.argv[1:])
+    themed_arguments = arguments.copy()
+    if not os.environ.get("ZELLIJ_THEME_RUN_CODEX_BIN"):
+        themed_arguments = [
+            value
+            for value in themed_arguments
+            if value != "--dangerously-bypass-approvals-and-sandbox"
+        ]
+    theme_runner = home / ".local/bin/zellij-theme-run"
+    if not (theme_runner.is_file() and os.access(theme_runner, os.X_OK)):
+        theme_runner = which("zellij-theme-run") or theme_runner
+    if theme_runner.is_file() and os.access(theme_runner, os.X_OK):
+        environment = dict(os.environ)
+        environment["ZELLIJ_THEME_RUN_CODEX_BIN"] = os.fspath(real)
+        environment["ZELLIJ_THEME_RUN_CODEX_WRAPPER"] = os.fspath(wrapper)
+        _exec(theme_runner, ["codex", *themed_arguments], environment)
+    _exec(real, arguments)
+
+
+def _section(name: str) -> None:
+    console.print(f"\n== {name} ==")
+
+
+def _print_command(*arguments: str) -> str:
+    result = run(arguments, check=False, capture=True)
+    if result.stdout:
+        console.print(result.stdout.rstrip())
+    return result.stdout
+
+
+def _matching_lines(
+    text: str,
+    pattern: str,
+    *,
+    limit: int | None = None,
+    tail: bool = False,
+) -> str:
+    expression = re.compile(pattern, re.IGNORECASE)
+    lines = [line for line in text.splitlines() if expression.search(line)]
+    if limit is not None:
+        lines = lines[-limit:] if tail else lines[:limit]
+    return "\n".join(lines)
+
+
+def _lspci_display_devices(text: str) -> str:
+    lines = text.splitlines()
+    selected: list[str] = []
+    for index, line in enumerate(lines):
+        if re.search(r"VGA|3D|Display", line, re.IGNORECASE):
+            selected.extend(lines[index : index + 5])
+    return "\n".join(dict.fromkeys(selected))
+
+
+def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
+    _section("system")
+    if which("hostnamectl"):
+        _print_command("hostnamectl")
+    console.print(
+        f"session={os.environ.get('XDG_SESSION_TYPE', 'unknown')} "
+        f"desktop={os.environ.get('XDG_CURRENT_DESKTOP', 'unknown')}"
+    )
+    console.print(f"kernel={platform.release()}")
+    for command in ("rpm-ostree", "bootc"):
+        if which(command):
+            _print_command(command, "status")
+    _section("graphics")
+    if which("lspci"):
+        console.print(_lspci_display_devices(output(("lspci", "-nnk"), check=False)))
+    if Path("/dev/dri").exists() and which("ls"):
+        _print_command("ls", "-l", "/dev/dri")
+    if which("lsmod"):
+        console.print(
+            _matching_lines(
+                output(("lsmod",), check=False),
+                r"^(nvidia|nouveau|amdgpu|i915)",
+            )
+        )
+    for device in Path("/sys/class/drm").glob("card[0-9]/device"):
+        vendor = (
+            (device / "vendor").read_text().strip()
+            if (device / "vendor").is_file()
+            else ""
+        )
+        identifier = (
+            (device / "device").read_text().strip()
+            if (device / "device").is_file()
+            else ""
+        )
+        console.print(f"{device} vendor={vendor} device={identifier}")
+    if which("nvidia-smi"):
+        _print_command("nvidia-smi")
+    if which("rpm"):
+        packages = _matching_lines(
+            output(("rpm", "-qa"), check=False),
+            r"^(nvidia|kmod-nvidia|akmod-nvidia|xorg-x11-nvidia|libnvidia|"
+            r"libva-nvidia|libva-utils|egl-wayland|egl-wayland2|"
+            r"ublue-os-nvidia|vulkan-loader|vulkan-tools)",
+        )
+        console.print("\n".join(sorted(packages.splitlines())))
+
+    _section("graphics-apis")
+    for command, arguments in (
+        ("glxinfo", ("-B",)),
+        ("eglinfo", ("-B",)),
+        ("vainfo", ("--display", "wayland")),
+    ):
+        if which(command):
+            _print_command(command, *arguments)
+    if which("vulkaninfo"):
+        _print_command("vulkaninfo", "--summary")
+    else:
+        console.print("vulkaninfo not available")
+
+    _section("flatpak-gl")
+    if which("flatpak"):
+        _print_command("flatpak", "--gl-drivers")
+        runtimes = output(
+            (
+                "flatpak",
+                "list",
+                "--runtime",
+                "--columns=application,branch,arch,origin,installation",
+            ),
+            check=False,
+        )
+        pattern = re.compile(
+            r"nvidia|org\.freedesktop\.Platform\.(GL|VAAPI)", re.IGNORECASE
+        )
+        console.print(
+            "\n".join(line for line in runtimes.splitlines() if pattern.search(line))
+        )
+    _section("power")
+    if which("powerprofilesctl"):
+        _print_command("powerprofilesctl", "get")
+    for path in (
+        Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"),
+        Path("/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference"),
+    ):
+        if path.is_file():
+            console.print(f"{path}={path.read_text().strip()}")
+
+    _section("pressure")
+    for command, arguments in (("uptime", ()), ("free", ("-h",))):
+        if which(command):
+            _print_command(command, *arguments)
+    if which("systemd-inhibit"):
+        _print_command("systemd-inhibit", "--list", "--no-pager")
+    memory = psutil.virtual_memory()
+    console.print(f"load={os.getloadavg()} memory_used={memory.percent:.1f}%")
+
+    _section("failed-units")
+    if which("systemctl"):
+        _print_command("systemctl", "--failed", "--no-pager")
+        _print_command("systemctl", "--user", "--failed", "--no-pager")
+
+    _section("gnome")
+    if gsettings_available():
+        _print_command("gsettings", "get", "org.gnome.shell", "enabled-extensions")
+    if which("gnome-extensions"):
+        _print_command("gnome-extensions", "list", "--enabled")
+    if which("journalctl"):
+        journal = output(
+            ("journalctl", "--user", "-b", "--no-pager", "-p", "warning..alert"),
+            check=False,
+        )
+        console.print(
+            _matching_lines(
+                journal,
+                r"gnome-shell|mutter|extension|clutter|st_widget|g_closure|"
+                r"gpu|egl|vulkan|wayland",
+                limit=80,
+                tail=True,
+            )
+        )
+
+    _section("chromium")
+    if which("ps"):
+        process_table = output(
+            ("ps", "-eo", "pid,ppid,pcpu,pmem,comm,args", "--sort=-pcpu"),
+            check=False,
+        )
+        console.print(
+            _matching_lines(
+                process_table,
+                r"helium|chrom|electron|discord",
+                limit=40,
+            )
+        )
+
+    _section("kernel-gpu")
+    if which("journalctl"):
+        kernel_log = output(("journalctl", "-k", "-b", "--no-pager"), check=False)
+        console.print(
+            _matching_lines(
+                kernel_log,
+                r"nouveau|nvidia|amdgpu|i915|drm|gpu|xid|timeout|hang|stall|firmware",
+                limit=120,
+                tail=True,
+            )
+        )
+
+    _section("hot-processes")
+    if which("ps"):
+        table = output(
+            (
+                "ps",
+                "-eo",
+                "pid,ppid,ni,pri,psr,pcpu,pmem,comm,args",
+                "--sort=-pcpu",
+            ),
+            check=False,
+        )
+        console.print("\n".join(table.splitlines()[:30]))
+
+
+def _accent_colors() -> tuple[str, str]:
+    repository = find_repo_root(Path(__file__))
+    palette = json.loads(
+        (repository / "dotfiles/.chezmoitemplates/catppuccin_palette.json").read_text()
+    )
+    return palette["latte"]["pink"], palette["frappe"]["pink"]
+
+
+def _gnome_accent_apply() -> None:
+    latte, frappe = _accent_colors()
+    scheme = (
+        output(
+            ("gsettings", "get", "org.gnome.desktop.interface", "color-scheme"),
+            check=False,
+        )
+        if gsettings_available()
+        else "default"
+    )
+    accent = frappe if "prefer-dark" in scheme else latte
+    gtk3 = f"""/* Generated by gnome-catppuccin-accent. */
+@define-color accent_color {accent};
+@define-color accent_bg_color {accent};
+@define-color accent_fg_color rgba(0, 0, 0, 0.8);
+@define-color theme_selected_bg_color {accent};
+@define-color theme_selected_fg_color rgba(0, 0, 0, 0.8);
+@define-color theme_unfocused_selected_bg_color {accent};
+@define-color theme_unfocused_selected_fg_color rgba(0, 0, 0, 0.8);
+"""
+    gtk4 = f"""/* Generated by gnome-catppuccin-accent. */
+@define-color accent_color {accent};
+@define-color accent_bg_color {accent};
+@define-color accent_fg_color rgba(0, 0, 0, 0.8);
+
+:root {{
+  --accent-bg-color: {accent};
+  --accent-fg-color: rgb(0 0 0 / 80%);
+  --accent-color: oklab(from var(--accent-bg-color) var(--standalone-color-oklab));
+}}
+"""
+    config = user_config_home()
+    write_if_changed(config / "gtk-3.0/catppuccin-accent.css", gtk3)
+    write_if_changed(config / "gtk-4.0/catppuccin-accent.css", gtk4)
+    if gsettings_available():
+        valid = output(
+            ("gsettings", "range", "org.gnome.desktop.interface", "accent-color"),
+            check=False,
+        )
+        if "'pink'" in valid:
+            run(
+                (
+                    "gsettings",
+                    "set",
+                    "org.gnome.desktop.interface",
+                    "accent-color",
+                    "pink",
+                ),
+                check=False,
+                capture=True,
+            )
+
+
+def gnome_catppuccin_accent_entrypoint() -> None:
+    mode = sys.argv[1] if len(sys.argv) == 2 else "--once"
+    if mode not in {"--once", "--watch"}:
+        raise SystemExit("usage: gnome-catppuccin-accent [--once|--watch]")
+    _gnome_accent_apply()
+    executable = which("gsettings")
+    if mode == "--watch" and executable is not None:
+        process = subprocess.Popen(
+            (
+                executable,
+                "monitor",
+                "org.gnome.desktop.interface",
+                "color-scheme",
+            ),
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        if process.stdout:
+            for _line in process.stdout:
+                _gnome_accent_apply()
+        raise SystemExit(process.wait())
+
+
+def python_entrypoint() -> None:
+    environment = dict(os.environ)
+    environment.setdefault("UV_PYTHON_PREFERENCE", "only-managed")
+    _exec("uv", ["run", "python", *sys.argv[1:]], environment)
+
+
+def python3_entrypoint() -> None:
+    environment = dict(os.environ)
+    environment.setdefault("UV_PYTHON_PREFERENCE", "only-managed")
+    _exec("uv", ["run", "python3", *sys.argv[1:]], environment)
+
+
+def vscode_nixd_entrypoint() -> None:
+    _exec(os.environ.get("VSCODE_NIXD_PATH", "nixd"), sys.argv[1:])
+
+
+def vscode_nixfmt_entrypoint() -> None:
+    _exec(os.environ.get("VSCODE_NIXFMT_PATH", "nixfmt"), sys.argv[1:] or ["-"])
+
+
+def _command_path(home: Path) -> str:
+    paths = (
+        (
+            home / ".local/share/dotfiles/helix-tip/bin",
+            Path("/opt/homebrew/bin"),
+            Path("/opt/homebrew/sbin"),
+            Path("/usr/bin"),
+            Path("/bin"),
+            Path("/usr/sbin"),
+            Path("/sbin"),
+            home / ".local/bin",
+            home / ".cargo/bin",
+            home / ".bun/bin",
+            home / ".bun/install/global/node_modules/.bin",
+            home / ".cache/.bun/bin",
+        )
+        if sys.platform == "darwin"
+        else (
+            home / ".local/share/dotfiles/helix-tip/bin",
+            home / ".local/bin",
+            home / ".cargo/bin",
+            home / ".bun/bin",
+            home / ".bun/install/global/node_modules/.bin",
+            home / ".cache/.bun/bin",
+            Path("/run/wrappers/bin"),
+            Path("/run/current-system/sw/bin"),
+            Path("/usr/local/bin"),
+            Path("/usr/bin"),
+            Path("/bin"),
+            Path("/usr/sbin"),
+            Path("/sbin"),
+            Path("/home/linuxbrew/.linuxbrew/bin"),
+            Path("/home/linuxbrew/.linuxbrew/sbin"),
+        )
+    )
+    return os.pathsep.join(os.fspath(path) for path in paths)
+
+
+def zellij_default_shell_entrypoint() -> None:
+    environment = dict(os.environ)
+    environment["PATH"] = _command_path(Path.home())
+    candidates = (
+        (
+            Path("/opt/homebrew/bin/zsh"),
+            Path("/usr/bin/zsh"),
+            Path("/bin/zsh"),
+            Path(environment.get("SHELL", "")),
+            Path("/opt/homebrew/bin/bash"),
+            Path("/usr/bin/bash"),
+            Path("/bin/bash"),
+        )
+        if sys.platform == "darwin"
+        else (
+            Path("/usr/bin/zsh"),
+            Path("/bin/zsh"),
+            Path(environment.get("SHELL", "")),
+            Path("/home/linuxbrew/.linuxbrew/bin/zsh"),
+            Path("/home/linuxbrew/.linuxbrew/bin/bash"),
+            Path("/usr/bin/bash"),
+            Path("/bin/bash"),
+        )
+    )
+    for candidate in candidates:
+        usable = candidate.is_file() and os.access(candidate, os.X_OK)
+        if (
+            usable
+            and run((candidate, "--version"), check=False, capture=True).returncode == 0
+        ):
+            environment["SHELL"] = os.fspath(candidate)
+            _exec(candidate, sys.argv[1:], environment)
+    _exec("/bin/sh", sys.argv[1:], environment)
+
+
+def ghostty_zellij_entrypoint() -> None:
+    home = Path.home()
+    environment = dict(os.environ)
+    environment["PATH"] = _command_path(home)
+    agent = (
+        home / "Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+        if sys.platform == "darwin"
+        else home / ".1password/agent.sock"
+    )
+    if not environment.get("SSH_CONNECTION") and agent.is_socket():
+        environment["SSH_AUTH_SOCK"] = os.fspath(agent)
+    zellij = which("zellij", path=environment["PATH"])
+    shells = (
+        (Path("/opt/homebrew/bin/zsh"),)
+        if sys.platform == "darwin"
+        else (
+            Path("/usr/bin/zsh"),
+            Path("/bin/zsh"),
+            Path("/home/linuxbrew/.linuxbrew/bin/zsh"),
+        )
+    )
+    shell = next(
+        (path for path in shells if path.is_file() and os.access(path, os.X_OK)),
+        None,
+    )
+    if shell:
+        environment["SHELL"] = os.fspath(shell)
+    if zellij:
+        theme = home / ".local/bin/zellij-theme-run"
+        if theme.is_file() and os.access(theme, os.X_OK):
+            _exec(theme, ["zellij"], environment)
+        _exec(
+            zellij,
+            [
+                "options",
+                "--default-layout",
+                "compact",
+                "--attach-to-session",
+                "false",
+                "--mirror-session",
+                "false",
+                "--on-force-close",
+                "quit",
+            ],
+            environment,
+        )
+    _exec(shell or environment.get("SHELL", "/bin/bash"), ["-l"], environment)

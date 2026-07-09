@@ -1,10 +1,47 @@
----
+- name: Configure host Flatpak prerequisites
+  ansible.builtin.import_tasks: flatpak.yml
+  when: common_is_linux
+  tags:
+    - host
+    - flatpak
+    - sushi-preview
+
+- name: Configure KMSCON virtual terminals
+  ansible.builtin.import_tasks: kmscon.yml
+  when: common_is_linux
+  tags:
+    - host
+    - kmscon
+
+- name: Configure host desktop settings
+  ansible.builtin.import_tasks: desktop-settings.yml
+  when: common_is_linux
+  tags:
+    - host
+    - desktop
+    - emoji-shortcut
+
+- name: Configure Kanata keyboard remapper
+  ansible.builtin.import_tasks: kanata.yml
+  when: common_is_linux
+  tags:
+    - host
+    - kanata
+
 - name: Configure host applications and desktop integration
   ansible.builtin.import_tasks: scripts.yml
   when: common_is_linux
   tags:
     - host
     - scripts
+
+- name: Configure host system services
+  ansible.builtin.import_tasks: system-services.yml
+  when: common_is_linux
+  tags:
+    - host
+    - services
+    - slow-boot-services
 
 - name: Configure host fonts
   ansible.builtin.import_tasks: fonts.yml

@@ -35,19 +35,6 @@
     dest: "{{ dotfiles_bin_dir }}/EquilotlCli-linux"
     mode: "0755"
 
-- name: Install Discord Equicord shared script library
-  ansible.builtin.copy:
-    src: "{{ dotfiles_ansible_scripts_dir }}/host/lib/"
-    dest: "{{ dotfiles_home_dir }}/.local/lib/dotfiles/host/lib/"
-    mode: "0644"
-    directory_mode: "0755"
-
-- name: Install Discord Equicord launcher
-  ansible.builtin.copy:
-    src: "{{ dotfiles_ansible_scripts_dir }}/apps/discord-equicord.sh"
-    dest: "{{ dotfiles_bin_dir }}/discord-equicord"
-    mode: "0755"
-
 - name: Ensure local applications directory exists
   ansible.builtin.file:
     path: "{{ dotfiles_home_dir }}/.local/share/applications"

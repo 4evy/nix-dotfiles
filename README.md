@@ -29,7 +29,7 @@ This repo is for my machines. It manages:
 - Homebrew userland tools from `Brewfile`
 - Ansible system/user setup under `ansible/`
 - chezmoi dotfiles under `dotfiles/`
-- Go helpers, Spectrum image build tooling, local scripts, browser config,
+- Go helpers, Python/uv automation, Spectrum image build tooling, browser config,
   shells, terminals, editors, desktop glue, and themes
 
 ## Linux / Spectrum
@@ -84,6 +84,19 @@ Use `just update` after the machine is already bootstrapped. It refreshes
 Homebrew/Ansible userland, applies chezmoi, then runs host roles. bootc image
 updates are handled by `just install`, `just switch`, or `just upgrade`.
 
+Published Spectrum images include OCI build/source/base-image metadata,
+`/usr/share/ublue-os/image-info.json`, a digest-bound SPDX SBOM, GitHub build
+provenance, and a keyless Cosign signature. Inspect the current OCI labels with:
+
+```bash
+docker buildx imagetools inspect ghcr.io/4evy/spectrum:latest \
+  --format '{{json .Image.Config.Labels}}'
+```
+
+The Artifact Hub labels are complete, but listing the image there remains
+opt-in and requires registering `oci://ghcr.io/4evy/spectrum` with Artifact
+Hub.
+
 ## macOS
 
 ```bash
@@ -91,12 +104,15 @@ git clone https://github.com/4evy/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 ./ansible/bootstrap.sh ansible/playbooks/userland.yml
 chezmoi init --source "$PWD/dotfiles"
-chezmoi apply --refresh-externals=always --force
+chezmoi apply --refresh-externals=auto --force
 ```
 
 The bootstrap installs Homebrew if needed, installs Ansible tooling, installs
-collections, then runs the requested playbook. Homebrew uses `/opt/homebrew` on
-Apple Silicon and `/usr/local` on Intel.
+collections, then runs the requested playbook. It installs upstream Nix with
+the official [`NixOS/nix-installer`](https://github.com/NixOS/nix-installer)
+and adds `deadnix`, `nh`, `nil`, `nom`, `nix-tree`, `nixd`, and `nixfmt` to the
+user's Nix profile. Homebrew uses `/opt/homebrew` on Apple Silicon and
+`/usr/local` on Intel.
 
 ## Nix
 
@@ -117,8 +133,9 @@ nix run .#ghidra-mcp
 sudo nixos-rebuild switch --flake .#lenovo-legion
 ```
 
-On non-Nix Linux hosts, install Determinate Nix on the live host and ensure the
-Nix profile tools are present:
+On macOS, install upstream Nix with `NixOS/nix-installer`; on non-Nix Linux
+hosts, install Determinate Nix. Both paths ensure the Nix profile tools are
+present:
 
 ```bash
 just nix
@@ -160,6 +177,51 @@ just watch check             # rerun a recipe when files change
 Most recipes have short aliases in `Justfile`: for example `just s`, `just up`,
 `just sw`, `just b`, `just f`, `just c`, and `just w`.
 
+## Python automation
+
+Repository-owned workstation and host automation lives in
+`ansible/files/scripts/workstation`. Ansible installs the project as an
+editable uv tool, exposing the grouped `dotfiles-scripts` CLI and dedicated
+commands such as `system-runner`, `install-ghidra-mcp`, and
+`hyper-window-tiling-build`.
+
+```bash
+uv sync
+uv run dotfiles-scripts --help
+uv run --locked ruff format --check .
+uv run --locked ruff check .
+uv run --locked ty check
+uv run --locked pytest
+```
+
+Install the repository-native uv/Ruff/ty pre-commit gate once per clone:
+
+```bash
+just install-hooks
+```
+
+The same lock, format, lint, type, test, compile, and package-build gates run
+in the Python GitHub Actions workflow. Ruff enables all stable and preview
+rules, and ty promotes every rule to an error; the documented exceptions in
+`pyproject.toml` are limited to formatter conflicts and repository-specific
+command-line or generated-code conventions.
+
+The package shares command, filesystem, HTTP, path, host, validation, and
+template helpers from `workstation.lib`. `ansible/bootstrap.sh` remains a
+small POSIX bootstrap because it must install Python/uv and Ansible on a fresh
+machine; downloaded upstream installer scripts and interactive shell startup
+configuration are not repository automation entrypoints.
+
+Keep declarative machine state in Ansible whenever a module exists: package,
+service, file, link, and dconf changes belong in roles so check mode and changed
+status remain accurate. Python commands are reserved for transformations,
+dynamic discovery, application-specific installers, and workflows that Ansible
+cannot express directly. The editable uv tool is reinstalled only when
+`pyproject.toml` or `uv.lock` changes; normal Python source edits are visible
+immediately without rebuilding the tool environment. One-time cleanup stays
+out of band: roles and commands describe only the current layout and do not
+retain migration branches for retired paths or service names.
+
 ## Checks
 
 Run the normal repo checks:
@@ -180,7 +242,9 @@ Run direct project checks when debugging one area:
 ```bash
 go test ./...
 uv run spectrum-build check
-uv run ty check spectrum/scripts/build.py spectrum/scripts/boot_artifacts.py spectrum/scripts/spectrum_build
+uv run --locked ruff check .
+uv run --locked ty check
+uv run --locked pytest
 cd packages/hyper-window-tiling && bun run check
 ```
 
@@ -207,6 +271,25 @@ After dependencies are installed, playbooks can be run directly:
 ansible-playbook ansible/playbooks/host.yml
 ansible-playbook ansible/playbooks/site.yml
 ```
+
+The Ansible/Python boundary is intentionally narrow:
+
+- Ansible core owns facts, files, links, downloads, archives, users/groups,
+  systemd units, package repositories, and service state.
+- `community.general` owns cross-platform integrations such as Flatpak,
+  dconf, Homebrew, launchd, pacman, apk, and kernel module loading.
+- The local `evy.dotfiles` collection adapts the remaining dynamic Python
+  builders and application-specific workflows to native Ansible results,
+  including check mode, changed/skipped state, warnings, diffs, and failures.
+- Python remains responsible for computation and transformation work such as
+  KMSCON theme rendering, verified upstream builds, release discovery, and
+  application-specific configuration formats.
+
+The local collection lives under `ansible/collections`; external collections
+are pinned in `ansible/requirements.yml`. Add another collection only when a
+role uses one of its modules—`ansible.posix`, `community.sops`, and
+`containers.podman` were reviewed but are not dependencies yet because the
+current roles do not need their modules.
 
 ## Notes
 

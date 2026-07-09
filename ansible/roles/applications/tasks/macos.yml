@@ -1,15 +1,46 @@
 ---
-- name: Configure RustDesk on macOS
-  ansible.builtin.command:
-    argv:
-      - "{{ prerequisites_modern_bash | default('bash') }}"
-      - "{{ dotfiles_ansible_scripts_dir }}/apps/configure-rustdesk-macos.sh"
-      - "{{ dotfiles_bin_dir }}"
-  args:
-    chdir: "{{ dotfiles_repo_root }}"
-  environment:
-    PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
-  changed_when: true
+- name: Link the RustDesk application command on macOS
+  ansible.builtin.file:
+    src: /Applications/RustDesk.app/Contents/MacOS/RustDesk
+    dest: "{{ dotfiles_bin_dir }}/rustdesk"
+    state: link
+    force: true
+  tags:
+    - rustdesk
+
+- name: Ensure RustDesk configuration directories exist on macOS
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ dotfiles_home_dir }}/Library/Preferences/com.carriez.RustDesk"
+    - "{{ dotfiles_home_dir }}/Library/LaunchAgents"
+  tags:
+    - rustdesk
+
+- name: Install RustDesk direct-access settings on macOS
+  ansible.builtin.copy:
+    src: "{{ dotfiles_ansible_dir }}/files/scripts/apps/rustdesk/RustDesk2.toml"
+    dest: "{{ dotfiles_home_dir }}/Library/Preferences/com.carriez.RustDesk/RustDesk2.toml"
+    mode: "0644"
+  tags:
+    - rustdesk
+
+- name: Install RustDesk launch agent on macOS
+  ansible.builtin.copy:
+    src: "{{ dotfiles_ansible_dir }}/files/scripts/apps/rustdesk/com.carriez.RustDesk.plist"
+    dest: "{{ dotfiles_home_dir }}/Library/LaunchAgents/com.carriez.RustDesk.plist"
+    mode: "0644"
+  register: applications_rustdesk_launch_agent
+  tags:
+    - rustdesk
+
+- name: Start the RustDesk launch agent on macOS
+  community.general.launchd:
+    name: com.carriez.RustDesk
+    enabled: true
+    state: "{{ 'restarted' if applications_rustdesk_launch_agent is changed else 'started' }}"
   tags:
     - rustdesk
 
@@ -17,6 +48,64 @@
   ansible.builtin.file:
     path: "{{ dotfiles_home_dir }}/Library/Application Support/Equicord/settings"
     state: directory
+    mode: "0755"
+  tags:
+    - discord
+    - equicord
+
+- name: Require ARM64 macOS for Equilotl CLI
+  ansible.builtin.assert:
+    that:
+      - >-
+        ansible_facts.get('architecture', ansible_facts.get('ansible_architecture', '')) == 'arm64'
+    fail_msg: "This dotfiles Equicord macOS install path only supports ARM64 Macs."
+  tags:
+    - discord
+    - equicord
+
+- name: Fetch latest Equilotl release metadata on macOS
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/Equicord/Equilotl/releases/latest
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: dotfiles-ansible
+    return_content: true
+    status_code: 200
+    timeout: 30
+  register: applications_equilotl_release_macos
+  tags:
+    - discord
+    - equicord
+
+- name: Select Equilotl macOS ARM64 CLI asset
+  ansible.builtin.set_fact:
+    applications_equilotl_macos_arm64_url: >-
+      {{
+        applications_equilotl_release_macos.json.assets
+        | selectattr('name', 'equalto', 'EquilotlCli-darwin-arm64')
+        | map(attribute='browser_download_url')
+        | first
+      }}
+  tags:
+    - discord
+    - equicord
+
+- name: Require Equilotl macOS ARM64 CLI asset
+  ansible.builtin.assert:
+    that:
+      - applications_equilotl_macos_arm64_url is defined
+      - applications_equilotl_macos_arm64_url | default('') | length > 0
+    fail_msg: >-
+      Latest Equilotl release does not include the expected
+      EquilotlCli-darwin-arm64 asset.
+  tags:
+    - discord
+    - equicord
+
+- name: Install Equilotl macOS ARM64 CLI
+  ansible.builtin.get_url:
+    url: "{{ applications_equilotl_macos_arm64_url }}"
+    dest: "{{ dotfiles_bin_dir }}/EquilotlCli-darwin-arm64"
     mode: "0755"
   tags:
     - discord
@@ -55,11 +144,50 @@
     - discord
     - equicord
 
+- name: Clear Equicord macOS ASAR file locks before patch
+  ansible.builtin.command:
+    argv:
+      - chflags
+      - nouchg
+      - /Applications/Discord.app/Contents/Resources/app.asar
+      - /Applications/Discord.app/Contents/Resources/_app.asar
+  changed_when: false
+  failed_when: false
+  tags:
+    - discord
+    - equicord
+
+- name: Install Equicord into Discord on macOS
+  ansible.builtin.command:
+    argv:
+      - "{{ dotfiles_bin_dir }}/EquilotlCli-darwin-arm64"
+      - --install
+      - --branch
+      - stable
+  environment:
+    HOME: "{{ dotfiles_home_dir }}"
+  changed_when: false
+  tags:
+    - discord
+    - equicord
+
+- name: Lock Equicord macOS ASAR files against Discord updater overwrite
+  ansible.builtin.command:
+    argv:
+      - chflags
+      - uchg
+      - /Applications/Discord.app/Contents/Resources/app.asar
+      - /Applications/Discord.app/Contents/Resources/_app.asar
+  changed_when: false
+  tags:
+    - discord
+    - equicord
+
 - name: Install Helium Homebrew cask on macOS
   community.general.homebrew_cask:
     name: helium-browser
     state: present
-    path: "{{ prerequisites_homebrew_prefix | default('/opt/homebrew') }}/bin:{{ dotfiles_path }}"
+    path: "{{ prerequisites_homebrew_prefix | default('/opt/homebrew') }}/bin"
   environment:
     HOMEBREW_NO_ASK: "1"
     PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
@@ -67,10 +195,11 @@
     - helium
 
 - name: Configure Helium on macOS
-  ansible.builtin.command:
-    argv:
-      - "{{ prerequisites_modern_bash | default('bash') }}"
-      - "{{ dotfiles_ansible_scripts_dir }}/apps/install-helium-macos.sh"
+  evy.dotfiles.operation:
+    executable: "{{ dotfiles_bin_dir }}/dotfiles-scripts"
+    command:
+      - apps
+      - install-helium-macos
       - "{{ dotfiles_cache_dir }}/helium-browser"
       - "{{ dotfiles_bin_dir }}"
       - "{{ dotfiles_cache_dir }}/helium-browser/installer-bin"
@@ -80,11 +209,10 @@
         --extension-mime-request-handling=always-prompt-for-install
         --omnibox-autocomplete-filtering=search --set-user-color=244,184,228
         --set-color-scheme=dark --set-color-variant=tonal_spot
-  args:
+    context: "{{ dotfiles_automation_context }}"
     chdir: "{{ dotfiles_repo_root }}"
-  environment:
-    PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
-  changed_when: true
+    environment:
+      PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
   tags:
     - helium
 
@@ -184,7 +312,7 @@
           - "{{ applications_raycast_beta_mount }}"
       changed_when: true
 
-    - name: Remove old Raycast Beta app
+    - name: Remove installed Raycast Beta app before replacement
       ansible.builtin.file:
         path: "{{ applications_raycast_beta_app }}"
         state: absent

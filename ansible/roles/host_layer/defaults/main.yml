@@ -1,58 +1,84 @@
 ---
 host_layer_scripts:
   - name: Tailscale on Bluefin
-    path: host/apps/tailscale-bluefin.sh
+    command: [host, apps, tailscale-bluefin]
     tags: [host, scripts, tailscale]
   - name: RustDesk Tailscale integration
-    path: host/apps/rustdesk-tailscale.sh
+    command: [host, apps, rustdesk-tailscale]
     tags: [host, scripts, rustdesk]
   - name: hyper-window-tiling
-    path: host/desktop/hyper-tiling.sh
+    command: [host, desktop, hyper-window-tiling]
     tags: [host, scripts, hyper-window-tiling]
   - name: Sushi preview
-    path: host/desktop/sushi-preview.sh
+    command: [host, desktop, sushi-preview]
     tags: [host, scripts, sushi-preview]
   - name: Flatpak NVIDIA GL runtime
-    path: host/desktop/flatpak-nvidia.sh
+    command: [host, desktop, flatpak-nvidia]
     tags: [host, scripts, flatpak-nvidia]
   - name: Flatpak maintenance
-    path: host/desktop/flatpak-maintenance.sh
-    changed: false
+    command: [host, desktop, flatpak-maintenance]
     tags: [host, scripts, flatpak-maintenance]
   - name: Telegram Flatpak
-    path: host/desktop/telegram-flatpak.sh
+    command: [host, desktop, telegram-flatpak]
     tags: [host, scripts, telegram-flatpak]
-  - name: emoji shortcut
-    path: host/desktop/emoji-shortcut.sh
-    tags: [host, scripts, emoji-shortcut]
-  - name: slow boot services
-    path: host/desktop/slow-boot-services.sh
-    tags: [host, scripts, slow-boot-services]
-  - name: KMSCON virtual console
-    path: host/desktop/kmscon.sh
-    tags: [host, scripts, kmscon]
-  - name: Kanata
-    path: host/keyboard/kanata.sh
-    tags: [host, scripts, kanata]
   - name: Toshy GNOME context integration
-    path: host/keyboard/toshy-gnome-context.sh
+    command: [host, keyboard, toshy-gnome-context]
     tags: [host, scripts, toshy-gnome-context]
   - name: Toshy Kanata chain
-    path: host/keyboard/toshy-kanata-chain.sh
+    command: [host, keyboard, toshy-kanata-chain]
     tags: [host, scripts, toshy]
   - name: Toshy Kanata chain verification
-    path: host/keyboard/toshy-kanata-check.sh
-    changed: false
+    command: [host, keyboard, toshy-kanata-check]
     tags: [host, scripts, toshy, kanata]
 
-host_layer_font_scripts:
-  - name: Install JetBrainsMono Nerd Font
-    path: host/fonts/jetbrains-nerd-font.sh
-    tags: [host, fonts, jetbrains-nerd-font]
-  - name: Configure host monospace font
-    path: host/fonts/monospace-settings.sh
-    tags: [host, fonts]
-  - name: Refresh host font cache
-    path: host/fonts/cache-refresh.sh
-    changed: false
-    tags: [host, fonts, font-cache]
+host_layer_flatpak_remotes:
+  - name: flathub
+    url: https://dl.flathub.org/repo/flathub.flatpakrepo
+  - name: gnome-nightly
+    url: https://nightly.gnome.org/gnome-nightly.flatpakrepo
+
+host_layer_flatpak_packages:
+  - name: org.flatpak.Builder
+    remote: flathub
+  - name: org.gnome.Platform//master
+    remote: gnome-nightly
+  - name: org.gnome.Sdk//master
+    remote: gnome-nightly
+  - name: org.freedesktop.Sdk.Extension.rust-stable//25.08
+    remote: flathub
+
+host_layer_emoji_binding_path: >-
+  /org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/emoji-picker/
+host_layer_emoji_command: "{{ dotfiles_bin_dir }}/carmenta-activate"
+
+host_layer_kanata_staged_binary: >-
+  {{ dotfiles_data_dir }}/host/bin-staging/kanata/root/bin/kanata
+host_layer_keep_input_remapper: >-
+  {{ lookup('env', 'DOTFILES_KEEP_INPUT_REMAPPER') == '1' }}
+
+host_layer_nerd_font_archive_url: >-
+  https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+host_layer_nerd_font_archive: "{{ dotfiles_cache_dir }}/JetBrainsMono.zip"
+host_layer_nerd_font_dir: >-
+  {{ dotfiles_data_home }}/fonts/JetBrainsMonoNerdFont
+
+host_layer_font_settings:
+  - key: font-name
+    path: /org/gnome/desktop/interface/font-name
+    value: "'Noto Sans 11'"
+  - key: document-font-name
+    path: /org/gnome/desktop/interface/document-font-name
+    value: "'Noto Sans 12'"
+  - key: monospace-font-name
+    path: /org/gnome/desktop/interface/monospace-font-name
+    value: "'JetBrainsMono Nerd Font Mono 11'"
+
+host_layer_slow_boot_units:
+  - zfs.target
+  - zfs-import-cache.service
+  - zfs-mount.service
+  - zfs-share.service
+  - zfs-zed.service
+  - zfs-volume-wait.service
+  - flatpak-preinstall.service
+  - NetworkManager-wait-online.service

@@ -5,7 +5,7 @@
     - local
     - go
 
-- name: Install repo-local script commands
+- name: Link uv-installed Python command aliases
   ansible.builtin.import_tasks: scripts.yml
   tags:
     - local

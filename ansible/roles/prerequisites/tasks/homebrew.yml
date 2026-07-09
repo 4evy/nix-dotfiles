@@ -178,7 +178,7 @@
   ansible.builtin.command:
     argv:
       - "{{ prerequisites_modern_bash }}"
-      - -lc
+      - -c
       - |
         set -euo pipefail
         for command_name in awk cp date diff find grep install ln make mkdir mktemp mv rm rmdir sed sort stat tar uniq which; do
@@ -202,7 +202,7 @@
   ansible.builtin.command:
     argv:
       - "{{ prerequisites_modern_bash }}"
-      - -lc
+      - -c
       - |
         major=${BASH_VERSINFO[0]}
         minor=${BASH_VERSINFO[1]}

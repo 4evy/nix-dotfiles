@@ -9,6 +9,8 @@ Thumbs.db
 .ansible/
 .venv/
 .cache/
+.pytest_cache/
+.ruff_cache/
 __pycache__/
 *.py[cod]
 .docker-cache/
@@ -41,3 +43,4 @@ dist/
 *.egg-info/
 .dotfiles-gnome-extension/
 tmp/
+/ansible/collections/ansible_collections/evy/dotfiles/tests/output/

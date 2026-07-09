@@ -11,14 +11,13 @@
     - local
     - verify
 
-- name: Verify repo-local script command binaries
+- name: Verify uv-installed Python command binaries
   ansible.builtin.command:
     argv:
-      - "{{ dotfiles_bin_dir }}/{{ item.1 }}"
+      - "{{ dotfiles_bin_dir }}/{{ item }}"
       - "--version"
   changed_when: false
-  loop: "{{ local_tools_script_tools | default([]) | subelements('bins') }}"
-  when: common_system in item.0.platforms
+  loop: "{{ local_tools_python_tools | default([]) }}"
   tags:
     - local
     - verify

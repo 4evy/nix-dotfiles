@@ -14,9 +14,11 @@
   <true/>
   <key>KeepAlive</key>
   <true/>
+  <key>ProcessType</key>
+  <string>Interactive</string>
   <key>StandardOutPath</key>
-  <string>/var/log/karabiner-vhid-daemon.log</string>
+  <string>/var/log/karabiner/virtual_hid_device_service.log</string>
   <key>StandardErrorPath</key>
-  <string>/var/log/karabiner-vhid-daemon.log</string>
+  <string>/var/log/karabiner/virtual_hid_device_service.log</string>
 </dict>
 </plist>

@@ -9,30 +9,11 @@ local_tools_go_tools:
       - Darwin
       - Linux
 
-local_tools_script_tools:
-  - name: system-runner
-    source: ansible/files/scripts/local/system-runner.sh
-    bins:
-      - system-runner
-    platforms:
-      - Darwin
-      - Linux
-  - name: hyper-window-tiling-build
-    source: ansible/files/scripts/local/hyper-window-tiling-build.sh
-    bins:
-      - hyper-window-tiling-build
-    platforms:
-      - Darwin
-      - Linux
-  - name: install-ghidra-mcp
-    source: ansible/files/scripts/apps/install-ghidra-mcp.sh
-    support_source: ansible/files/scripts/apps/ghidra-mcp
-    support_name: ghidra-mcp
-    bins:
-      - install-ghidra-mcp
-    platforms:
-      - Darwin
-      - Linux
+local_tools_python_tools:
+  - dotfiles-scripts
+  - hyper-window-tiling-build
+  - install-ghidra-mcp
+  - system-runner
 
 local_tools_upstream_script_tools:
   - name: yt-dlp-script

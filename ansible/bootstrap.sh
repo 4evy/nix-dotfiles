@@ -304,6 +304,10 @@ set -- \
 	"$@"
 if needs_ansible_become_prompt "$@"; then
 	set -- --ask-become-pass "$@"
+elif ! has_ansible_become_prompt_arg "$@" &&
+	[ -z "${ANSIBLE_BECOME_ASK_PASS-}" ]; then
+	ANSIBLE_BECOME_ASK_PASS=false
+	export ANSIBLE_BECOME_ASK_PASS
 fi
 
 cleanup

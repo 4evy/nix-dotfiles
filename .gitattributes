@@ -26,6 +26,8 @@ go.mod linguist-detectable
 *.json.tmpl linguist-language=JSON linguist-detectable
 *.kdl.tmpl linguist-language=KDL linguist-detectable
 *.nix.tmpl linguist-language=Nix
+*.py.in linguist-language=Python
+*.py.tmpl linguist-language=Python
 *.ron.tmpl linguist-language=RON linguist-detectable
 *.sh.tmpl linguist-language=Shell linguist-detectable
 *.theme.tmpl linguist-language=INI linguist-detectable
@@ -34,7 +36,6 @@ go.mod linguist-detectable
 *.yaml.tmpl linguist-language=YAML linguist-detectable
 *.yml.tmpl linguist-language=YAML linguist-detectable
 *.zsh.tmpl linguist-language=Shell linguist-detectable
-dotfiles/.chezmoiscripts/* linguist-language=Shell
 dotfiles/.chezmoitemplates/*.conf.tmpl linguist-language=INI linguist-detectable
 dotfiles/.chezmoitemplates/catppuccin_rgb linguist-language=Go-Template linguist-detectable
 dotfiles/Library/Application[[:space:]]Support/com.mitchellh.ghostty/config.tmpl linguist-language=INI linguist-detectable
@@ -42,7 +43,7 @@ dotfiles/dot_bash_profile.tmpl linguist-language=Shell linguist-detectable
 dotfiles/dot_bashenv.tmpl linguist-language=Shell linguist-detectable
 dotfiles/dot_bashrc.tmpl linguist-language=Shell linguist-detectable
 dotfiles/dot_config/ghostty/config.tmpl linguist-language=INI linguist-detectable
-dotfiles/dot_config/ghostty/executable_zellij-theme-run.tmpl linguist-language=Shell
+dotfiles/dot_config/ghostty/executable_zellij-theme-run.tmpl linguist-language=Python
 dotfiles/dot_gitconfig.tmpl linguist-language=gitconfig linguist-detectable
 dotfiles/dot_gitignore_global linguist-language=Ignore-List linguist-detectable
 dotfiles/dot_local/bin/executable_* linguist-language=Shell
@@ -88,10 +89,12 @@ spectrum/repos/*.repo.in linguist-language=INI linguist-detectable
 packages/hyper-window-tiling/src/**/*.d.ts -linguist-vendored
 
 # These files are checked in generated/runtime artifacts built from package
-# sources or dependency resolvers.
+# sources, host discovery, encryption tools, or dependency resolvers.
 flake.lock linguist-generated
 go.sum linguist-generated
+hosts/**/hardware-configuration.nix linguist-generated
 package-lock.json linguist-generated
 packages/hyper-window-tiling/bun.lock linguist-generated
 packages/**/dist/** linguist-generated
+secrets/*.yaml linguist-generated
 uv.lock linguist-generated

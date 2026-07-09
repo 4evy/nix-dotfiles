@@ -1,9 +1,10 @@
 import json
 import os
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from xwaykeyz.config_api import (
+    from xwaykeyz.config_api import (  # ty: ignore[unresolved-import]
         Key,
         devices_api,
         dump_diagnostics_key,
@@ -66,17 +67,13 @@ try:
         symbol_placeholder="?",
     )
 except (NameError, TypeError):
-    try:
+    with suppress(NameError, TypeError):
         keyboard_layout_correction(
             enabled=False,
             correct_number_row=False,
         )
-    except (NameError, TypeError):
-        pass
 
-try:
-    import xwaykeyz.config_api as _xwaykeyz_config_api
+with suppress(ImportError, AttributeError, KeyError):
+    import xwaykeyz.config_api as _xwaykeyz_config_api  # ty: ignore[unresolved-import]
 
     _xwaykeyz_config_api._LAYOUT_CORRECTION["enabled"] = False
-except (ImportError, AttributeError, KeyError):
-    pass

@@ -4,7 +4,9 @@ from __future__ import annotations
 import argparse
 import io
 from pathlib import Path
-import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import Element, ElementTree, indent, register_namespace
+
+from defusedxml.ElementTree import fromstring
 
 
 def parse_args() -> argparse.Namespace:
@@ -15,7 +17,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def namespace_for(root: ET.Element) -> str:
+def namespace_for(root: Element) -> str:
     if root.tag.startswith("{"):
         return root.tag[1:].partition("}")[0]
     return ""
@@ -25,17 +27,17 @@ def qualified(name: str, namespace: str) -> str:
     return f"{{{namespace}}}{name}" if namespace else name
 
 
-def set_text(root: ET.Element, namespace: str, name: str, value: str) -> None:
+def set_text(root: Element, namespace: str, name: str, value: str) -> None:
     element = root.find(f".//{qualified(name, namespace)}")
     if element is None:
         raise SystemExit(f"missing POM property: {name}")
     element.text = value
 
 
-def write_xml(path: Path, root: ET.Element, *, xml_declaration: bool) -> None:
-    ET.indent(root)
+def write_xml(path: Path, root: Element, *, xml_declaration: bool) -> None:
+    indent(root)
     buffer = io.BytesIO()
-    ET.ElementTree(root).write(
+    ElementTree(root).write(
         buffer,
         encoding="utf-8",
         xml_declaration=xml_declaration,
@@ -48,11 +50,11 @@ def write_xml(path: Path, root: ET.Element, *, xml_declaration: bool) -> None:
 
 
 def rewrite_pom(path: Path, ghidra_version: str, stamp: str) -> None:
-    text = path.read_text()
-    root = ET.fromstring(text)
+    text = path.read_text(encoding="utf-8")
+    root = fromstring(text)
     namespace = namespace_for(root)
     if namespace:
-        ET.register_namespace("", namespace)
+        register_namespace("", namespace)
 
     set_text(root, namespace, "ghidra.version", ghidra_version)
     set_text(root, namespace, "build.timestamp", stamp)

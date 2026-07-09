@@ -1,34 +1,223 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=83"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "dotfiles-python"
 version = "0.1.0"
 description = "Python tooling for dotfiles."
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
-  "astral>=3.2,<4",
   "boltons>=25,<27",
+  "defusedxml>=0.7,<1",
+  "filelock>=3.18,<4",
+  "githubkit>=0.15,<1",
   "humanize>=4.13,<5",
+  "httpx>=0.28,<1",
+  "httpx-retries>=0.6,<1",
+  "jinja2>=3.1,<4",
+  "packaging>=24,<27",
+  "pillow>=11,<13",
+  "platformdirs>=4.3,<5",
+  "plumbum>=2,<3",
+  "psutil>=7,<8",
+  "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'",
+  "pydantic>=2.13,<3",
   "pydantic-settings>=2.14.2",
-  "requests>=2.32,<3",
-  "urllib3>=2,<3",
+  "rich>=15,<16",
+  "tenacity>=9.1,<10",
+  "tomlkit>=0.13,<1",
+  "typer>=0.20,<1",
 ]
 
 [project.scripts]
+alt-tab-license = "workstation.local.user_commands:alt_tab_license_entrypoint"
+codex = "workstation.local.user_commands:codex_entrypoint"
+desktop-perf-audit = "workstation.local.user_commands:desktop_perf_audit_entrypoint"
+discord-equicord = "workstation.apps.discord:entrypoint"
+dotfiles-python = "workstation.local.user_commands:python_entrypoint"
+dotfiles-python3 = "workstation.local.user_commands:python3_entrypoint"
+dotfiles-scripts = "workstation.cli:entrypoint"
+ghostty-zellij = "workstation.local.user_commands:ghostty_zellij_entrypoint"
+gnome-catppuccin-accent = "workstation.local.user_commands:gnome_catppuccin_accent_entrypoint"
+hyper-window-tiling-build = "workstation.local.hyper_window_tiling_build:entrypoint"
+install-ghidra-mcp = "workstation.apps.ghidra_mcp:entrypoint"
+install-yaml-language-server = "workstation.host.devtools:install_entrypoint"
+jj-get = "workstation.local.jj:jj_get_entrypoint"
+jj-git-fetch = "workstation.local.jj:jj_git_fetch_entrypoint"
+jj-redate = "workstation.local.jj:jj_redate_entrypoint"
+raycast-beta-patch = "workstation.local.raycast:entrypoint"
 spectrum-build = "spectrum_build.cli:entrypoint"
+system-runner = "workstation.local.system_runner:entrypoint"
+vscode-nixd = "workstation.local.user_commands:vscode_nixd_entrypoint"
+vscode-nixfmt = "workstation.local.user_commands:vscode_nixfmt_entrypoint"
+yaml-language-server = "workstation.host.devtools:yaml_language_server_entrypoint"
+zellij-default-shell = "workstation.local.user_commands:zellij_default_shell_entrypoint"
 
 [dependency-groups]
-dev = ["ty"]
+dev = ["pytest>=9,<10", "ruff>=0.15.20,<0.16", "ty>=0.0.57,<0.1"]
+
+[tool.uv]
+required-version = ">=0.11.28,<0.12"
+required-environments = [
+  "sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[tool.uv.pip]
+strict = true
 
 [tool.setuptools]
-package-dir = { "" = "spectrum/scripts" }
+package-dir = { workstation = "ansible/files/scripts/workstation", spectrum_build = "spectrum/scripts/spectrum_build" }
+packages = [
+  "workstation",
+  "workstation.apps",
+  "workstation.host",
+  "workstation.lib",
+  "workstation.local",
+  "workstation.macos",
+  "spectrum_build",
+  "spectrum_build.core",
+  "spectrum_build.features",
+  "spectrum_build.image",
+  "spectrum_build.integrations",
+  "spectrum_build.manifests",
+]
 
-[tool.setuptools.packages.find]
-where = ["spectrum/scripts"]
-include = ["spectrum_build*"]
+[tool.pytest.ini_options]
+filterwarnings = ["error"]
+minversion = "9.0"
+strict = true
+testpaths = [
+  "ansible/files/scripts/tests",
+  "ansible/plugins/filter/tests",
+  "spectrum/scripts/tests",
+]
 
-[tool.pyright]
-pythonVersion = "3.11"
-extraPaths = ["spectrum/scripts", "packages/toshy", "ansible/files/scripts"]
+[tool.ruff]
+extend-exclude = ["packages/toshy/slices"]
+line-length = 88
+preview = true
+show-fixes = true
+target-version = "py314"
+unsafe-fixes = false
+
+[tool.ruff.lint]
+ignore = [
+  # Ruff formatter conflicts: https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+  "COM812",
+  "COM819",
+  "D203",
+  "D206",
+  "D213",
+  "D300",
+  "E111",
+  "E114",
+  "E117",
+  "ISC002",
+  "Q000",
+  "Q001",
+  "Q002",
+  "Q003",
+  "Q004",
+  "W191",
+  # The formatter intentionally leaves some long URLs and command strings intact.
+  "E501",
+  # Copyright headers and exhaustive API prose do not make automation safer.
+  "CPY001",
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "D105",
+  "D106",
+  "D107",
+  "DOC",
+  # Factoring every exception string into a variable obscures local error handling.
+  "EM101",
+  "EM102",
+  "TRY003",
+  # Typer callbacks are positional by framework contract.
+  "FBT",
+  # These rewrites tend to reduce readability without improving correctness.
+  "FLY002",
+  "PLR2004",
+  "PLR6301",
+  "RSE102",
+  "TRY300",
+  # These are command-line programs; stdout is part of their interface.
+  "T201",
+  # Importing subprocess and using argv without a shell are intentional here.
+  "S404",
+  "S603",
+  "S606",
+  # Standalone automation scripts and tests are not importable packages.
+  "INP001",
+  # Package initializers intentionally register Typer commands and expose a version.
+  "RUF067",
+  # Runtime import placement is deliberate; ty checks the annotations themselves.
+  "TC001",
+  "TC003",
+  # Ruff cannot infer the shared fail() helper's NoReturn contract here; ty can.
+  "RET503",
+]
+select = ["ALL"]
+
+[tool.ruff.lint.flake8-implicit-str-concat]
+allow-multiline = false
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["workstation", "spectrum_build"]
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.per-file-ignores]
+"ansible/collections/ansible_collections/evy/dotfiles/plugins/modules/operation.py" = [
+  "E402",
+  "EXE001",
+]
+"**/test_*.py" = ["PLC2701", "PLR2004", "S101", "SLF001"]
+"spectrum/scripts/spectrum_build/integrations/dnf.py" = ["ANN401"]
+"ansible/files/scripts/apps/ghidra-mcp/rewrite-pom.py" = ["S405"]
+"ansible/files/scripts/apps/install-ghostty-tip-linux.container.py" = ["S607"]
+"ansible/files/scripts/workstation/automation.py" = ["PLC0415"]
+"ansible/files/scripts/workstation/chezmoi.py" = ["B009"]
+"ansible/files/scripts/workstation/apps/installers.py" = ["S108"]
+"ansible/files/scripts/workstation/lib/files.py" = ["S202"]
+"ansible/files/scripts/workstation/lib/templates.py" = ["S701"]
+"spectrum/scripts/build.py" = ["S607"]
+"spectrum/scripts/spectrum_build/image/cleanup.py" = ["S108"]
+
+[tool.ruff.lint.pylint]
+max-args = 8
+max-branches = 20
+max-locals = 25
+max-positional-args = 8
+max-returns = 10
+max-statements = 80
+max-statements-in-try = 10
+
+[tool.ruff.format]
+docstring-code-format = true
+preview = true
+
+[tool.ty.environment]
+extra-paths = [
+  "./spectrum/scripts",
+  "./packages/toshy",
+  "./ansible/files/scripts",
+]
+
+[tool.ty.src]
+exclude = ["packages/toshy/slices"]
+include = ["**/*.py"]
+
+[tool.ty.rules]
+all = "error"
+
+[tool.ty.terminal]
+error-on-warning = true

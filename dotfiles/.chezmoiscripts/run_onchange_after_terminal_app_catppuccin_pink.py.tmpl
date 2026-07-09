@@ -1,0 +1,9 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+
+command = {{ joinPath .chezmoi.homeDir ".local/bin/dotfiles-scripts" | quote }}
+os.execv(command, (command, "chezmoi", "terminal-profile"))
+{{- end }}

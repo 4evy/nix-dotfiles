@@ -11,60 +11,189 @@
     - ghostty
     - homebrew
 
-- name: Detect installed Helix formula metadata
+- name: Tap local dotfiles Homebrew formulae
+  community.general.homebrew_tap:
+    name: 4evy/dotfiles
+    url: "{{ dotfiles_repo_root }}"
+    state: present
+    path: "{{ prerequisites_homebrew_prefix }}/bin"
+  environment:
+    PATH: "{{ prerequisites_homebrew_path }}"
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - homebrew
+    - kanata
+
+- name: Ensure local dotfiles Homebrew tap Formula directory exists
+  ansible.builtin.file:
+    path: "{{ prerequisites_homebrew_prefix }}/Library/Taps/4evy/homebrew-dotfiles/Formula"
+    state: directory
+    mode: "0755"
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - homebrew
+    - kanata
+
+- name: Sync command-enabled Kanata formula into local tap
+  ansible.builtin.copy:
+    src: "{{ dotfiles_repo_root }}/Formula/kanata-with-cmd.rb"
+    dest: "{{ prerequisites_homebrew_prefix }}/Library/Taps/4evy/homebrew-dotfiles/Formula/kanata-with-cmd.rb"
+    mode: "0644"
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - homebrew
+    - kanata
+
+- name: Trust local dotfiles Homebrew tap
   ansible.builtin.command:
     argv:
       - "{{ prerequisites_homebrew_prefix }}/bin/brew"
-      - info
-      - --json=v2
-      - --installed
-      - helix
+      - trust
+      - --tap
+      - 4evy/dotfiles
   environment:
     PATH: "{{ prerequisites_homebrew_path }}"
-  register: prerequisites_homebrew_helix_info
+  register: prerequisites_homebrew_dotfiles_tap_trust
+  changed_when: prerequisites_homebrew_dotfiles_tap_trust.stdout is search('Trusted')
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - homebrew
+    - kanata
+
+- name: Clear Discord cask ASAR locks before Homebrew changes
+  ansible.builtin.command:
+    argv:
+      - chflags
+      - nouchg
+      - /Applications/Discord.app/Contents/Resources/app.asar
+      - /Applications/Discord.app/Contents/Resources/_app.asar
   changed_when: false
   failed_when: false
   when: common_is_macos
   tags:
     - bootstrap
-    - helix
+    - discord
     - homebrew
 
-- name: Remove stable Helix formula before installing HEAD
+- name: Remove Homebrew core Kanata before installing command-enabled formula
   community.general.homebrew:
-    name: helix
+    name: kanata
     state: absent
     path: "{{ prerequisites_homebrew_prefix }}/bin"
   environment:
     HOMEBREW_NO_ASK: "1"
     PATH: "{{ prerequisites_homebrew_path }}"
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - homebrew
+    - kanata
+
+- name: Detect installed Discord cask version
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_homebrew_prefix }}/bin/brew"
+      - list
+      - --cask
+      - --versions
+      - discord
+  environment:
+    PATH: "{{ prerequisites_homebrew_path }}"
+  register: prerequisites_homebrew_discord_versions
+  changed_when: false
+  failed_when: false
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - discord
+    - homebrew
+
+- name: Detect Discord cask install receipt version
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - -c
+      - |
+        import json
+        import pathlib
+
+        receipt = pathlib.Path("{{ prerequisites_homebrew_prefix }}/Caskroom/discord/.metadata/INSTALL_RECEIPT.json")
+        try:
+            print(json.loads(receipt.read_text()).get("source", {}).get("version", ""))
+        except Exception:
+            pass
+  register: prerequisites_homebrew_discord_receipt_version
+  changed_when: false
+  failed_when: false
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - discord
+    - homebrew
+
+- name: Check Discord cask metadata directory
+  ansible.builtin.stat:
+    path: "{{ prerequisites_homebrew_prefix }}/Caskroom/discord/.metadata/{{ prerequisites_homebrew_discord_installed_version }}"
+  register: prerequisites_homebrew_discord_metadata
   vars:
-    prerequisites_homebrew_helix_formula: >-
+    prerequisites_homebrew_discord_installed_version: >-
       {{
-        (
-          prerequisites_homebrew_helix_info.stdout
-          | default('{"formulae":[]}', true)
-          | from_json
-        ).formulae
-        | default([])
-        | first
-        | default({})
-      }}
-    prerequisites_homebrew_helix_installed: >-
-      {{
-        prerequisites_homebrew_helix_formula.installed
-        | default([])
-        | first
-        | default({})
+        prerequisites_homebrew_discord_versions.stdout.split()[1]
+        if prerequisites_homebrew_discord_versions.stdout.split() | length > 1
+        else ''
       }}
   when:
     - common_is_macos
-    - prerequisites_homebrew_helix_info.rc | default(1) == 0
-    - prerequisites_homebrew_helix_installed | length > 0
-    - not prerequisites_homebrew_helix_installed.installed_as_head | default(false)
+    - prerequisites_homebrew_discord_installed_version | length > 0
   tags:
     - bootstrap
-    - helix
+    - discord
+    - homebrew
+
+- name: Check Discord app bundle payload
+  ansible.builtin.stat:
+    path: /Applications/Discord.app/Contents/Info.plist
+  register: prerequisites_homebrew_discord_app
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - discord
+    - homebrew
+
+- name: Repair corrupted Discord cask metadata before bundle
+  ansible.builtin.command:
+    argv:
+      - "{{ prerequisites_homebrew_prefix }}/bin/brew"
+      - reinstall
+      - --cask
+      - --force
+      - discord
+  environment:
+    HOMEBREW_NO_ASK: "1"
+    PATH: "{{ prerequisites_homebrew_path }}"
+  changed_when: true
+  vars:
+    prerequisites_homebrew_discord_installed_version: >-
+      {{
+        prerequisites_homebrew_discord_versions.stdout.split()[1]
+        if prerequisites_homebrew_discord_versions.stdout.split() | length > 1
+        else ''
+      }}
+    prerequisites_homebrew_discord_receipt_version_value: "{{ prerequisites_homebrew_discord_receipt_version.stdout | default('') | trim }}"
+  when:
+    - common_is_macos
+    - prerequisites_homebrew_discord_installed_version | length > 0
+    - >
+      prerequisites_homebrew_discord_receipt_version_value != prerequisites_homebrew_discord_installed_version
+      or not prerequisites_homebrew_discord_metadata.stat.isdir | default(false)
+      or not prerequisites_homebrew_discord_app.stat.exists | default(false)
+  tags:
+    - bootstrap
+    - discord
     - homebrew
 
 - name: Apply Homebrew bundle
@@ -74,7 +203,7 @@
       - bundle
       - install
       - --jobs
-      - auto
+      - "1"
       - --force-cleanup
       - --file
       - "{{ dotfiles_repo_root }}/Brewfile"

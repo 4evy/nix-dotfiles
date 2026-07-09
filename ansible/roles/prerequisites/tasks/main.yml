@@ -43,12 +43,6 @@
     - bootstrap
     - packages
 
-- name: Run bootstrap migrations
-  ansible.builtin.import_tasks: migrations.yml
-  tags:
-    - bootstrap
-    - migration
-
 - name: Install Rust bootstrap
   ansible.builtin.import_tasks: rustup.yml
   tags:

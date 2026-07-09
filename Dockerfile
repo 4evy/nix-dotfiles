@@ -13,10 +13,14 @@ ARG TEST_HOME=/home/dotfiles
 # Actions installs Podman from Ubuntu apt, whose imagebuilder rejects BuildKit
 # conveniences like COPY --link and heredoc RUN blocks.
 COPY containers/fedora-smoke-test-packages.txt /tmp/fedora-smoke-test-packages.txt
+# hadolint ignore=DL3041
 RUN --mount=type=cache,id=dotfiles-dnf4-${TARGETPLATFORM},sharing=locked,target=/var/cache/dnf \
     --mount=type=cache,id=dotfiles-dnf5-${TARGETPLATFORM},sharing=locked,target=/var/cache/libdnf5 \
     set -eu; \
-    dnf install -y --setopt=install_weak_deps=False $(sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' /tmp/fedora-smoke-test-packages.txt)
+    sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' /tmp/fedora-smoke-test-packages.txt \
+      > /tmp/fedora-smoke-test-packages.filtered.txt; \
+    xargs -r dnf install -y --setopt=install_weak_deps=False \
+      < /tmp/fedora-smoke-test-packages.filtered.txt
 
 RUN set -eu; \
     mkdir -p "$(dirname "${TEST_HOME}")"; \
@@ -50,6 +54,8 @@ USER root
 RUN chown -R "${TEST_UID}:${TEST_GID}" "${TEST_HOME}" /workspace/dotfiles
 USER ${TEST_USER}
 
+# ansible-test discovers its collection from the working directory.
+# hadolint ignore=DL3003
 RUN --mount=type=cache,id=dotfiles-go-mod-${TARGETPLATFORM},target=/home/dotfiles/go/pkg/mod,uid=${TEST_UID},gid=${TEST_GID} \
     --mount=type=cache,id=dotfiles-go-build-${TARGETPLATFORM},target=/home/dotfiles/.cache/go-build,uid=${TEST_UID},gid=${TEST_GID} \
     set -eu; \
@@ -59,7 +65,10 @@ RUN --mount=type=cache,id=dotfiles-go-mod-${TARGETPLATFORM},target=/home/dotfile
     done; \
     ansible-playbook ansible/playbooks/site.yml --tags local; \
     ansible-lint ansible; \
-    yamllint .
+    yamllint .; \
+    cd ansible/collections/ansible_collections/evy/dotfiles; \
+    ansible-test sanity --local; \
+    ansible-test integration --local operation
 
 USER root
 RUN chown -R "${TEST_UID}:${TEST_GID}" "${TEST_HOME}" /workspace/dotfiles
@@ -95,6 +104,6 @@ RUN set -eu; \
       --exclude=scripts \
       "$@"
 
-RUN ansible-playbook --version >/dev/null
-RUN ansible-lint --version >/dev/null
-RUN yamllint --version >/dev/null
+RUN ansible-playbook --version >/dev/null \
+    && ansible-lint --version >/dev/null \
+    && yamllint --version >/dev/null

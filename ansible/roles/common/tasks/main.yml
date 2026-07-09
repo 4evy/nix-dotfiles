@@ -11,35 +11,18 @@
   tags:
     - common
 
-- name: Detect operating system name
-  ansible.builtin.command:
-    argv:
-      - uname
-      - -s
-  changed_when: false
-  check_mode: false
-  register: common_uname_command
-  tags:
-    - common
-
 - name: Set operating system facts
   ansible.builtin.set_fact:
-    common_system: "{{ common_detected_system }}"
-    common_is_macos: "{{ common_detected_system == 'Darwin' }}"
-    common_is_linux: "{{ common_detected_system == 'Linux' }}"
-  vars:
-    common_detected_system: "{{ ansible_facts.get('system', common_uname_command.stdout | default('')) }}"
+    common_system: "{{ ansible_facts.system }}"
+    common_is_macos: "{{ ansible_facts.system == 'Darwin' }}"
+    common_is_linux: "{{ ansible_facts.system == 'Linux' }}"
   tags:
     - common
 
 - name: Detect rpm-ostree
-  ansible.builtin.command:
-    argv:
-      - rpm-ostree
-      - --version
-  changed_when: false
-  failed_when: false
-  register: common_rpm_ostree_command
+  ansible.builtin.stat:
+    path: /usr/bin/rpm-ostree
+  register: common_rpm_ostree_binary
   when: common_is_linux
   tags:
     - common
@@ -47,6 +30,9 @@
 - name: Detect package managers
   ansible.builtin.set_fact:
     common_has_rpm_ostree: >-
-      {{ common_is_linux and (common_rpm_ostree_command.rc | default(1)) == 0 }}
+      {{
+        common_is_linux
+        and common_rpm_ostree_binary.stat.executable | default(false)
+      }}
   tags:
     - common

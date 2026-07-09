@@ -59,7 +59,7 @@ def hex_to_rgb_csv(value: str) -> str:
 
 def coordinate_from_env(name: str, minimum: float, maximum: float) -> float | None:
     value = os.environ.get(name)
-    if value is None or value == "":
+    if not value:
         return None
     coordinate = float(value)
     if coordinate < minimum or coordinate > maximum:
@@ -142,7 +142,7 @@ def local_sun_event(
     )
     if utc_hour is None:
         return None
-    utc_midnight = dt.datetime.combine(date, dt.time(), tzinfo=dt.timezone.utc)
+    utc_midnight = dt.datetime.combine(date, dt.time(), tzinfo=dt.UTC)
     return (utc_midnight + dt.timedelta(hours=utc_hour)).astimezone(timezone)
 
 
@@ -227,9 +227,11 @@ def render_config(palette: dict[str, dict[str, str]]) -> str:
 
 def write_if_changed(path: pathlib.Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists() and path.read_text() == text:
+    if path.exists() and path.read_text(encoding="utf-8") == text:
         return
-    with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as handle:
         handle.write(text)
         tmp_path = pathlib.Path(handle.name)
     tmp_path.chmod(0o644)
