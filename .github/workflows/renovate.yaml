@@ -64,7 +64,7 @@ jobs:
         env:
           LOG_LEVEL: info
           RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
-          RENOVATE_GIT_AUTHOR: "4evy <git@ps1.sh>"
+          RENOVATE_GIT_AUTHOR: "4evy <git@evy.pink>"
           RENOVATE_GIT_PRIVATE_KEY: ${{ secrets.RENOVATE_GIT_PRIVATE_KEY }}
           RENOVATE_ONBOARDING: "false"
           RENOVATE_REPOSITORIES: '["${{ github.repository }}"]'

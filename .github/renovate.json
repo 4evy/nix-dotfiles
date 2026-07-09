@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:best-practices"],
-  "gitAuthor": "4evy <git@ps1.sh>",
+  "gitAuthor": "4evy <git@evy.pink>",
   "dependencyDashboard": false,
   "configMigration": false,
   "automerge": true,

@@ -58,7 +58,7 @@ jobs:
           fi
 
           git config user.name "4evy"
-          git config user.email "git@ps1.sh"
+          git config user.email "git@evy.pink"
 
           if [ -n "${WORKFLOW_SIGNING_KEY}" ]; then
             signing_key_file="${RUNNER_TEMP}/workflow-signing-key"
@@ -93,12 +93,12 @@ jobs:
               git config gpg.program "${RUNNER_TEMP}/gpg-sign"
 
               signing_key="$(
-                gpg --batch --list-secret-keys --with-colons git@ps1.sh |
+                gpg --batch --list-secret-keys --with-colons git@evy.pink |
                   awk -F: '/^fpr:/ { print $10; exit }'
               )"
 
               if [ -z "${signing_key}" ]; then
-                printf '%s\n' 'WORKFLOW_SIGNING_KEY is configured, but no key for git@ps1.sh was imported.'
+                printf '%s\n' 'WORKFLOW_SIGNING_KEY is configured, but no key for git@evy.pink was imported.'
                 exit 1
               fi
 
