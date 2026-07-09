@@ -1,23 +1,26 @@
 (defcfg
   process-unmapped-keys yes
   log-layer-changes yes
-  macos-dev-names-exclude (
-    "Pebble K380s"
-  )
 )
 
 (defsrc
-  esc caps lctl lmet rmet rctl w    a    s    d         ret             \
+  esc caps lctl lalt lmet rmet ralt rctl w    a    s    d         ret             bksl     nubs     nuhs     ro
 )
 
 (defalias
   caps-hyper (tap-hold-press 200 200 esc (multi lmet lctl lalt lsft (layer-while-held hyper)))
+  win-up (macos-window top-half top-two-thirds top-third)
+  win-left (macos-window left-half left-two-thirds first-third)
+  win-down (macos-window bottom-half bottom-two-thirds bottom-third)
+  win-right (macos-window right-half right-two-thirds last-third)
+  win-max-almost (macos-window almost-maximize center)
+  win-max (macos-window maximize)
 )
 
 (deflayer base
-  caps @caps-hyper lmet lctl rctl rmet w       a         s         d         ret             \
+  caps @caps-hyper lmet lalt lctl rctl ralt rmet w       a         s         d         ret             bksl     nubs     nuhs     ro
 )
 
 (deflayer hyper
-  _    _           _    _    _    _    w a s d ret \
+  _    _           _    _    _    _    _    _    @win-up @win-left @win-down @win-right @win-max-almost @win-max @win-max @win-max @win-max
 )
