@@ -10,6 +10,8 @@ programs = [
 ]
 default_args = ["--dangerously-bypass-approvals-and-sandbox"]
 skip_env = ["ZELLIJ_THEME_RUN_CODEX_WRAPPER"]
+env_unset = ["NO_COLOR"]
+env = ["COLORTERM=truecolor"]
 env_overlay = "codex-trust"
 startup_pane_color = true
 

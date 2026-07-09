@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -99,6 +100,7 @@ func TestCreateTrustRuntimeTrustsGitRootAndExplicitCwd(t *testing.T) {
 	}
 	runGit(t, repo, "init")
 	t.Chdir(subdir)
+	gitRoot := runGitOutput(t, subdir, "rev-parse", "--show-toplevel")
 
 	_, args, cleanup, err := CreateTrustRuntimeForArgs("catppuccin-frappe-pink", nil)
 	if err != nil {
@@ -109,7 +111,7 @@ func TestCreateTrustRuntimeTrustsGitRootAndExplicitCwd(t *testing.T) {
 	for _, want := range []string{
 		"-C",
 		subdir,
-		projectsTrustOverride([]string{subdir, repo}),
+		projectsTrustOverride([]string{subdir, gitRoot}),
 	} {
 		if !contains(args, want) {
 			t.Fatalf("args should contain %q, got %#v", want, args)
@@ -145,4 +147,15 @@ func runGit(t *testing.T, dir string, args ...string) {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v failed: %v\n%s", args, err, output)
 	}
+}
+
+func runGitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	output, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git %v failed: %v", args, err)
+	}
+	return strings.TrimSpace(string(output))
 }
