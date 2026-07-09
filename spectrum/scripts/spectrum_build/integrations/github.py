@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
 import os
 import re
 from dataclasses import dataclass
 
+from githubkit import GitHub
+from githubkit.exception import GitHubException
+
 from spectrum_build.core.common import fail
-from spectrum_build.integrations.http import download
 
 
 @dataclass(frozen=True)
@@ -26,30 +27,24 @@ RELEASE_RPMS = (
 )
 
 
-def github_api_headers() -> dict[str, str]:
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "dotfiles-spectrum-build",
-    }
-    if token := os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN"):
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
-
-
 def latest_github_asset_url(repo: str, asset_pattern: str) -> str:
-    release = json.loads(
-        download(
-            f"https://api.github.com/repos/{repo}/releases/latest",
-            headers=github_api_headers(),
+    try:
+        owner, name = repo.split("/", maxsplit=1)
+        github = GitHub(
+            os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN"),
+            user_agent="dotfiles-spectrum-build",
+            timeout=60,
         )
-    )
-    for asset in release.get("assets", []):
-        name = asset.get("name") or ""
-        url = asset.get("browser_download_url")
-        if url and re.fullmatch(asset_pattern, name):
-            return url
+        response = github.rest.repos.get_latest_release(owner, name)
+    except (GitHubException, ValueError) as error:
+        fail(f"failed to read the latest {repo} release: {error}")
 
-    names = ", ".join(asset.get("name") or "" for asset in release.get("assets", []))
+    release = response.parsed_data
+    for asset in release.assets:
+        if re.fullmatch(asset_pattern, asset.name):
+            return str(asset.browser_download_url)
+
+    names = ", ".join(asset.name for asset in release.assets)
     fail(
         f"no asset matching {asset_pattern!r} in {repo} latest release; assets: {names}"
     )

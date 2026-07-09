@@ -7,7 +7,6 @@ from pathlib import Path
 
 from spectrum_build.image.formatting import format_bytes, tree_size
 
-
 DEFAULT_MAX_INITRAMFS_BYTES = 300 * 1024 * 1024
 
 

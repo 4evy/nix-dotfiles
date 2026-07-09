@@ -4,7 +4,6 @@ from pathlib import Path
 
 from spectrum_build.core.common import fail
 
-
 # Spectrum shell policy
 #
 # This module overrides Bluefin/Homebrew shell defaults because the failure was
@@ -186,7 +185,7 @@ def align_shell_defaults(root: Path = Path("/")) -> None:
     patch_bluefin_zsh_brew_path(root)
 
 
-def validate_shell_defaults(root: Path = Path("/")) -> None:
+def validate_shell_defaults(root: Path = Path("/")) -> None:  # noqa: C901
     open_wrapper = _root_path(root, OPEN_WRAPPER)
     if not open_wrapper.is_file():
         fail(f"open command wrapper is missing: {open_wrapper}")

@@ -5,7 +5,6 @@ from pathlib import Path
 
 from spectrum_build.core.common import fail, require_readable_file
 
-
 ROOTFS_DIR = "image/rootfs"
 
 

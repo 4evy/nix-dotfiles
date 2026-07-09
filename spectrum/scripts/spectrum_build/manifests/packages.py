@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from collections.abc import Mapping, Sequence
-from itertools import chain
 
 from spectrum_build.core.common import fail
-
 
 PackageGroups = Mapping[str, Sequence[str]]
 
@@ -19,7 +16,6 @@ REQUIRED_PACKAGES: PackageGroups = {
         "just",
         "procps-ng",
         "python3",
-        "python3-libdnf5",
     ),
     "toolchain": (
         "binutils",
@@ -49,10 +45,7 @@ REQUIRED_PACKAGES: PackageGroups = {
         "systemd-devel",
         "zlib-devel",
     ),
-    "editors": (
-        "code",
-        "vim-enhanced",
-    ),
+    "editors": ("vim-enhanced",),
     "fonts": (
         "google-noto-color-emoji-fonts",
         "google-noto-emoji-fonts",
@@ -67,8 +60,6 @@ REQUIRED_PACKAGES: PackageGroups = {
         "liberation-serif-fonts",
     ),
     "system": (
-        "1password",
-        "1password-cli",
         "opensc",
         "openssh-clients",
         "openssl",
@@ -82,7 +73,6 @@ REQUIRED_PACKAGES: PackageGroups = {
         "podman-compose",
         "pipewire-gstreamer",
         "selinux-policy-devel",
-        "tailscale",
         "systemd-oomd-defaults",
         "uresourced",
         "vulkan-tools",
@@ -93,6 +83,12 @@ REQUIRED_PACKAGES: PackageGroups = {
 }
 
 OPTIONAL_PACKAGES: PackageGroups = {}
+
+EXTERNAL_REPOSITORY_PACKAGES: PackageGroups = {
+    "1password": ("1password", "1password-cli"),
+    "code": ("code",),
+    "tailscale-stable": ("tailscale",),
+}
 
 VALIDATION_PACKAGES: Sequence[str] = (
     "1password",
@@ -107,14 +103,11 @@ VALIDATION_PACKAGES: Sequence[str] = (
 )
 
 
-def package_names(groups: PackageGroups) -> Iterable[str]:
-    return chain.from_iterable(groups.values())
-
-
 def validate_package_groups() -> None:
     for label, groups in {
         "required": REQUIRED_PACKAGES,
         "optional": OPTIONAL_PACKAGES,
+        "external": EXTERNAL_REPOSITORY_PACKAGES,
     }.items():
         if not isinstance(groups, dict):
             fail(f"{label} packages must be grouped in a dict")

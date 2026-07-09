@@ -37,19 +37,17 @@ class MesonProject:
 def clone_pinned_git_ref(
     project: PinnedGitProject, destination: Path, runner: CommandRunner
 ) -> None:
-    runner.run(
-        [
-            "git",
-            "clone",
-            "--depth",
-            "1",
-            "--branch",
-            project.tag,
-            "--filter=blob:none",
-            project.repo,
-            destination,
-        ]
-    )
+    runner.run([
+        "git",
+        "clone",
+        "--depth",
+        "1",
+        "--branch",
+        project.tag,
+        "--filter=blob:none",
+        project.repo,
+        destination,
+    ])
     actual_revision = runner.output(["git", "-C", destination, "rev-parse", "HEAD"])
     if actual_revision != project.revision:
         fail(
@@ -61,17 +59,15 @@ def clone_pinned_git_ref(
 def install_meson_project(
     project: MesonProject, source: Path, build_dir: Path, runner: CommandRunner
 ) -> None:
-    runner.run(
-        [
-            "meson",
-            "setup",
-            build_dir,
-            source,
-            "--prefix=/usr",
-            "--libdir=lib64",
-            "--buildtype=release",
-            *project.options,
-        ]
-    )
+    runner.run([
+        "meson",
+        "setup",
+        build_dir,
+        source,
+        "--prefix=/usr",
+        "--libdir=lib64",
+        "--buildtype=release",
+        *project.options,
+    ])
     runner.run(["meson", "compile", "-C", build_dir])
     runner.run(["meson", "install", "-C", build_dir])

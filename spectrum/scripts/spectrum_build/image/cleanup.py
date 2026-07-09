@@ -3,7 +3,6 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-
 DNF_CLEANUP_PATTERNS = (
     "/run/dnf",
     "/var/cache/dnf/*",

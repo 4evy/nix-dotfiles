@@ -1,4 +1,4 @@
-ARG BLUEFIN_BASE_IMAGE=ghcr.io/ublue-os/bluefin-nvidia-open:stable@sha256:82abcda61cd79547f8242b43c819ab84d3688e14f13bde74279b708a26a733ac
+ARG BLUEFIN_BASE_IMAGE=ghcr.io/ublue-os/bluefin-nvidia-open:stable@sha256:1e7a59c83f104652bd06308f0a6439669cb3ea327d4e968695af85c67abea352
 ARG BLUEFIN_BASE_IMAGE_NAME=bluefin-nvidia-open
 ARG BLUEFIN_BASE_IMAGE_TAG=stable
 
@@ -17,9 +17,12 @@ ARG IMAGE_TAG="latest"
 ARG IMAGE_REF="ostree-image:docker://ghcr.io/4evy/spectrum"
 ARG IMAGE_TITLE="spectrum"
 ARG IMAGE_DESCRIPTION="Spectrum Bluefin image for dotfiles"
+ARG IMAGE_AUTHORS="4evy <git@evy.pink>"
 ARG IMAGE_SOURCE="https://github.com/4evy/dotfiles"
 ARG IMAGE_URL="https://github.com/4evy/dotfiles"
 ARG IMAGE_DOCUMENTATION="https://github.com/4evy/dotfiles#readme"
+ARG IMAGE_README="https://raw.githubusercontent.com/4evy/dotfiles/master/README.md"
+ARG IMAGE_LOGO="https://avatars.githubusercontent.com/u/57304299?v=4"
 ARG IMAGE_LICENSES="MIT"
 ARG IMAGE_CREATED
 ARG IMAGE_REVISION
@@ -27,6 +30,7 @@ ARG IMAGE_VERSION
 
 LABEL org.opencontainers.image.title="${IMAGE_TITLE}" \
       org.opencontainers.image.description="${IMAGE_DESCRIPTION}" \
+      org.opencontainers.image.authors="${IMAGE_AUTHORS}" \
       org.opencontainers.image.source="${IMAGE_SOURCE}" \
       org.opencontainers.image.url="${IMAGE_URL}" \
       org.opencontainers.image.documentation="${IMAGE_DOCUMENTATION}" \
@@ -35,10 +39,14 @@ LABEL org.opencontainers.image.title="${IMAGE_TITLE}" \
       org.opencontainers.image.revision="${IMAGE_REVISION}" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
       org.opencontainers.image.vendor="${IMAGE_VENDOR}" \
+      org.opencontainers.image.license="${IMAGE_LICENSES}" \
       containers.bootc=1 \
       io.artifacthub.package.deprecated=false \
       io.artifacthub.package.keywords="bootc,bluefin,ublue,spectrum,dotfiles" \
       io.artifacthub.package.license="${IMAGE_LICENSES}" \
+      io.artifacthub.package.logo-url="${IMAGE_LOGO}" \
+      io.artifacthub.package.maintainers="[{\"name\":\"4evy\",\"email\":\"git@evy.pink\"}]" \
+      io.artifacthub.package.readme-url="${IMAGE_README}" \
       io.artifacthub.package.prerelease=false
 
 # Fedora composefs images cannot create new root-level mountpoints at runtime.
@@ -54,12 +62,12 @@ RUN --mount=type=bind,from=ctx,source=/image,target=/ctx \
     --mount=type=tmpfs,target=/tmp \
     --mount=type=secret,id=github_token,required=false \
     mkdir -p /var/roothome && \
-    dnf5 -y install --setopt=install_weak_deps=False uv python3-libdnf5 && \
+    dnf5 -y install --setopt=install_weak_deps=False uv && \
     cp -a /ctx /tmp/spectrum-src && \
     GITHUB_TOKEN="$(cat /run/secrets/github_token 2>/dev/null || true)" \
     UV_CACHE_DIR=/tmp/uv-cache \
     UV_PROJECT_ENVIRONMENT=/tmp/spectrum-build-venv \
-    bash /tmp/spectrum-src/spectrum/build.sh
+    python3 /tmp/spectrum-src/spectrum/scripts/build.py
 
 # Cache mount targets can leave empty /var directories behind in the final image;
 # bootc lint treats those as fatal unless tmpfiles rules own them.

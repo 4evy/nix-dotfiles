@@ -14,6 +14,15 @@ def main() -> int:
         return 1
 
     project_dir = Path(__file__).resolve().parents[2]
+    project_environment = os.environ.get("UV_PROJECT_ENVIRONMENT")
+    if project_environment and not (Path(project_environment) / "pyvenv.cfg").is_file():
+        created = subprocess.run(
+            ["uv", "venv", "--system-site-packages", project_environment],
+            env=os.environ,
+            check=False,
+        )
+        if created.returncode != 0:
+            return created.returncode
     return subprocess.run(
         [
             "uv",

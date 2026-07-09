@@ -48,8 +48,17 @@ class ImageConfig(BaseSettings):
     def resolved_version(self) -> str:
         return self.version or self.tag
 
-    def image_info(self) -> dict[str, str]:
-        return {
+    @property
+    def base_image_ref(self) -> str:
+        return self.base_image.partition("@")[0]
+
+    @property
+    def base_image_digest(self) -> str | None:
+        _, separator, digest = self.base_image.partition("@")
+        return digest if separator else None
+
+    def image_info(self, *, fedora_version: str | None = None) -> dict[str, str]:
+        metadata = {
             "image-name": self.name,
             "image-flavor": "spectrum",
             "image-vendor": self.vendor,
@@ -59,6 +68,11 @@ class ImageConfig(BaseSettings):
             "base-image-ref": self.base_image,
             "base-image-tag": self.base_image_tag,
         }
+        if self.base_image_digest:
+            metadata["base-image-digest"] = self.base_image_digest
+        if fedora_version:
+            metadata["fedora-version"] = fedora_version
+        return metadata
 
 
 class BuildEnvironment(BaseSettings):

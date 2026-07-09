@@ -5,7 +5,6 @@ import subprocess
 
 from spectrum_build.core.common import CommandRunner, fail
 
-
 REQUIRED_UNITS = (
     "pcscd.socket",
     "podman.socket",

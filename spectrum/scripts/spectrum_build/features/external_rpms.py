@@ -4,9 +4,8 @@ import platform
 import sys
 
 from spectrum_build.core.context import BuildContext
-from spectrum_build.integrations.github import RELEASE_RPMS
 from spectrum_build.image.platform_info import fedora_arch
-
+from spectrum_build.integrations.github import RELEASE_RPMS
 
 DISCORD_RPM_URL = "https://discord.com/api/download?platform=linux&format=rpm"
 

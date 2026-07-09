@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from spectrum_build.core.context import BuildContext
 
-
 StepAction = Callable[[BuildContext], None]
 
 

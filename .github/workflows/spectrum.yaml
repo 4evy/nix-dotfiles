@@ -7,14 +7,18 @@ on:
     paths:
       - .github/workflows/spectrum.yaml
       - .dockerignore
+      - pyproject.toml
       - spectrum/**
+      - uv.lock
   push:
     branches:
       - master
     paths:
       - .github/workflows/spectrum.yaml
       - .dockerignore
+      - pyproject.toml
       - spectrum/**
+      - uv.lock
   schedule:
     - cron: "42 4 * * *"
   workflow_dispatch: null
@@ -27,7 +31,7 @@ permissions:
   contents: read # needed to checkout repository contents
 
 env:
-  BLUEFIN_BASE_IMAGE: ghcr.io/ublue-os/bluefin-nvidia-open:stable@sha256:82abcda61cd79547f8242b43c819ab84d3688e14f13bde74279b708a26a733ac
+  BLUEFIN_BASE_IMAGE: ghcr.io/ublue-os/bluefin-nvidia-open:stable@sha256:1e7a59c83f104652bd06308f0a6439669cb3ea327d4e968695af85c67abea352
   BLUEFIN_BASE_IMAGE_NAME: bluefin-nvidia-open
   BLUEFIN_BASE_IMAGE_TAG: stable
   IMAGE_NAME: spectrum
@@ -41,6 +45,7 @@ jobs:
       packages: write # needed to push images to GitHub Container Registry
       id-token: write # needed for keyless cosign signing
       attestations: write # needed to publish GitHub provenance attestations
+      artifact-metadata: write # needed to link attestations to the published image
     steps:
       - name: Checkout Repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -61,6 +66,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y podman skopeo
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Verify Bluefin Base Image
+        env:
+          BLUEFIN_BASE_IMAGE: ${{ env.BLUEFIN_BASE_IMAGE }}
+        run: |
+          cosign verify \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+            --certificate-identity=https://github.com/ublue-os/bluefin/.github/workflows/reusable-build.yml@refs/heads/main \
+            "${BLUEFIN_BASE_IMAGE}"
+
       - name: Prepare Image Metadata
         id: image
         env:
@@ -75,6 +92,8 @@ jobs:
           date_tag="$(date -u +%Y%m%d)"
           created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           version="${date_tag}-${short_sha}"
+          repository_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          raw_repository_url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}"
 
           {
             echo "image_ref=${image_registry}/${image_name}"
@@ -83,6 +102,10 @@ jobs:
             echo "created=${created}"
             echo "revision=${revision}"
             echo "version=${version}"
+            echo "source=${repository_url}/blob/${revision}/spectrum/Containerfile"
+            echo "url=${repository_url}/tree/${revision}"
+            echo "documentation=${raw_repository_url}/${revision}/README.md"
+            echo "readme=${raw_repository_url}/${revision}/README.md"
             echo "tags<<EOF"
             echo "latest"
             echo "${date_tag}"
@@ -102,11 +125,21 @@ jobs:
           LOCAL_REF: "${{ steps.image.outputs.local_ref }}"
           REVISION: "${{ steps.image.outputs.revision }}"
           VERSION: "${{ steps.image.outputs.version }}"
+          SOURCE: "${{ steps.image.outputs.source }}"
+          URL: "${{ steps.image.outputs.url }}"
+          DOCUMENTATION: "${{ steps.image.outputs.documentation }}"
+          README: "${{ steps.image.outputs.readme }}"
         run: |
           github_token_file=$(mktemp)
           trap 'rm -f "${github_token_file}"' EXIT
           printf '%s' "${GITHUB_TOKEN}" >"${github_token_file}"
           chmod 600 "${github_token_file}"
+          base_image_ref="${BLUEFIN_BASE_IMAGE%@*}"
+          base_image_digest="${BLUEFIN_BASE_IMAGE##*@}"
+          if [[ "${base_image_digest}" == "${BLUEFIN_BASE_IMAGE}" ]]; then
+            printf '%s\n' 'BLUEFIN_BASE_IMAGE must be pinned by digest' >&2
+            exit 1
+          fi
 
           sudo podman build \
             --pull=newer \
@@ -122,8 +155,55 @@ jobs:
             --build-arg "IMAGE_CREATED=${CREATED}" \
             --build-arg "IMAGE_REVISION=${REVISION}" \
             --build-arg "IMAGE_VERSION=${VERSION}" \
+            --build-arg "IMAGE_SOURCE=${SOURCE}" \
+            --build-arg "IMAGE_URL=${URL}" \
+            --build-arg "IMAGE_DOCUMENTATION=${DOCUMENTATION}" \
+            --build-arg "IMAGE_README=${README}" \
+            --label "org.opencontainers.image.base.name=${base_image_ref}" \
+            --label "org.opencontainers.image.base.digest=${base_image_digest}" \
             --file spectrum/Containerfile \
             .
+
+      - name: Validate OCI Metadata
+        env:
+          BLUEFIN_BASE_IMAGE: ${{ env.BLUEFIN_BASE_IMAGE }}
+          EXPECTED_DOCUMENTATION: "${{ steps.image.outputs.documentation }}"
+          EXPECTED_README: "${{ steps.image.outputs.readme }}"
+          EXPECTED_REVISION: "${{ steps.image.outputs.revision }}"
+          EXPECTED_SOURCE: "${{ steps.image.outputs.source }}"
+          EXPECTED_URL: "${{ steps.image.outputs.url }}"
+          EXPECTED_VERSION: "${{ steps.image.outputs.version }}"
+          LOCAL_REF: "${{ steps.image.outputs.local_ref }}"
+        run: |
+          set -euo pipefail
+          base_image_ref="${BLUEFIN_BASE_IMAGE%@*}"
+          base_image_digest="${BLUEFIN_BASE_IMAGE##*@}"
+          sudo podman image inspect "${LOCAL_REF}" \
+            | jq -e \
+              --arg base_digest "${base_image_digest}" \
+              --arg base_ref "${base_image_ref}" \
+              --arg documentation "${EXPECTED_DOCUMENTATION}" \
+              --arg readme "${EXPECTED_README}" \
+              --arg revision "${EXPECTED_REVISION}" \
+              --arg source "${EXPECTED_SOURCE}" \
+              --arg url "${EXPECTED_URL}" \
+              --arg version "${EXPECTED_VERSION}" \
+              '.[0].Config.Labels as $labels
+              | $labels["containers.bootc"] == "1"
+                and $labels["org.opencontainers.image.authors"] == "4evy <git@evy.pink>"
+                and $labels["org.opencontainers.image.base.digest"] == $base_digest
+                and $labels["org.opencontainers.image.base.name"] == $base_ref
+                and $labels["org.opencontainers.image.documentation"] == $documentation
+                and $labels["org.opencontainers.image.license"] == "MIT"
+                and $labels["org.opencontainers.image.licenses"] == "MIT"
+                and $labels["org.opencontainers.image.revision"] == $revision
+                and $labels["org.opencontainers.image.source"] == $source
+                and $labels["org.opencontainers.image.url"] == $url
+                and $labels["org.opencontainers.image.version"] == $version
+                and $labels["io.artifacthub.package.logo-url"] == "https://avatars.githubusercontent.com/u/57304299?v=4"
+                and $labels["io.artifacthub.package.readme-url"] == $readme
+                and ($labels["io.artifacthub.package.maintainers"] | fromjson | .[0])
+                  == {"name": "4evy", "email": "git@evy.pink"}'
 
       - name: Report Boot Artifacts
         env:
@@ -183,9 +263,17 @@ jobs:
           digest=$(sudo cat "$digest_file")
           echo "digest=${digest}" >>"$GITHUB_OUTPUT"
 
-      - name: Install Cosign
+      - name: Generate SPDX SBOM
         if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: "${{ steps.image.outputs.image_ref }}@${{ steps.push.outputs.digest }}"
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          output-file: spectrum.spdx.json
+          artifact-name: spectrum.spdx.json
+          format: spdx-json
+          upload-release-assets: false
 
       - name: Sign Image
         if: github.event_name != 'pull_request'
@@ -207,4 +295,13 @@ jobs:
         with:
           subject-name: ${{ steps.image.outputs.image_ref }}
           subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest Image SBOM
+        if: github.event_name != 'pull_request'
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ steps.image.outputs.image_ref }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: spectrum.spdx.json
           push-to-registry: true

@@ -12,7 +12,6 @@ from spectrum_build.integrations.source_build import (
     pinned_git_project,
 )
 
-
 KMSCON_BUILD_COMMANDS = (
     "git",
     "infocmp",

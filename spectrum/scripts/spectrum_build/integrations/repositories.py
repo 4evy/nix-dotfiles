@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import configparser
+import io
 from dataclasses import dataclass
 from pathlib import Path
 
-from spectrum_build.core.common import atomic_write, require_readable_file
+from spectrum_build.core.common import atomic_write, fail, require_readable_file
 from spectrum_build.core.context import BuildContext
 from spectrum_build.integrations.http import download
-from spectrum_build.image.platform_info import aitoolkit_repo_url, fedora_version_id
-
 
 ONEPASSWORD_GPG_KEY = Path("/etc/pki/rpm-gpg/RPM-GPG-KEY-1password")
 REPO_DIR = "image/repos"
@@ -17,6 +17,7 @@ REPO_DIR = "image/repos"
 class RepositoryFile:
     destination: Path
     source: Path | str
+    repo_ids: tuple[str, ...] = ()
     import_rpm_key: bool = False
 
 
@@ -26,6 +27,7 @@ def repository_files(context_dir: Path) -> tuple[RepositoryFile, ...]:
         RepositoryFile(
             destination=repo_dir / "vscode.repo",
             source=context_dir / f"{REPO_DIR}/vscode.repo",
+            repo_ids=("code",),
         ),
         RepositoryFile(
             destination=ONEPASSWORD_GPG_KEY,
@@ -35,16 +37,30 @@ def repository_files(context_dir: Path) -> tuple[RepositoryFile, ...]:
         RepositoryFile(
             destination=repo_dir / "1password.repo",
             source=context_dir / f"{REPO_DIR}/1password.repo",
+            repo_ids=("1password",),
         ),
         RepositoryFile(
             destination=repo_dir / "tailscale.repo",
             source="https://pkgs.tailscale.com/stable/fedora/tailscale.repo",
-        ),
-        RepositoryFile(
-            destination=repo_dir / "iolaum-aitoolkit.repo",
-            source=aitoolkit_repo_url(fedora_version_id()),
+            repo_ids=("tailscale-stable",),
         ),
     )
+
+
+def disabled_repository_config(content: bytes, repo_ids: tuple[str, ...]) -> bytes:
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read_string(content.decode())
+    missing = set(repo_ids).difference(parser.sections())
+    if missing:
+        fail(
+            f"repository configuration is missing sections: {', '.join(sorted(missing))}"
+        )
+    for repo_id in repo_ids:
+        parser[repo_id]["enabled"] = "0"
+
+    output = io.StringIO()
+    parser.write(output, space_around_delimiters=False)
+    return output.getvalue().encode()
 
 
 def install_repositories(context: BuildContext) -> None:
@@ -55,8 +71,21 @@ def install_repositories(context: BuildContext) -> None:
         else:
             content = download(source.source)
 
+        if source.repo_ids:
+            content = disabled_repository_config(content, source.repo_ids)
         atomic_write(source.destination, content)
 
         if source.import_rpm_key:
             context.runner.require("rpm")
             context.runner.run(["rpm", "--import", source.destination])
+
+
+def validate_repositories_disabled(context_dir: Path) -> None:
+    for repository in repository_files(context_dir):
+        if not repository.repo_ids:
+            continue
+        parser = configparser.ConfigParser(interpolation=None)
+        parser.read(repository.destination)
+        for repo_id in repository.repo_ids:
+            if parser.getboolean(repo_id, "enabled", fallback=True):
+                fail(f"external repository is enabled in final image: {repo_id}")

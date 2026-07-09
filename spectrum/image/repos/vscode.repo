@@ -1,7 +1,7 @@
 [code]
 name=Visual Studio Code
 baseurl=https://packages.microsoft.com/yumrepos/vscode
-enabled=1
+enabled=0
 autorefresh=1
 type=rpm-md
 gpgcheck=1
