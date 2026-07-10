@@ -12,6 +12,11 @@ from spectrum_build.integrations.source_build import (
     pinned_git_project,
 )
 
+PYTHON_SYSTEM_SITE_PACKAGES = (
+    "import sys; "
+    "print(f'/usr/lib/python{sys.version_info.major}.{sys.version_info.minor}/site-packages')"
+)
+
 KMSCON_BUILD_COMMANDS = (
     "cp",
     "git",
@@ -43,6 +48,10 @@ KMSCON = MesonProject(
 )
 
 
+def python_system_site_packages(runner: CommandRunner) -> Path:
+    return Path(runner.output(["/usr/bin/python3", "-c", PYTHON_SYSTEM_SITE_PACKAGES]))
+
+
 def install(runner: CommandRunner) -> None:
     astral = pinned_git_project(
         "astral",
@@ -71,13 +80,7 @@ def install(runner: CommandRunner) -> None:
         kmscon_source = work_dir / KMSCON.name
 
         clone_pinned_git_ref(astral, astral_source, runner)
-        purelib = Path(
-            runner.output([
-                "/usr/bin/python3",
-                "-c",
-                "import sysconfig; print(sysconfig.get_path('purelib'))",
-            ])
-        )
+        purelib = python_system_site_packages(runner)
         runner.run(["install", "-d", purelib])
         runner.run(["cp", "-a", astral_source / "src/astral", purelib])
         license_dir = Path("/usr/share/licenses/python3-astral")

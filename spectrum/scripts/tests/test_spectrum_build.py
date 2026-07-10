@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from spectrum_build.core.common import BuildError, CommandRunner, atomic_write
+from spectrum_build.features import kmscon
 from spectrum_build.image import platform_info
 from spectrum_build.image.shell import (
     BLUEFIN_OPEN_ALIAS,
@@ -168,6 +169,30 @@ def test_pinned_project_environment_is_namespaced(
         tag="v2",
         revision="b" * 40,
     )
+
+
+def test_kmscon_uses_system_python_site_packages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = CommandRunner()
+    calls: list[Sequence[str | Path]] = []
+
+    def fake_output(args: Sequence[str | Path]) -> str:
+        calls.append(args)
+        return "/usr/lib/python3.14/site-packages"
+
+    monkeypatch.setattr(runner, "output", fake_output)
+
+    assert kmscon.python_system_site_packages(runner) == Path(
+        "/usr/lib/python3.14/site-packages"
+    )
+    assert calls == [
+        [
+            "/usr/bin/python3",
+            "-c",
+            kmscon.PYTHON_SYSTEM_SITE_PACKAGES,
+        ]
+    ]
 
 
 def test_clone_rejects_tag_resolving_to_unexpected_revision(
