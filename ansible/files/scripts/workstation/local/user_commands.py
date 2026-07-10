@@ -142,14 +142,14 @@ open location "shottr://settings/license"
 delay 0.5
 
 tell application "System Events"
-  repeat 50 times
+  repeat 150 times
     if exists process "Shottr" then exit repeat
     delay 0.1
   end repeat
 
   tell process "Shottr"
     set frontmost to true
-    repeat 50 times
+    repeat 150 times
       if exists window "Preferences" then exit repeat
       delay 0.1
     end repeat
@@ -203,11 +203,11 @@ def _shottr_is_activated(domain: str) -> bool:
     return bool(stored_license and vault)
 
 
-def shottr_license_entrypoint() -> None:
+def shottr_license_entrypoint(*, force: bool = False) -> None:
     domain = "cc.ffitch.shottr"
     action = sys.argv[1] if len(sys.argv) == 2 else ""
     if action == "install":
-        if _shottr_is_activated(domain):
+        if _shottr_is_activated(domain) and not force:
             error_console.print(
                 "shottr-license: Shottr already has activation state; leaving it in place"
             )
@@ -224,7 +224,7 @@ def shottr_license_entrypoint() -> None:
         else:
             console.print("shottr-license: not installed")
         return
-    raise SystemExit("Usage: shottr-license <install|status>")
+    raise SystemExit("Usage: shottr-license <install|status> [--force]")
 
 
 def _real_codex(home: Path, wrapper: Path) -> Path:

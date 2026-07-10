@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import sys
+from typing import TYPE_CHECKING
+
+from workstation.local import user_commands
 from workstation.local.user_commands import (
     _lspci_display_devices,
     _matching_lines,
 )
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_matching_lines_supports_head_and_tail_limits() -> None:
@@ -30,3 +37,30 @@ def test_lspci_display_devices_keeps_following_context() -> None:
     assert "Kernel driver in use: nvidia" in result
     assert "02:00.0 Audio device" in result
     assert "03:00.0 Network controller" not in result
+
+
+def test_shottr_install_keeps_existing_activation_without_force(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    activated: list[str] = []
+    monkeypatch.setattr(user_commands, "_shottr_is_activated", lambda _domain: True)
+    monkeypatch.setattr(user_commands, "_activate_shottr_license", activated.append)
+    monkeypatch.setattr(sys, "argv", ["shottr-license", "install"])
+
+    user_commands.shottr_license_entrypoint()
+
+    assert activated == []
+
+
+def test_shottr_force_install_reactivates_existing_license(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    activated: list[str] = []
+    monkeypatch.setattr(user_commands, "_shottr_is_activated", lambda _domain: True)
+    monkeypatch.setattr(user_commands, "_shottr_license_key", lambda: "license-key")
+    monkeypatch.setattr(user_commands, "_activate_shottr_license", activated.append)
+    monkeypatch.setattr(sys, "argv", ["shottr-license", "install"])
+
+    user_commands.shottr_license_entrypoint(force=True)
+
+    assert activated == ["license-key"]

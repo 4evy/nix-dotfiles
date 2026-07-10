@@ -340,6 +340,7 @@
       - chezmoi
       - shottr-license
       - install
+      - --force
   args:
     chdir: "{{ dotfiles_repo_root }}"
   environment:

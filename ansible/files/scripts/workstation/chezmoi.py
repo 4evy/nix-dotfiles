@@ -4,6 +4,7 @@ import os
 import sys
 from importlib import import_module
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
@@ -35,12 +36,15 @@ def alt_tab_license() -> None:
 
 
 @app.command("shottr-license")
-def shottr_license(action: str = typer.Argument("status")) -> None:
+def shottr_license(
+    action: str = typer.Argument("status"),
+    force: Annotated[bool, typer.Option("--force")] = False,
+) -> None:
     """Install or show the Shottr license state."""
     original = sys.argv
     try:
         sys.argv = [original[0], action]
-        shottr_license_entrypoint()
+        shottr_license_entrypoint(force=force)
     finally:
         sys.argv = original
 
