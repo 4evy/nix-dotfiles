@@ -321,6 +321,18 @@ def configure_kanata(
     run(("launchctl", "bootstrap", "system", plist))
     run(("launchctl", "enable", f"system/{label}"))
     run(("launchctl", "kickstart", "-k", f"system/{label}"))
+    time.sleep(3)
+    state = run(
+        ("launchctl", "print", f"system/{label}"),
+        check=False,
+        capture=True,
+    )
+    if state.returncode != 0 or "state = running" not in state.stdout:
+        raise DotfilesError(
+            "kanata: daemon exited during startup; grant Input Monitoring and "
+            "Accessibility to /Applications/Kanata.app in System Settings, then "
+            "rerun setup"
+        )
     return OperationResult(
         changed=True, msg="Reconciled the macOS Kanata launch daemon"
     )
