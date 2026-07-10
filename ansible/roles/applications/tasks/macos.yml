@@ -56,8 +56,7 @@
 - name: Require ARM64 macOS for Equilotl CLI
   ansible.builtin.assert:
     that:
-      - >-
-        ansible_facts.get('architecture', ansible_facts.get('ansible_architecture', '')) == 'arm64'
+      - common_architecture == 'arm64'
     fail_msg: "This dotfiles Equicord macOS install path only supports ARM64 Macs."
   tags:
     - discord

@@ -1,27 +1,27 @@
 ---
 - name: Set Homebrew paths on macOS
   ansible.builtin.set_fact:
-    prerequisites_homebrew_prefix: "{{ '/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local' }}"
+    prerequisites_homebrew_prefix: "{{ prerequisites_macos_homebrew_prefix }}"
     prerequisites_homebrew_path: >-
       {{
         [
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/coreutils/libexec/gnubin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/findutils/libexec/gnubin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/gnu-sed/libexec/gnubin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/grep/libexec/gnubin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/gawk/libexec/gnubin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/gnu-tar/libexec/gnubin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/gnu-which/libexec/gnubin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/diffutils/libexec/gnubin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/make/libexec/gnubin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/opt/gnu-getopt/bin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/bin',
-          ('/opt/homebrew' if ansible_facts.architecture == 'arm64' else '/usr/local') ~ '/sbin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/coreutils/libexec/gnubin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/findutils/libexec/gnubin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/gnu-sed/libexec/gnubin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/grep/libexec/gnubin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/gawk/libexec/gnubin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/gnu-tar/libexec/gnubin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/gnu-which/libexec/gnubin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/diffutils/libexec/gnubin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/make/libexec/gnubin',
+          prerequisites_macos_homebrew_prefix ~ '/opt/gnu-getopt/bin',
+          prerequisites_macos_homebrew_prefix ~ '/bin',
+          prerequisites_macos_homebrew_prefix ~ '/sbin',
           dotfiles_path,
         ]
         | join(':')
       }}
-    prerequisites_modern_bash: "{{ '/opt/homebrew/bin/bash' if ansible_facts.architecture == 'arm64' else '/usr/local/bin/bash' }}"
+    prerequisites_modern_bash: "{{ prerequisites_macos_homebrew_prefix }}/bin/bash"
     prerequisites_homebrew_bootstrap_formulae:
       - bash
       - uv
@@ -37,6 +37,8 @@
       - grep
       - make
     prerequisites_homebrew_enabled: true
+  vars:
+    prerequisites_macos_homebrew_prefix: "{{ '/opt/homebrew' if common_architecture == 'arm64' else '/usr/local' }}"
   when: common_is_macos
   tags:
     - bootstrap
@@ -62,7 +64,7 @@
 - name: Require supported macOS architecture
   ansible.builtin.assert:
     that:
-      - ansible_facts.architecture in ['arm64', 'x86_64']
+      - common_architecture in ['arm64', 'x86_64']
     fail_msg: "This macOS profile requires Apple Silicon or Intel x86_64."
   when: common_is_macos
   tags:
