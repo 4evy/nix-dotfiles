@@ -11,35 +11,35 @@ const PATCHED = Symbol.for("dotfiles.raycast.keydumpHookPatched");
  * @returns {void}
  */
 function installDatabaseKeyDump(keyFile = process.env.RAYCAST_KEYDUMP_FILE) {
-	if (!keyFile) {
-		throw new Error("RAYCAST_KEYDUMP_FILE is required");
-	}
-	if (Module.prototype[PATCHED]) return;
+  if (!keyFile) {
+    throw new Error("RAYCAST_KEYDUMP_FILE is required");
+  }
+  if (Module.prototype[PATCHED]) return;
 
-	const originalRequire = Module.prototype.require;
+  const originalRequire = Module.prototype.require;
 
-	Module.prototype.require = function requireWithKeyDump(id, ...args) {
-		const result = originalRequire.call(this, id, ...args);
+  Module.prototype.require = function requireWithKeyDump(id, ...args) {
+    const result = originalRequire.call(this, id, ...args);
 
-		if (id?.includes("data.darwin-arm64") && result.DatabaseClient) {
-			const OriginalDatabaseClient = result.DatabaseClient;
+    if (id?.includes("data.darwin-arm64") && result.DatabaseClient) {
+      const OriginalDatabaseClient = result.DatabaseClient;
 
-			result.DatabaseClient = class DatabaseClientWithKeyDump extends (
-				OriginalDatabaseClient
-			) {
-				constructor(...args) {
-					fs.writeFileSync(keyFile, args[1]);
-					super(...args);
-				}
-			};
-		}
+      result.DatabaseClient = class DatabaseClientWithKeyDump extends (
+        OriginalDatabaseClient
+      ) {
+        constructor(...args) {
+          fs.writeFileSync(keyFile, args[1]);
+          super(...args);
+        }
+      };
+    }
 
-		return result;
-	};
+    return result;
+  };
 
-	Module.prototype[PATCHED] = true;
+  Module.prototype[PATCHED] = true;
 }
 
 module.exports = {
-	installDatabaseKeyDump,
+  installDatabaseKeyDump,
 };

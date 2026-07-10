@@ -7,8 +7,8 @@ import path from "node:path";
  * @returns {string | undefined}
  */
 export function expandHome(value) {
-	if (!value?.startsWith("~/")) return value;
-	return path.join(os.homedir(), value.slice(2));
+  if (!value?.startsWith("~/")) return value;
+  return path.join(os.homedir(), value.slice(2));
 }
 
 /**
@@ -16,12 +16,12 @@ export function expandHome(value) {
  * @returns {Promise<boolean>}
  */
 export async function pathExists(file) {
-	try {
-		await access(file);
-		return true;
-	} catch {
-		return false;
-	}
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -29,7 +29,7 @@ export async function pathExists(file) {
  * @returns {Promise<unknown>}
  */
 export async function readJson(file) {
-	return JSON.parse(await readFile(file, "utf8"));
+  return JSON.parse(await readFile(file, "utf8"));
 }
 
 /**
@@ -38,7 +38,7 @@ export async function readJson(file) {
  * @returns {Promise<void>}
  */
 export async function writeJson(file, value) {
-	await writeFile(file, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+  await writeFile(file, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
 }
 
 /**
@@ -47,7 +47,7 @@ export async function writeJson(file, value) {
  * @returns {T}
  */
 export function clone(value) {
-	return value == null ? value : structuredClone(value);
+  return value == null ? value : structuredClone(value);
 }
 
 /**
@@ -55,7 +55,7 @@ export function clone(value) {
  * @returns {number}
  */
 export function countRecords(value) {
-	if (Array.isArray(value)) return value.length;
-	if (value == null) return 0;
-	return Object.keys(value).length;
+  if (Array.isArray(value)) return value.length;
+  if (value == null) return 0;
+  return Object.keys(value).length;
 }

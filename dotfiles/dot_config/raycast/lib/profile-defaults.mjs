@@ -33,8 +33,8 @@
  */
 
 export const PROFILE_USER_DEFAULTS = {
-	currentUser: "CurrentUser",
-	oauthToken: "OAuthTokenResponse",
+  currentUser: "CurrentUser",
+  oauthToken: "OAuthTokenResponse",
 };
 
 /**
@@ -43,14 +43,14 @@ export const PROFILE_USER_DEFAULTS = {
  * @returns {RaycastProfilePayload}
  */
 export function parseProfilePayload(currentUser, oauthToken) {
-	if (!currentUser || !oauthToken) {
-		throw new Error("current user and OAuth token JSON are required");
-	}
+  if (!currentUser || !oauthToken) {
+    throw new Error("current user and OAuth token JSON are required");
+  }
 
-	return {
-		currentUser: JSON.parse(currentUser),
-		oauthToken: JSON.parse(oauthToken),
-	};
+  return {
+    currentUser: JSON.parse(currentUser),
+    oauthToken: JSON.parse(oauthToken),
+  };
 }
 
 /**
@@ -58,12 +58,12 @@ export function parseProfilePayload(currentUser, oauthToken) {
  * @returns {void}
  */
 export function validateProfilePayload({ currentUser, oauthToken }) {
-	if (!currentUser?.id || !currentUser?.name) {
-		throw new Error("current user payload is missing id or name");
-	}
-	if (!oauthToken?.access_token) {
-		throw new Error("OAuth token payload is missing access_token");
-	}
+  if (!currentUser?.id || !currentUser?.name) {
+    throw new Error("current user payload is missing id or name");
+  }
+  if (!oauthToken?.access_token) {
+    throw new Error("OAuth token payload is missing access_token");
+  }
 }
 
 /**
@@ -72,20 +72,20 @@ export function validateProfilePayload({ currentUser, oauthToken }) {
  * @returns {Promise<RaycastCurrentUser>}
  */
 export async function applyProfileDefaults(db, profile) {
-	validateProfilePayload(profile);
+  validateProfilePayload(profile);
 
-	await db.userDefaults.set(
-		PROFILE_USER_DEFAULTS.currentUser,
-		JSON.stringify(profile.currentUser),
-	);
-	await db.userDefaults.set(
-		PROFILE_USER_DEFAULTS.oauthToken,
-		JSON.stringify(profile.oauthToken),
-	);
+  await db.userDefaults.set(
+    PROFILE_USER_DEFAULTS.currentUser,
+    JSON.stringify(profile.currentUser),
+  );
+  await db.userDefaults.set(
+    PROFILE_USER_DEFAULTS.oauthToken,
+    JSON.stringify(profile.oauthToken),
+  );
 
-	const stored = await db.userDefaults.get(PROFILE_USER_DEFAULTS.currentUser);
-	if (!stored) throw new Error("CurrentUser was not stored");
-	return JSON.parse(stored);
+  const stored = await db.userDefaults.get(PROFILE_USER_DEFAULTS.currentUser);
+  if (!stored) throw new Error("CurrentUser was not stored");
+  return JSON.parse(stored);
 }
 
 /**
@@ -93,9 +93,9 @@ export async function applyProfileDefaults(db, profile) {
  * @returns {string}
  */
 export function profileSummary(stored) {
-	return [
-		`OK - ${stored.name}`,
-		`pro:${stored.has_pro_features}`,
-		`sub:${stored.subscription?.status}`,
-	].join(" | ");
+  return [
+    `OK - ${stored.name}`,
+    `pro:${stored.has_pro_features}`,
+    `sub:${stored.subscription?.status}`,
+  ].join(" | ");
 }

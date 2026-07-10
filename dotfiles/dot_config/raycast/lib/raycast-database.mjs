@@ -44,31 +44,31 @@ const require = createRequire(import.meta.url);
  */
 
 export const DEFAULT_APP_SUPPORT =
-	"~/Library/Application Support/com.raycast-x.macos";
+  "~/Library/Application Support/com.raycast-x.macos";
 export const DEFAULT_APP_BUNDLE = "/Applications/Raycast Beta.app";
 export const DEFAULT_DATA_ADDON =
-	"Contents/Resources/macos-app_RaycastDesktopApp.bundle/Contents/Resources/backend/data.darwin-arm64.node";
+  "Contents/Resources/macos-app_RaycastDesktopApp.bundle/Contents/Resources/backend/data.darwin-arm64.node";
 
 /**
  * @param {string} appSupport
  * @returns {Promise<string | undefined>}
  */
 export async function latestRaycastNodeBin(appSupport) {
-	const runtimeDir = path.join(appSupport, "node/runtime");
-	if (!(await pathExists(runtimeDir))) return undefined;
+  const runtimeDir = path.join(appSupport, "node/runtime");
+  if (!(await pathExists(runtimeDir))) return undefined;
 
-	const entries = await readdir(runtimeDir, { withFileTypes: true });
-	const bins = [];
-	for (const entry of entries) {
-		if (!entry.isDirectory() || !entry.name.startsWith("node-v")) continue;
+  const entries = await readdir(runtimeDir, { withFileTypes: true });
+  const bins = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith("node-v")) continue;
 
-		const bin = path.join(runtimeDir, entry.name, "bin");
-		if (await pathExists(path.join(bin, "node"))) bins.push(bin);
-	}
+    const bin = path.join(runtimeDir, entry.name, "bin");
+    if (await pathExists(path.join(bin, "node"))) bins.push(bin);
+  }
 
-	return bins.toSorted((a, b) =>
-		b.localeCompare(a, undefined, { numeric: true }),
-	)[0];
+  return bins.toSorted((a, b) =>
+    b.localeCompare(a, undefined, { numeric: true }),
+  )[0];
 }
 
 /**
@@ -76,17 +76,17 @@ export async function latestRaycastNodeBin(appSupport) {
  * @returns {Promise<string | undefined>}
  */
 export async function findKeyFile(appSupport) {
-	const configured = expandHome(process.env.RAYCAST_KEY_FILE);
-	if (configured) return configured;
+  const configured = expandHome(process.env.RAYCAST_KEY_FILE);
+  if (configured) return configured;
 
-	const nodeBin = await latestRaycastNodeBin(appSupport);
-	if (nodeBin) {
-		const cached = path.join(nodeBin, ".raycast-key-cache");
-		if (await pathExists(cached)) return cached;
-	}
+  const nodeBin = await latestRaycastNodeBin(appSupport);
+  if (nodeBin) {
+    const cached = path.join(nodeBin, ".raycast-key-cache");
+    if (await pathExists(cached)) return cached;
+  }
 
-	const lastKey = path.join(appSupport, "last_key");
-	return (await pathExists(lastKey)) ? lastKey : undefined;
+  const lastKey = path.join(appSupport, "last_key");
+  return (await pathExists(lastKey)) ? lastKey : undefined;
 }
 
 /**
@@ -94,16 +94,16 @@ export async function findKeyFile(appSupport) {
  * @returns {Promise<string>}
  */
 export async function readKey(keyFile) {
-	if (!keyFile) throw new Error("Raycast database key file was not found");
+  if (!keyFile) throw new Error("Raycast database key file was not found");
 
-	const bytes = await readFile(keyFile);
-	if (bytes.includes(0)) {
-		throw new Error(
-			`${keyFile} contains raw key bytes; use the runtime .raycast-key-cache dumped by keydump.cjs`,
-		);
-	}
+  const bytes = await readFile(keyFile);
+  if (bytes.includes(0)) {
+    throw new Error(
+      `${keyFile} contains raw key bytes; use the runtime .raycast-key-cache dumped by keydump.cjs`,
+    );
+  }
 
-	return bytes.toString("utf8").trim();
+  return bytes.toString("utf8").trim();
 }
 
 /**
@@ -111,17 +111,17 @@ export async function readKey(keyFile) {
  * @returns {RaycastDatabaseClient}
  */
 export function openDatabaseWithKey({ appSupport, key, nativeAddon }) {
-	/** @type {RaycastNativeAddon} */
-	const raycastData = require(nativeAddon);
-	const db = new raycastData.DatabaseClient(appSupport, key, () => {});
+  /** @type {RaycastNativeAddon} */
+  const raycastData = require(nativeAddon);
+  const db = new raycastData.DatabaseClient(appSupport, key, () => {});
 
-	if (!db.initReport?.overallSuccess) {
-		throw new Error(
-			`failed to open Raycast database: ${JSON.stringify(db.initReport)}`,
-		);
-	}
+  if (!db.initReport?.overallSuccess) {
+    throw new Error(
+      `failed to open Raycast database: ${JSON.stringify(db.initReport)}`,
+    );
+  }
 
-	return db;
+  return db;
 }
 
 /**
@@ -130,44 +130,44 @@ export function openDatabaseWithKey({ appSupport, key, nativeAddon }) {
  * @returns {Promise<RaycastDatabaseContext>}
  */
 export async function loadDatabase() {
-	const appSupport = expandHome(
-		process.env.RAYCAST_APP_SUPPORT || DEFAULT_APP_SUPPORT,
-	);
-	const appBundle = expandHome(
-		process.env.RAYCAST_APP_BUNDLE || DEFAULT_APP_BUNDLE,
-	);
-	const addon = expandHome(
-		process.env.RAYCAST_DATA_ADDON || path.join(appBundle, DEFAULT_DATA_ADDON),
-	);
+  const appSupport = expandHome(
+    process.env.RAYCAST_APP_SUPPORT || DEFAULT_APP_SUPPORT,
+  );
+  const appBundle = expandHome(
+    process.env.RAYCAST_APP_BUNDLE || DEFAULT_APP_BUNDLE,
+  );
+  const addon = expandHome(
+    process.env.RAYCAST_DATA_ADDON || path.join(appBundle, DEFAULT_DATA_ADDON),
+  );
 
-	const keyFile = await findKeyFile(appSupport);
-	const key = await readKey(keyFile);
-	const db = openDatabaseWithKey({
-		appSupport,
-		key,
-		nativeAddon: addon,
-	});
+  const keyFile = await findKeyFile(appSupport);
+  const key = await readKey(keyFile);
+  const db = openDatabaseWithKey({
+    appSupport,
+    key,
+    nativeAddon: addon,
+  });
 
-	return { db, appSupport, keyFile };
+  return { db, appSupport, keyFile };
 }
 
 /**
  * @returns {string}
  */
 export function dataAddonPath() {
-	const appBundle = expandHome(
-		process.env.RAYCAST_APP_BUNDLE || DEFAULT_APP_BUNDLE,
-	);
-	return expandHome(
-		process.env.RAYCAST_DATA_ADDON || path.join(appBundle, DEFAULT_DATA_ADDON),
-	);
+  const appBundle = expandHome(
+    process.env.RAYCAST_APP_BUNDLE || DEFAULT_APP_BUNDLE,
+  );
+  return expandHome(
+    process.env.RAYCAST_DATA_ADDON || path.join(appBundle, DEFAULT_DATA_ADDON),
+  );
 }
 
 /**
  * @returns {RaycastNativeAddon}
  */
 export function loadRaycastDataAddon() {
-	return require(dataAddonPath());
+  return require(dataAddonPath());
 }
 
 /**
@@ -175,8 +175,8 @@ export function loadRaycastDataAddon() {
  * @returns {string}
  */
 export function backupPath(appSupport) {
-	return expandHome(
-		process.env.RAYCAST_AI_DISABLE_BACKUP ||
-			path.join(appSupport, "raycast-ai-disable-backup.json"),
-	);
+  return expandHome(
+    process.env.RAYCAST_AI_DISABLE_BACKUP ||
+      path.join(appSupport, "raycast-ai-disable-backup.json"),
+  );
 }

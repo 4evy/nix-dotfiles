@@ -18,27 +18,27 @@ export const RAYCAST_DEFAULTS_DOMAIN = "com.raycast-x.macos";
  * @returns {Promise<MacOSDefaultValue>}
  */
 export async function readMacOSDefault({ key, restoreType }) {
-	try {
-		const { stdout } = await execFile("defaults", [
-			"read",
-			RAYCAST_DEFAULTS_DOMAIN,
-			key,
-		]);
-		const value = stdout.trimEnd();
-		return {
-			exists: true,
-			key,
-			restoreType,
-			value: restoreType === "bool" ? value === "1" : value,
-		};
-	} catch {
-		return {
-			exists: false,
-			key,
-			restoreType,
-			value: null,
-		};
-	}
+  try {
+    const { stdout } = await execFile("defaults", [
+      "read",
+      RAYCAST_DEFAULTS_DOMAIN,
+      key,
+    ]);
+    const value = stdout.trimEnd();
+    return {
+      exists: true,
+      key,
+      restoreType,
+      value: restoreType === "bool" ? value === "1" : value,
+    };
+  } catch {
+    return {
+      exists: false,
+      key,
+      restoreType,
+      value: null,
+    };
+  }
 }
 
 /**
@@ -46,9 +46,9 @@ export async function readMacOSDefault({ key, restoreType }) {
  * @returns {Promise<void>}
  */
 export async function deleteMacOSDefault({ key }) {
-	await execFile("defaults", ["delete", RAYCAST_DEFAULTS_DOMAIN, key]).catch(
-		() => {},
-	);
+  await execFile("defaults", ["delete", RAYCAST_DEFAULTS_DOMAIN, key]).catch(
+    () => {},
+  );
 }
 
 /**
@@ -56,20 +56,20 @@ export async function deleteMacOSDefault({ key }) {
  * @returns {Promise<void>}
  */
 export async function restoreMacOSDefault(defaultValue) {
-	if (!defaultValue.exists) {
-		await deleteMacOSDefault(defaultValue);
-		return;
-	}
+  if (!defaultValue.exists) {
+    await deleteMacOSDefault(defaultValue);
+    return;
+  }
 
-	const valueArgs =
-		defaultValue.restoreType === "bool"
-			? ["-bool", defaultValue.value ? "true" : "false"]
-			: ["-string", String(defaultValue.value)];
+  const valueArgs =
+    defaultValue.restoreType === "bool"
+      ? ["-bool", defaultValue.value ? "true" : "false"]
+      : ["-string", String(defaultValue.value)];
 
-	await execFile("defaults", [
-		"write",
-		RAYCAST_DEFAULTS_DOMAIN,
-		defaultValue.key,
-		...valueArgs,
-	]);
+  await execFile("defaults", [
+    "write",
+    RAYCAST_DEFAULTS_DOMAIN,
+    defaultValue.key,
+    ...valueArgs,
+  ]);
 }
