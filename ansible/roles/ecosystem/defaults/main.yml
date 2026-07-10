@@ -27,6 +27,8 @@ ecosystem_nix_profile_packages:
     bin: nh
   - package: nil
     bin: nil
+  - package: nix
+    bin: nix-instantiate
   - package: nix-output-monitor
     bin: nom
   - package: nix-tree
