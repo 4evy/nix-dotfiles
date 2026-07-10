@@ -118,15 +118,13 @@ def alt_tab_license_entrypoint() -> None:
 def _shottr_license_key() -> str:
     repository = find_repo_root(Path.cwd())
     secrets = repository / "secrets/secrets.yaml"
-    key = output(
-        (
-            "sops",
-            "--decrypt",
-            "--extract",
-            '["shottr-license-key"]',
-            os.fspath(secrets),
-        )
-    ).strip()
+    key = output((
+        "sops",
+        "--decrypt",
+        "--extract",
+        '["shottr-license-key"]',
+        os.fspath(secrets),
+    )).strip()
     if not re.fullmatch(r"[A-Z0-9]{6}(?:-[A-Z0-9]{6}){4}", key):
         raise DotfilesError("Shottr license key in SOPS has an unexpected format")
     return key
