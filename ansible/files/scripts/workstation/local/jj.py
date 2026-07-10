@@ -12,6 +12,9 @@ from workstation.errors import DotfilesError
 from workstation.lib.commands import output, run, which
 from workstation.lib.files import write_if_changed
 
+_REDATE_INTERACTIVE_REVSET = "mutable() & remote_bookmarks().."
+_REDATE_INTERACTIVE_LIMIT = "20"
+
 
 def _jj() -> tuple[str, ...]:
     root = os.environ.get("JJ_WORKSPACE_ROOT")
@@ -325,18 +328,39 @@ def _redate_args(args: list[str]) -> list[str]:
             raise SystemExit(f"jj-redate: unknown option: {value}")
         else:
             result.append(value)
-    return result or ["@"]
+    return result
+
+
+def _gum() -> str | None:
+    path = which("gum")
+    return os.fspath(path) if path is not None else None
+
+
+def _redate_selectable_revset() -> str:
+    return os.environ.get("JJ_REDATE_REVSET", _REDATE_INTERACTIVE_REVSET)
+
+
+def _redate_selectable_limit() -> str:
+    return os.environ.get("JJ_REDATE_LIMIT", _REDATE_INTERACTIVE_LIMIT)
 
 
 def _prompt(label: str, default: str) -> str:
-    use_gum = (
+    gum = _gum()
+    if (
         not os.environ.get("JJ_REDATE_NO_GUM")
         and sys.stdin.isatty()
         and sys.stdout.isatty()
-        and which("gum") is not None
-    )
-    if use_gum:
-        return output(("gum", "input", "--prompt", label, "--value", default))
+        and gum is not None
+    ):
+        result = subprocess.run(
+            (gum, "input", "--prompt", label, "--value", default),
+            check=False,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        if result.returncode == 0:
+            return result.stdout.rstrip("\n")
+        raise DotfilesError(f"command failed ({result.returncode}): gum input")
     try:
         return input(label) or default
     except EOFError:
@@ -369,24 +393,22 @@ def _timestamp() -> str:
 
 def _confirm_redate(revisions: list[str], timestamp: str) -> bool:
     label = " ".join(revisions)
+    gum = _gum()
     if (
         not os.environ.get("JJ_REDATE_NO_GUM")
         and sys.stdin.isatty()
         and sys.stdout.isatty()
-        and which("gum") is not None
+        and gum is not None
     ):
-        return (
-            run(
-                (
-                    "gum",
-                    "confirm",
-                    f"Set author and committer timestamp on {label} to {timestamp}?",
-                ),
-                check=False,
-                capture=True,
-            ).returncode
-            == 0
+        result = subprocess.run(
+            (
+                gum,
+                "confirm",
+                f"Set author and committer timestamp on {label} to {timestamp}?",
+            ),
+            check=False,
         )
+        return result.returncode == 0
     print(
         f"Setting author and committer timestamp on {label} to {timestamp}",
         file=sys.stderr,
@@ -399,6 +421,79 @@ def _log(revset: str, template: str, reverse: bool = False) -> str:
     if reverse:
         args.append("--reversed")
     return output((*args, "--no-graph", "--template", template))
+
+
+def _redate_selectable_items(revset: str, limit: str) -> list[tuple[str, str]]:
+    template = (
+        'change_id ++ "\\t" ++ '
+        'if(current_working_copy, "@", "o") ++ "\\t" ++ '
+        'change_id.shortest(8) ++ "\\t" ++ '
+        'author.email() ++ "\\t" ++ '
+        'committer.timestamp().format("%Y-%m-%d %H:%M:%S") ++ "\\t" ++ '
+        'commit_id.shortest(8) ++ "\\t" ++ '
+        'description.first_line() ++ "\\n"'
+    )
+    items: list[tuple[str, str]] = []
+    for line in _log(f"latest(({revset}), {limit})", template).splitlines():
+        fields = line.split("\t", 6)
+        if len(fields) != 7:
+            continue
+        change, marker, short_change, email, timestamp, short_commit, description = (
+            fields
+        )
+        summary = " ".join(description.split()) or "(no description set)"
+        label = f"{marker} {short_change} {email} {timestamp} {short_commit}  {summary}"
+        items.append((label, f"change_id({change})"))
+    return items
+
+
+def _interactive_redate_revisions() -> list[str] | None:
+    gum = _gum()
+    if (
+        os.environ.get("JJ_REDATE_NO_GUM")
+        or not sys.stdin.isatty()
+        or not sys.stdout.isatty()
+        or gum is None
+    ):
+        return None
+    revset = _redate_selectable_revset()
+    limit = _redate_selectable_limit()
+    items = _redate_selectable_items(revset, limit)
+    if not items:
+        raise DotfilesError(f"jj-redate: no revisions matched {revset!r}")
+    labels = [label for label, _ in items]
+    revsets_by_label = dict(items)
+    height = str(min(max(len(items), 5), 20))
+    result = subprocess.run(
+        (
+            gum,
+            "choose",
+            "--ordered",
+            "--limit",
+            str(len(items)),
+            "--height",
+            height,
+            "--header",
+            "Select revisions to redate",
+            *labels,
+        ),
+        check=False,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode == 0:
+        selected = [line for line in result.stdout.splitlines() if line]
+        if selected:
+            return [revsets_by_label[line] for line in selected]
+        raise DotfilesError("jj-redate: no revisions selected")
+    raise DotfilesError(f"command failed ({result.returncode}): gum choose")
+
+
+def _redate_revisions(args: list[str]) -> list[str]:
+    revisions = _redate_args(args)
+    if revisions:
+        return revisions
+    return _interactive_redate_revisions() or ["@"]
 
 
 def _timestamp_run(timestamp: str, *args: str) -> None:
@@ -498,7 +593,7 @@ def jj_redate_entrypoint() -> None:
         if any(value in {"-h", "--help"} for value in arguments):
             print("usage: jj-redate [-r REVSET] [REVSETS]...")
             return
-        revisions = _redate_args(arguments)
+        revisions = _redate_revisions(arguments)
         revset = " | ".join(f"({value})" for value in revisions)
         timestamp = _timestamp()
         if not _confirm_redate(revisions, timestamp):
