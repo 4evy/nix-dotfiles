@@ -161,11 +161,25 @@ end
 # GUI applications
 if OS.mac?
   cask "1password"
+  cask "alt-tab"
+  cask "appcleaner"
+  cask "brave-browser"
   cask "discord"
+  cask "docker-desktop", args: { "no-binaries": true }, no_upgrade: true
+  cask "firefox"
   cask "ghostty@tip", greedy: true
+  cask "google-chrome"
   cask "helium-browser"
+  cask "iina"
+  cask "itsycal"
+  cask "libreoffice"
+  cask "prismlauncher"
   cask "rustdesk"
+  cask "shottr"
+  cask "stats"
+  cask "telegram"
   cask "visual-studio-code"
+  # Raycast Beta is installed by ansible/roles/applications/tasks/macos.yml.
 end
 
 # Fonts
