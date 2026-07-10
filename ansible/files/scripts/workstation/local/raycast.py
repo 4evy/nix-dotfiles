@@ -65,21 +65,24 @@ def _restore_node(node: Path, real: Path, hook: Path) -> None:
     hook.unlink(missing_ok=True)
 
 
-def _write_node_wrapper(node: Path, real: Path, hook: Path) -> None:
+def _write_node_wrapper(node: Path, real: Path, hook: Path, key_file: Path) -> None:
     script = f"""#!/usr/bin/env python3
 from __future__ import annotations
 import os
 import sys
 real = {os.fspath(real)!r}
 hook = {os.fspath(hook)!r}
-os.execv(real, (real, "--require", hook, *sys.argv[1:]))
+key_file = {os.fspath(key_file)!r}
+environment = os.environ.copy()
+environment["RAYCAST_KEYDUMP_FILE"] = key_file
+os.execve(real, (real, "--require", hook, *sys.argv[1:]), environment)
 """
     write_if_changed(node, script, "0755")
 
 
 def _extract_key(
     app_support: Path, hook_source: Path, beta_app: Path
-) -> tuple[Path, str]:
+) -> tuple[Path, Path]:
     directory = _node_directory(app_support)
     hook = directory / ".keydump.cjs"
     key_file = directory / ".raycast-key-cache"
@@ -89,15 +92,13 @@ def _extract_key(
         _restore_node(node, real, hook)
     cached = _read_key(key_file)
     if cached is not None:
-        return node, cached
-    source = require_file(hook_source).read_text()
-    write_if_changed(
-        hook,
-        source.replace("__KEY_FILE_JSON__", json.dumps(os.fspath(key_file))),
-    )
+        _log(f"using cached Raycast DB key: {key_file}")
+        return node, key_file
+    require_file(hook_source)
+    write_if_changed(hook, f"require({json.dumps(os.fspath(hook_source))});\n")
     node.replace(real)
     try:
-        _write_node_wrapper(node, real, hook)
+        _write_node_wrapper(node, real, hook, key_file)
         _log("extracting Raycast DB key")
         run(("open", beta_app))
         captured = wait_until(key_file.is_file, attempts=30, interval=1)
@@ -113,7 +114,7 @@ def _extract_key(
     finally:
         _restore_node(node, real, hook)
     _log(f"Raycast DB key extracted: {key[:16]}... ({len(key)} bytes)")
-    return node, key
+    return node, key_file
 
 
 def _resize_avatar(source: Path, destination: Path) -> None:
@@ -172,9 +173,7 @@ def main() -> int:
         os.environ.get("RAYCAST_PROFILE_FILE", profile_dir / "profile.toml")
     )
     hook = Path(os.environ.get("RAYCAST_KEYDUMP_HOOK", profile_dir / "keydump.cjs"))
-    bridge = Path(
-        os.environ.get("RAYCAST_USER_DEFAULTS_BRIDGE", profile_dir / "bridge.cjs")
-    )
+    raycast_db = Path(os.environ.get("RAYCAST_DB_CLI", profile_dir / "raycast-db.mjs"))
     if not beta_app.is_dir():
         _warn("Raycast Beta not found; skipping Raycast Beta user patch")
         return 0
@@ -184,8 +183,8 @@ def main() -> int:
     with require_file(profile_file).open("rb") as profile_handle:
         profile = tomllib.load(profile_handle)
     require_file(hook)
-    require_file(bridge)
-    node, key = _extract_key(app_support, hook, beta_app)
+    require_file(raycast_db)
+    node, key_file = _extract_key(app_support, hook, beta_app)
     avatar = _ensure_avatar(profile, app_support)
     current_user = profile.get("current_user")
     oauth_token = profile.get("oauth_token")
@@ -200,15 +199,21 @@ def main() -> int:
     avatar_url = avatar.resolve().as_uri()
     current_user["image"] = avatar_url
     current_user["avatar"] = avatar_url
-    run((
-        node,
-        bridge,
-        app_support,
-        key,
-        data_node,
-        json.dumps(current_user, separators=(",", ":")),
-        json.dumps(oauth_token, separators=(",", ":")),
-    ))
+    run(
+        (
+            node,
+            raycast_db,
+            "profile",
+            "apply",
+            json.dumps(current_user, separators=(",", ":")),
+            json.dumps(oauth_token, separators=(",", ":")),
+        ),
+        env={
+            "RAYCAST_APP_SUPPORT": os.fspath(app_support),
+            "RAYCAST_DATA_ADDON": os.fspath(data_node),
+            "RAYCAST_KEY_FILE": os.fspath(key_file),
+        },
+    )
     _log("starting Raycast Beta")
     run(("open", beta_app))
     _log("Raycast Beta started")
