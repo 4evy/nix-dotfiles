@@ -123,7 +123,8 @@ brew "openssh"
 brew "sshpass"
 # Linux Tailscale is a host service managed by the image and host-layer scripts.
 if OS.mac?
-  brew "tailscale", restart_service: true
+  # tailscaled requires a boot-level root service; Ansible owns that service.
+  brew "tailscale"
 end
 brew "wget"
 

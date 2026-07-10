@@ -70,6 +70,89 @@
     - macos
     - tailscale
 
+- name: Detect legacy user-scoped Tailscale service
+  ansible.builtin.stat:
+    path: "{{ dotfiles_home_dir }}/Library/LaunchAgents/homebrew.mxcl.tailscale.plist"
+  register: prerequisites_tailscale_user_service
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - macos
+    - tailscale
+
+- name: Stop legacy user-scoped Tailscale service
+  ansible.builtin.command:
+    argv:
+      - /opt/homebrew/bin/brew
+      - services
+      - stop
+      - tailscale
+  environment:
+    HOME: "{{ dotfiles_home_dir }}"
+    PATH: /opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin
+  changed_when: true
+  when:
+    - common_is_macos
+    - prerequisites_tailscale_user_service.stat.exists
+  tags:
+    - bootstrap
+    - macos
+    - tailscale
+
+- name: Detect system Tailscale service definition
+  ansible.builtin.stat:
+    path: /Library/LaunchDaemons/homebrew.mxcl.tailscale.plist
+  register: prerequisites_tailscale_system_service
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - macos
+    - tailscale
+
+- name: Install Tailscale as a system launch daemon
+  ansible.builtin.command:
+    argv:
+      - /opt/homebrew/bin/brew
+      - services
+      - start
+      - tailscale
+  environment:
+    PATH: /opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin
+  become: true
+  register: prerequisites_tailscale_system_service_install
+  changed_when: >-
+    'Successfully started' in prerequisites_tailscale_system_service_install.stdout
+  when:
+    - common_is_macos
+    - not prerequisites_tailscale_system_service.stat.exists
+  tags:
+    - bootstrap
+    - macos
+    - tailscale
+
+- name: Ensure the Tailscale system launch daemon is running
+  community.general.launchd:
+    name: homebrew.mxcl.tailscale
+    enabled: true
+    state: started
+  become: true
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - macos
+    - tailscale
+
+- name: Wait for the Tailscale daemon socket
+  ansible.builtin.wait_for:
+    path: /var/run/tailscaled.socket
+    state: present
+    timeout: 15
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - macos
+    - tailscale
+
 - name: Install Tailscale SSH launch daemon helper
   ansible.builtin.template:
     src: "{{ dotfiles_ansible_dir }}/files/scripts/macos/templates/tailscale-ssh-helper.py.in"
@@ -82,6 +165,19 @@
   vars:
     prerequisites_tailscale_bin: /opt/homebrew/bin/tailscale
   become: true
+  register: prerequisites_tailscale_ssh_helper_result
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - macos
+    - tailscale
+
+- name: Remove legacy Tailscale SSH shell helper
+  ansible.builtin.file:
+    path: /Library/Application Support/dotfiles/tailscale-ssh.sh
+    state: absent
+  become: true
+  register: prerequisites_tailscale_ssh_legacy_helper
   when: common_is_macos
   tags:
     - bootstrap
@@ -112,7 +208,14 @@
   community.general.launchd:
     name: dev.4evy.tailscale-ssh
     enabled: true
-    state: "{{ 'restarted' if prerequisites_tailscale_ssh_plist is changed else 'started' }}"
+    state: >-
+      {{
+        'restarted'
+        if prerequisites_tailscale_ssh_helper_result is changed
+        or prerequisites_tailscale_ssh_legacy_helper is changed
+        or prerequisites_tailscale_ssh_plist is changed
+        else 'started'
+      }}
   become: true
   when: common_is_macos
   tags:
