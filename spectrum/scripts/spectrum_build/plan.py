@@ -17,7 +17,10 @@ from spectrum_build.image.services import (
     enable_required_units,
 )
 from spectrum_build.image.shell import align_shell_defaults
-from spectrum_build.integrations.repositories import install_repositories
+from spectrum_build.integrations.repositories import (
+    disable_repositories,
+    install_repositories,
+)
 from spectrum_build.manifests.packages import (
     EXTERNAL_REPOSITORY_PACKAGES,
     OPTIONAL_PACKAGES,
@@ -69,6 +72,7 @@ def install_external_repository_packages(context: BuildContext) -> None:
             f"Installing packages from isolated repository: {repo_id}", file=sys.stderr
         )
         context.dnf.install(packages, enabled_repositories=(repo_id,))
+        disable_repositories(context.config.context_dir)
 
 
 def configure_system(context: BuildContext) -> None:

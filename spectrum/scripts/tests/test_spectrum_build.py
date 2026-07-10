@@ -17,9 +17,8 @@ from spectrum_build.image.shell import (
     patch_brew_profile_guard,
     remove_bluefin_open_alias,
 )
-from spectrum_build.integrations import github
+from spectrum_build.integrations import github, repositories
 from spectrum_build.integrations.dnf import Dnf
-from spectrum_build.integrations.repositories import disabled_repository_config
 from spectrum_build.integrations.source_build import (
     PinnedGitProject,
     clone_pinned_git_ref,
@@ -126,12 +125,31 @@ def test_dnf_cli_preserves_optional_and_signature_flags(
 def test_repository_configuration_is_disabled_and_validated() -> None:
     content = b"[vendor]\nname=Vendor\nenabled=1\nbaseurl=https://example.invalid\n"
 
-    result = disabled_repository_config(content, ("vendor",)).decode()
+    result = repositories.disabled_repository_config(content, ("vendor",)).decode()
 
     assert "[vendor]" in result
     assert "enabled=0" in result
     with pytest.raises(BuildError, match="missing sections: other"):
-        disabled_repository_config(content, ("other",))
+        repositories.disabled_repository_config(content, ("other",))
+
+
+def test_installed_repository_configuration_is_redisabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "vendor.repo"
+    destination.write_text(
+        "[vendor]\nname=Vendor\nenabled=1\nbaseurl=https://example.invalid\n"
+    )
+    repository = repositories.RepositoryFile(
+        destination=destination,
+        source=destination,
+        repo_ids=("vendor",),
+    )
+    monkeypatch.setattr(repositories, "repository_files", lambda _: (repository,))
+
+    repositories.disable_repositories(tmp_path)
+
+    assert "enabled=0" in destination.read_text()
 
 
 def test_github_sdk_selects_matching_release_asset(

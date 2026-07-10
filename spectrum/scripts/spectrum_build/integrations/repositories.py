@@ -80,6 +80,19 @@ def install_repositories(context: BuildContext) -> None:
             context.runner.run(["rpm", "--import", source.destination])
 
 
+def disable_repositories(context_dir: Path) -> None:
+    for repository in repository_files(context_dir):
+        if not repository.repo_ids:
+            continue
+        require_readable_file(repository.destination)
+        atomic_write(
+            repository.destination,
+            disabled_repository_config(
+                repository.destination.read_bytes(), repository.repo_ids
+            ),
+        )
+
+
 def validate_repositories_disabled(context_dir: Path) -> None:
     for repository in repository_files(context_dir):
         if not repository.repo_ids:
