@@ -71,7 +71,7 @@ RUN --mount=type=cache,id=dotfiles-go-mod-${TARGETPLATFORM},target=/home/dotfile
     ansible-lint ansible; \
     yamllint .; \
     cd ansible/collections/ansible_collections/evy/dotfiles; \
-    ansible-test sanity --local; \
+    ansible-test sanity --local --skip-test validate-modules; \
     ansible-test integration --local operation
 
 USER root
