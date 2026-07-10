@@ -1,7 +1,2 @@
-#!/usr/bin/env python3
-from __future__ import annotations
-
-import os
-
-command = {{ joinPath .chezmoi.homeDir ".local/bin/ghostty-zellij" | quote }}
-os.execv(command, (command,))
+#!/bin/sh
+exec {{ joinPath .chezmoi.homeDir ".local/bin/ghostty-zellij" | quote }}
