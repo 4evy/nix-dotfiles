@@ -214,6 +214,24 @@ def main() -> int:
             "RAYCAST_KEY_FILE": os.fspath(key_file),
         },
     )
+    command_aliases = profile.get("command_aliases", [])
+    if command_aliases:
+        if not isinstance(command_aliases, list):
+            raise DotfilesError("profile command_aliases must be a list")
+        run(
+            (
+                node,
+                raycast_db,
+                "aliases",
+                "apply",
+                json.dumps(command_aliases, separators=(",", ":")),
+            ),
+            env={
+                "RAYCAST_APP_SUPPORT": os.fspath(app_support),
+                "RAYCAST_DATA_ADDON": os.fspath(data_node),
+                "RAYCAST_KEY_FILE": os.fspath(key_file),
+            },
+        )
     _log("starting Raycast Beta")
     run(("open", beta_app))
     _log("Raycast Beta started")

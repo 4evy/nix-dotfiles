@@ -23,3 +23,18 @@ refresh_token = "8AJuVJ7tWnLUZMgHafPwQQRxrBgZs"
 token_type = "Bearer"
 expires_in = 999999999
 scope = "read write"
+
+[[command_aliases]]
+id = "c:r:applications::*::application::=::/Applications/Ghostty.app"
+extension_id = "e:r:applications"
+alias = "terminal"
+
+[[command_aliases]]
+id = "c:r:applications::*::application::=::/Applications/Helium.app"
+extension_id = "e:r:applications"
+alias = "chrome"
+
+[[command_aliases]]
+id = "c:r:clipboard-history::-::history"
+extension_id = "e:r:clipboard-history"
+alias = "paste"

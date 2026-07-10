@@ -42,6 +42,8 @@ Commands:
       Print CurrentUser and OAuthTokenResponse user defaults.
   profile apply <current-user-json> <oauth-token-json> [--dry-run]
       Write CurrentUser and OAuthTokenResponse through the shared DB layer.
+  aliases apply <aliases-json> [--dry-run]
+      Upsert command aliases from JSON.
   user-default get <key>
       Read one Raycast user default, parsed as JSON when possible.
   user-default set <key> <value> [--dry-run]
@@ -161,6 +163,105 @@ function parseJsonArgument(value) {
 	} catch (error) {
 		throw new Error(`invalid JSON: ${error.message}`);
 	}
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ id: string, extensionId: string, alias: string | null, enabled?: boolean }[]}
+ */
+function parseAliasPayload(value) {
+	if (!Array.isArray(value)) {
+		throw new Error("aliases payload must be a JSON array");
+	}
+
+	return value.map((entry, index) => {
+		if (!entry || typeof entry !== "object") {
+			throw new Error(`alias entry ${index} must be an object`);
+		}
+
+		const id = entry.id;
+		const extensionId = entry.extensionId ?? entry.extension_id;
+		const alias = entry.alias;
+		if (typeof id !== "string" || id.length === 0) {
+			throw new Error(`alias entry ${index} is missing id`);
+		}
+		if (typeof extensionId !== "string" || extensionId.length === 0) {
+			throw new Error(`alias entry ${index} is missing extensionId`);
+		}
+		if (alias !== null && typeof alias !== "string") {
+			throw new Error(`alias entry ${index} alias must be a string or null`);
+		}
+		if (typeof alias === "string" && /\s/.test(alias)) {
+			throw new Error(`alias entry ${index} alias cannot contain whitespace`);
+		}
+
+		return {
+			id,
+			extensionId,
+			alias: alias === "" ? null : alias,
+			...(typeof entry.enabled === "boolean" ? { enabled: entry.enabled } : {}),
+		};
+	});
+}
+
+/**
+ * @param {RaycastDatabaseContext["db"]} db
+ * @param {{ id: string, extensionId: string, alias: string | null, enabled?: boolean }[]} aliases
+ * @param {boolean} dryRun
+ * @returns {Promise<object[]>}
+ */
+async function applyCommandAliases(db, aliases, dryRun) {
+	const results = [];
+
+	for (const entry of aliases) {
+		const before = await db.settings.getCommandSettings(entry.id);
+		const enabled = entry.enabled ?? before?.enabled ?? true;
+		const update = {
+			id: entry.id,
+			extensionId: entry.extensionId,
+			enabled,
+			alias: entry.alias,
+		};
+
+		if (!dryRun) {
+			if (before) {
+				await db.settings.updateCommandSettings(entry.id, update);
+			} else {
+				await db.settings.addCommandSettings(update);
+			}
+		}
+
+		results.push({
+			id: entry.id,
+			before,
+			...(dryRun
+				? { plannedAfter: { ...before, ...update } }
+				: { after: await db.settings.getCommandSettings(entry.id) }),
+		});
+	}
+
+	return results;
+}
+
+/**
+ * @param {string[]} argv
+ * @returns {Promise<void>}
+ */
+async function runAliases(argv) {
+	const [action, payload] = withoutFlags(argv);
+	const dryRun = hasFlag(argv, "--dry-run");
+
+	if (action !== "apply" || !payload) {
+		throw new Error("usage: aliases apply <aliases-json> [--dry-run]");
+	}
+
+	const aliases = parseAliasPayload(JSON.parse(payload));
+	await withDatabase(async ({ db }) => {
+		printJson({
+			dryRun,
+			aliases: await applyCommandAliases(db, aliases, dryRun),
+		});
+	});
 }
 
 /**
@@ -298,6 +399,11 @@ async function run() {
 
 	if (command === "profile") {
 		await runProfile(argv);
+		return;
+	}
+
+	if (command === "aliases") {
+		await runAliases(argv);
 		return;
 	}
 
