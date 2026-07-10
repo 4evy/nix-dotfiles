@@ -11,6 +11,12 @@
   tags:
     - common
 
+- name: Gather missing operating system facts
+  ansible.builtin.setup:
+  when: "'system' not in ansible_facts"
+  tags:
+    - common
+
 - name: Set operating system facts
   ansible.builtin.set_fact:
     common_system: "{{ ansible_facts.system }}"
