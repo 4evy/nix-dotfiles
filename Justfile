@@ -21,6 +21,7 @@ nix_bin := "/nix/var/nix/profiles/default/bin/nix"
 nix_profile_bin_dir := env("HOME", "") + "/.nix-profile/bin"
 nixos_profile_bin_dir := "/run/current-system/sw/bin"
 nix_profile_tools := "deadnix:deadnix nh:nh nil:nil nix-instantiate:nix nom:nix-output-monitor nix-tree:nix-tree nixd:nixd nixfmt:nixfmt"
+pi_extension_profile_tools := "agent-statusline:github:euvlok/pkgs#agent-statusline agent-statusline-pi:github:euvlok/pkgs#agent-statusline-pi pi-ssh-tools:github:euvlok/pkgs#pi-ssh-tools web-search-pi:github:euvlok/pkgs#web-search-pi"
 export PATH := env("PATH", "") + ":" + nix_bin_dir + ":" + nix_profile_bin_dir + ":" + nixos_profile_bin_dir + ":" + homebrew_path
 
 alias a := apply
@@ -434,11 +435,16 @@ nix: (doctor 'nix')
     fi
 
     missing=()
-    for spec in {{ nix_profile_tools }}; do
+    for spec in {{ nix_profile_tools }} {{ pi_extension_profile_tools }}; do
       bin=${spec%%:*}
-      pkg=${spec#*:}
-      if ! command -v "$bin" >/dev/null 2>&1; then
-        missing+=("nixpkgs#$pkg")
+      source=${spec#*:}
+      if ! command -v "$bin" >/dev/null 2>&1 &&
+        [[ ! -e "$HOME/.nix-profile/bin/$bin" ]] &&
+        [[ ! -e "/run/current-system/sw/bin/$bin" ]]; then
+        if [[ $source != *'#'* ]]; then
+          source="nixpkgs#$source"
+        fi
+        missing+=("$source")
       fi
     done
 

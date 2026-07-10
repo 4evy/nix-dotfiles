@@ -177,9 +177,14 @@
     argv:
       - /bin/sh
       - -c
-      - command -v "$1"
+      - |
+        command -v "$1" >/dev/null 2>&1 \
+          || test -e "$2" \
+          || test -e "$3"
       - dotfiles-nix-profile-tool
       - "{{ item.bin }}"
+      - "{{ dotfiles_home_dir }}/.nix-profile/bin/{{ item.bin }}"
+      - "/run/current-system/sw/bin/{{ item.bin }}"
   changed_when: false
   failed_when: false
   check_mode: false
@@ -199,7 +204,7 @@
       - "{{ ecosystem_nix_command_bin }}"
       - profile
       - install
-      - "nixpkgs#{{ item.item.package }}"
+      - "{{ item.item.source | default('nixpkgs#' ~ item.item.package) }}"
   environment:
     PATH: "{{ ecosystem_nix_path }}"
   changed_when: true

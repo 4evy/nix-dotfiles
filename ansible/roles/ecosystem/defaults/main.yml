@@ -20,6 +20,7 @@ ecosystem_nix_paths:
   - "{{ dotfiles_home_dir }}/.nix-profile/bin"
   - "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
 ecosystem_nix_path: "{{ ecosystem_nix_paths | join(':') }}"
+ecosystem_eupkgs_flake: github:euvlok/pkgs
 ecosystem_nix_profile_packages:
   - package: deadnix
     bin: deadnix
@@ -37,3 +38,15 @@ ecosystem_nix_profile_packages:
     bin: nixd
   - package: nixfmt
     bin: nixfmt
+  - package: agent-statusline
+    bin: agent-statusline
+    source: "{{ ecosystem_eupkgs_flake }}#agent-statusline"
+  - package: agent-statusline-pi
+    bin: agent-statusline-pi
+    source: "{{ ecosystem_eupkgs_flake }}#agent-statusline-pi"
+  - package: pi-ssh-tools
+    bin: pi-ssh-tools
+    source: "{{ ecosystem_eupkgs_flake }}#pi-ssh-tools"
+  - package: web-search-pi
+    bin: web-search-pi
+    source: "{{ ecosystem_eupkgs_flake }}#web-search-pi"
