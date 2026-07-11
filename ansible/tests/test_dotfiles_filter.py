@@ -8,7 +8,9 @@ from typing import cast
 
 
 def _merge_filter() -> Callable[[object, str], str]:
-    plugin = runpy.run_path(os.fspath(Path(__file__).parents[1] / "dotfiles.py"))
+    plugin = runpy.run_path(
+        os.fspath(Path(__file__).parents[1] / "plugins/filter/dotfiles.py")
+    )
     return cast("Callable[[object, str], str]", plugin["merge_gvariant_string_list"])
 
 

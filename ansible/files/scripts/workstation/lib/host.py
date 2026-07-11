@@ -118,7 +118,7 @@ def enable_gnome_extensions(*uuids: str) -> None:
     current = result.stdout.strip().removeprefix("@as ").strip()
     try:
         enabled = ast.literal_eval(current)
-    except SyntaxError, ValueError:
+    except (SyntaxError, ValueError):  # fmt: skip
         return
     if not isinstance(enabled, list):
         return

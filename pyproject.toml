@@ -59,7 +59,7 @@ zellij-default-shell = "workstation.local.user_commands:zellij_default_shell_ent
 dev = ["pytest>=9,<10", "ruff>=0.15.20,<0.16", "ty>=0.0.57,<0.1"]
 
 [tool.uv]
-required-version = ">=0.11.28,<0.12"
+required-version = ">=0.11.26,<0.12"
 required-environments = [
   "sys_platform == 'darwin' and platform_machine == 'arm64'",
   "sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -91,7 +91,7 @@ minversion = "9.0"
 strict = true
 testpaths = [
   "ansible/files/scripts/tests",
-  "ansible/plugins/filter/tests",
+  "ansible/tests",
   "spectrum/scripts/tests",
 ]
 

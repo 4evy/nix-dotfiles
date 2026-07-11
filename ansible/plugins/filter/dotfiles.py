@@ -12,7 +12,7 @@ def merge_gvariant_string_list(current: object, value: str) -> str:
     text = text.strip().removeprefix("@as ").strip()
     try:
         parsed = ast.literal_eval(text)
-    except SyntaxError, ValueError:
+    except (SyntaxError, ValueError):  # fmt: skip
         parsed = []
     if not isinstance(parsed, list):
         parsed = []
