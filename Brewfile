@@ -57,6 +57,7 @@ brew "git-lfs"
 brew "gitui"
 brew "golangci-lint"
 brew "gopls"
+brew "hadolint"
 brew "autoconf"
 brew "automake"
 brew "cmake"
@@ -85,6 +86,27 @@ brew "watchexec"
 brew "yamllint"
 brew "yaml-language-server"
 brew "zizmor"
+
+# Reverse engineering and binary analysis
+brew "afl++"
+brew "apktool"
+brew "binutils"
+brew "binwalk"
+brew "capstone"
+brew "dex2jar"
+brew "jadx"
+brew "keystone"
+brew "nasm"
+brew "qemu"
+brew "radare2"
+brew "rizin"
+brew "unicorn"
+brew "upx"
+brew "yara"
+
+if OS.linux?
+  brew "gdb"
+end
 
 # Editors and terminals
 # Linux Helix tip is installed by the custom Ansible app script.
@@ -172,13 +194,13 @@ if OS.mac?
   cask "google-chrome"
   cask "helium-browser"
   cask "iina"
+  cask "imhex"
   cask "itsycal"
   cask "libreoffice"
   cask "prismlauncher"
   cask "rustdesk"
   cask "shottr"
   cask "stats"
-  cask "telegram"
   cask "visual-studio-code"
   # Raycast Beta is installed by ansible/roles/applications/tasks/macos.yml.
 end
