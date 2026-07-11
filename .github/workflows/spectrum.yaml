@@ -266,17 +266,36 @@ jobs:
           digest=$(sudo cat "$digest_file")
           echo "digest=${digest}" >>"$GITHUB_OUTPUT"
 
+      - name: Download Syft
+        id: syft
+        if: github.event_name != 'pull_request'
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          syft-version: v1.42.3
+
       - name: Generate SPDX SBOM
         if: github.event_name != 'pull_request'
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE_REF: "${{ steps.image.outputs.image_ref }}"
+          LOCAL_REF: "${{ steps.image.outputs.local_ref }}"
+          SYFT_CMD: "${{ steps.syft.outputs.cmd }}"
+        run: |
+          set -euo pipefail
+          mount_path=$(sudo podman image mount "${LOCAL_REF}")
+          trap 'sudo podman image unmount "${LOCAL_REF}" >/dev/null' EXIT
+          sudo "${SYFT_CMD}" scan \
+            "dir:${mount_path}" \
+            --source-name "${IMAGE_REF}@${DIGEST}" \
+            --output spdx-json=spectrum.spdx.json
+
+      - name: Upload SPDX SBOM
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          image: "${{ steps.image.outputs.image_ref }}@${{ steps.push.outputs.digest }}"
-          registry-username: ${{ github.actor }}
-          registry-password: ${{ secrets.GITHUB_TOKEN }}
-          output-file: spectrum.spdx.json
-          artifact-name: spectrum.spdx.json
-          format: spdx-json
-          upload-release-assets: false
+          name: spectrum.spdx.json
+          path: spectrum.spdx.json
+          if-no-files-found: error
 
       - name: Sign Image
         if: github.event_name != 'pull_request'
