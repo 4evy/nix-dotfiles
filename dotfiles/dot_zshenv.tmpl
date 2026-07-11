@@ -6,9 +6,14 @@
 
 # 01 / PATH
 # Use unique Zsh arrays to preserve order without duplicate entries.
+{{- $isNixOS := false }}
+{{- if eq .chezmoi.os "linux" }}
+{{- $isNixOS = eq .chezmoi.osRelease.id "nixos" }}
+{{- end }}
 
 typeset -U path PATH fpath FPATH
 path=(
+  {{- if not $isNixOS }}
   "$HOME/.pi/agent/bin"
   "$HOME/.local/share/dotfiles/helix-tip/bin"
   {{- if eq .chezmoi.os "darwin" }}
@@ -48,9 +53,12 @@ path=(
   "$HOME/.cargo/bin"
   "$HOME/.go/bin"
   "$HOME/.yarn/bin"
+  {{- end }}
   {{- if eq .chezmoi.os "linux" }}
+  {{- if not $isNixOS }}
   "$HOME/.nix-profile/bin"
   "/nix/var/nix/profiles/default/bin"
+  {{- end }}
   "/usr/local/bin"
   "/usr/bin"
   "/bin"

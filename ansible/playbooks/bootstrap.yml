@@ -8,6 +8,7 @@
         - always
         - common
     - role: prerequisites
+      when: not (common_is_nixos | default(false) | bool)
       tags:
         - bootstrap
         - prerequisites

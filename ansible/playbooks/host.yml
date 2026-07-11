@@ -8,5 +8,6 @@
         - always
         - common
     - role: host_layer
+      when: not (common_is_nixos | default(false) | bool)
       tags:
         - host

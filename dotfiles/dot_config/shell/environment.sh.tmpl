@@ -9,11 +9,13 @@
 
 _dotfiles_homebrew_prefix=
 {{- if eq .chezmoi.os "linux" }}
+{{- if ne .chezmoi.osRelease.id "nixos" }}
 if [[ -d /home/linuxbrew/.linuxbrew ]]; then
 	_dotfiles_homebrew_prefix=/home/linuxbrew/.linuxbrew
 elif [[ -d "$HOME/.linuxbrew" ]]; then
 	_dotfiles_homebrew_prefix="$HOME/.linuxbrew"
 fi
+{{- end }}
 {{- else if eq .chezmoi.os "darwin" }}
 {{- if eq .chezmoi.arch "arm64" }}
 if [[ -d /opt/homebrew ]]; then

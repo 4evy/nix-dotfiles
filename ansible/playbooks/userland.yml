@@ -8,18 +8,22 @@
         - always
         - common
     - role: prerequisites
+      when: not (common_is_nixos | default(false) | bool)
       tags:
         - bootstrap
         - prerequisites
         - userland
     - role: local_tools
+      when: not (common_is_nixos | default(false) | bool)
       tags:
         - local
         - tools
         - userland
     - role: ecosystem
+      when: not (common_is_nixos | default(false) | bool)
       tags:
         - ecosystem
         - tools
         - userland
     - role: applications
+      when: not (common_is_nixos | default(false) | bool)

@@ -30,7 +30,12 @@ in
   environment = {
     systemPackages = (
       lib.attrsets.attrValues {
-        inherit (pkgs) telegram-desktop;
+        inherit (pkgs)
+          firefox
+          libreoffice
+          prismlauncher
+          rustdesk-flutter
+          ;
         inherit (pkgs.unstable) jq;
       }
     );
@@ -106,7 +111,7 @@ in
   };
 
   networking = {
-    hostName = "lenovo-legion";
+    hostName = "nixos";
     networkmanager = {
       ensureProfiles.environmentFiles = [ config.sops.secrets.wireless.path ];
       ensureProfiles.profiles = {
@@ -253,7 +258,7 @@ in
         ];
         hashedPasswordFile = config.sops.secrets."4evy-password".path;
         openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAc3DwiG6OJVICR7FQQE+I9R2447GFLrIRyF9+xP6aM5 4evy@lenovo-legion"
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAc3DwiG6OJVICR7FQQE+I9R2447GFLrIRyF9+xP6aM5 4evy@nixos"
         ];
       };
     };

@@ -25,6 +25,11 @@
     common_architecture: "{{ ansible_facts.architecture }}"
     common_is_macos: "{{ ansible_facts.system == 'Darwin' }}"
     common_is_linux: "{{ ansible_facts.system == 'Linux' }}"
+    common_is_nixos: >-
+      {{
+        ansible_facts.system == 'Linux'
+        and ansible_facts.distribution == 'NixOS'
+      }}
   tags:
     - common
 

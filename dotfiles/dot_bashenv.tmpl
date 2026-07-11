@@ -13,6 +13,10 @@
 
 # PATH
 # Prepend preferred tools while retaining the inherited order.
+{{- $isNixOS := false }}
+{{- if eq .chezmoi.os "linux" }}
+{{- $isNixOS = eq .chezmoi.osRelease.id "nixos" }}
+{{- end }}
 
 _dotfiles_path_prepend_once() {
 	local -a current_path=() new_path=()
@@ -42,6 +46,7 @@ _dotfiles_path_prepend_once() {
 }
 
 _dotfiles_path_entries=(
+	{{- if not $isNixOS }}
 	"$HOME/.pi/agent/bin"
 	"$HOME/.local/share/dotfiles/helix-tip/bin"
 	{{- if eq .chezmoi.os "darwin" }}
@@ -81,9 +86,12 @@ _dotfiles_path_entries=(
 	"$HOME/.cargo/bin"
 	"$HOME/.go/bin"
 	"$HOME/.yarn/bin"
+	{{- end }}
 	{{- if eq .chezmoi.os "linux" }}
+	{{- if not $isNixOS }}
 	"$HOME/.nix-profile/bin"
 	/nix/var/nix/profiles/default/bin
+	{{- end }}
 	/usr/local/bin
 	/usr/bin
 	/bin

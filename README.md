@@ -42,6 +42,26 @@ cd ~/dotfiles
 just setup
 ```
 
+### NixOS
+
+The NixOS host keeps the same chezmoi and Ansible orchestration, but NixOS owns
+all system, desktop, development, and repository-tool packages. The Ansible
+roles deliberately skip Homebrew, Rustup, Bun-global, Nix-profile, downloaded
+script, and source/archive installers when the detected distribution is NixOS.
+
+From an installed NixOS system:
+
+```bash
+git clone https://github.com/4evy/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+sudo nixos-rebuild switch --flake .#nixos
+just setup
+```
+
+`just setup` still applies the shared Ansible playbooks and chezmoi source. On
+NixOS, host and package state changes belong in `hosts/linux` or
+`modules/nixos`, followed by another `nixos-rebuild`.
+
 ### macOS
 
 ```bash
@@ -109,7 +129,7 @@ cd packages/hyper-window-tiling && bun run check
 ```bash
 nix flake check
 nix run .#ghidra-mcp
-sudo nixos-rebuild switch --flake .#lenovo-legion
+sudo nixos-rebuild switch --flake .#nixos
 
 ansible-playbook ansible/playbooks/host.yml
 ansible-playbook ansible/playbooks/site.yml

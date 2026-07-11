@@ -1,6 +1,6 @@
 { inputs, ... }:
 {
-  lenovo-legion = inputs.nixpkgs.lib.nixosSystem {
+  nixos = inputs.nixpkgs.lib.nixosSystem {
     specialArgs = { inherit inputs; };
     modules = [
       ./configuration.nix

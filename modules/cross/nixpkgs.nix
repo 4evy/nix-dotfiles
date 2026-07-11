@@ -19,7 +19,7 @@
               callPackage = unstable.lib.callPackageWith eupkgsScope;
             };
           eupkgsOverlay = inputs.eupkgs.overlays.default eupkgsScope unstable;
-          eupkgs = builtins.removeAttrs eupkgsOverlay [ "_internalCallByNamePackageFile" ];
+          eupkgs = removeAttrs eupkgsOverlay [ "_internalCallByNamePackageFile" ];
         in
         {
           inherit unstable eupkgs;
@@ -42,6 +42,9 @@
           hyper-window-tiling = final.callPackage ../../packages/hyper-window-tiling.nix { };
           hyper-window-tiling-gnome = final.hyper-window-tiling.gnome;
           hyper-window-tiling-kde = final.hyper-window-tiling.kde;
+          dotfiles-python = final.callPackage ../../packages/dotfiles-python.nix {
+            inherit (final.unstable) python314Packages;
+          };
           system-runner = final.writeScriptBin "system-runner" ''
             #!${final.python3}/bin/python3
             ${builtins.readFile ../../ansible/files/scripts/workstation/local/system_runner.py}
