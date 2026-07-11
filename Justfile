@@ -160,6 +160,79 @@ status: (doctor 'status')
 [macos]
 status: (_linux-only 'status')
 
+# Reclaim disposable Podman, Nix, tool, user, and journal data.
+[confirm('Remove unused Podman data, old Nix generations, caches, and archived journals?')]
+[group('system')]
+[linux]
+clean: _clean-podman _clean-podman-root _clean-nix _clean-tool-caches _clean-user-cache _clean-journal
+
+[private]
+_clean-podman:
+    {{ podman }} system prune --all --force
+
+[private]
+_clean-podman-root:
+    sudo {{ podman }} system prune --force
+
+[private]
+_clean-nix:
+    nh clean all --keep 1
+
+[private]
+[script]
+_clean-tool-caches:
+    if command -v uv >/dev/null 2>&1; then
+      if ! uv cache prune; then
+        printf 'uv cache prune failed; the full user-cache cleanup will retry it.\n' >&2
+      fi
+    fi
+    if command -v go >/dev/null 2>&1; then
+      go clean -cache -testcache
+    fi
+    if command -v brew >/dev/null 2>&1; then
+      brew cleanup --prune=all -s
+    fi
+
+[private]
+[script]
+_clean-user-cache:
+    cache_dir=${XDG_CACHE_HOME:-$HOME/.cache}
+    case "$cache_dir" in
+      '' | / | "$HOME")
+        printf 'Refusing unsafe cache directory: %q\n' "$cache_dir" >&2
+        exit 2
+        ;;
+    esac
+    if [[ -d $cache_dir ]]; then
+      if ! find "$cache_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; then
+        printf 'Retrying user-cache cleanup with elevated privileges.\n' >&2
+        sudo find "$cache_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      fi
+    fi
+
+[private]
+[script]
+_clean-journal:
+    journal_size_kib=0
+    for journal_dir in /var/log/journal /run/log/journal; do
+      if [[ -d $journal_dir ]]; then
+        directory_size_kib=$(sudo du -sk "$journal_dir" | awk '{ print $1 }')
+        journal_size_kib=$((journal_size_kib + directory_size_kib))
+      fi
+    done
+    journal_threshold_kib=$((1024 * 1024))
+
+    if ((journal_size_kib > journal_threshold_kib)); then
+      sudo journalctl --rotate
+      sudo journalctl --vacuum-size=500M
+    else
+      printf 'Journal uses at most 1 GiB; skipping cleanup.\n'
+    fi
+
+[group('system')]
+[macos]
+clean: (_linux-only 'clean')
+
 # Reboot the host.
 [confirm('Reboot this host now?')]
 [group('system')]
@@ -460,8 +533,8 @@ nix: (doctor 'nix')
 # Apply chezmoi-managed dotfiles.
 [group('setup')]
 apply: (doctor 'apply')
-    PATH="{{ homebrew_path }}:$PATH" chezmoi init --source "$PWD/dotfiles"
-    PATH="{{ homebrew_path }}:$PATH" chezmoi apply --refresh-externals=auto --force
+    PATH="$PATH:{{ homebrew_path }}" chezmoi init --source "$PWD/dotfiles"
+    PATH="$PATH:{{ homebrew_path }}" chezmoi apply --refresh-externals=auto --force
 
 [doc('Bootstrap userland, apply dotfiles, then apply host roles.')]
 [group('setup')]
@@ -478,15 +551,15 @@ _deps:
     if [[ ! -f .ansible/collections/ansible_collections/community/general/MANIFEST.json ]]; then
       install_args+=(--force)
     fi
-    PATH="{{ homebrew_path }}:$PATH" ansible-galaxy "${install_args[@]}"
+    PATH="$PATH:{{ homebrew_path }}" ansible-galaxy "${install_args[@]}"
 
 [private]
 _userland:
-    PATH="{{ homebrew_path }}:$PATH" ./ansible/bootstrap.sh ansible/playbooks/userland.yml
+    PATH="$PATH:{{ homebrew_path }}" ./ansible/bootstrap.sh ansible/playbooks/userland.yml
 
 [private]
 _host:
-    PATH="{{ homebrew_path }}:$PATH" ansible-playbook ansible/playbooks/host.yml
+    PATH="$PATH:{{ homebrew_path }}" ansible-playbook ansible/playbooks/host.yml
 
 # Format files managed by this repo.
 [group('dev')]
