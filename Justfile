@@ -285,8 +285,11 @@ spectrum-boot-report target=local_ref: (doctor 'build')
       --volume "$PWD:/workspace:ro" \
       "$target" \
       -ceu '
+        mkdir -p /tmp/spectrum-workspace/ansible/files/scripts
         mkdir -p /tmp/spectrum-workspace/spectrum
         cp /workspace/pyproject.toml /workspace/uv.lock /tmp/spectrum-workspace/
+        cp -a /workspace/ansible/files/scripts/workstation \
+          /tmp/spectrum-workspace/ansible/files/scripts/
         cp -a /workspace/spectrum/scripts /tmp/spectrum-workspace/spectrum/
         UV_PROJECT_ENVIRONMENT=/tmp/spectrum-boot-report-venv \
           uv --cache-dir /tmp/spectrum-uv-cache \
