@@ -514,6 +514,9 @@ _dotfiles_stop_ghidra_mcp_for_cxg() {
 	local refs_dir="$state_dir/cxg-refs"
 	local pid_file="$state_dir/cxg-ghidra-mcp.pid"
 	local server_pid="${_dotfiles_cxg_ghidra_mcp_pid:-}"
+	local timeout="${GHIDRA_MCP_SHUTDOWN_TIMEOUT_SEC:-5}"
+	local deadline
+	local process_state
 
 	if [[ -n "${_dotfiles_cxg_ghidra_mcp_ref_file:-}" ]]; then
 		rm -f -- "$_dotfiles_cxg_ghidra_mcp_ref_file"
@@ -532,7 +535,27 @@ _dotfiles_stop_ghidra_mcp_for_cxg() {
 	fi
 
 	if [[ -n "$server_pid" ]]; then
+		# The serve wrapper waits for its foreground bridge before running traps,
+		# so TERM sent only to the wrapper can be deferred forever. Stop its
+		# children too, and never let cxg teardown wait without a deadline.
+		if command -v pkill >/dev/null 2>&1; then
+			pkill -TERM -P "$server_pid" >/dev/null 2>&1 || true
+		fi
 		kill "$server_pid" >/dev/null 2>&1 || true
+
+		deadline=$((SECONDS + timeout))
+		while kill -0 "$server_pid" >/dev/null 2>&1 && ((SECONDS < deadline)); do
+			process_state="$(ps -o stat= -p "$server_pid" 2>/dev/null)"
+			[[ "$process_state" != *Z* ]] || break
+			sleep 0.1
+		done
+
+		if kill -0 "$server_pid" >/dev/null 2>&1; then
+			if command -v pkill >/dev/null 2>&1; then
+				pkill -KILL -P "$server_pid" >/dev/null 2>&1 || true
+			fi
+			kill -KILL "$server_pid" >/dev/null 2>&1 || true
+		fi
 		wait "$server_pid" >/dev/null 2>&1 || true
 	fi
 
