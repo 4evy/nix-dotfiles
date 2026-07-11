@@ -102,7 +102,7 @@ def desktop_integrations() -> None:
             *command,
             "ansible/playbooks/host.yml",
             "--tags",
-            "always,hyper-window-tiling,sushi-preview,telegram-flatpak,emoji-shortcut",
+            "always,hyper-window-tiling,sushi-preview,emoji-shortcut",
         ),
         cwd=repository,
     )

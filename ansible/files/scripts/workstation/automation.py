@@ -34,7 +34,6 @@ _ALLOWED_COMMANDS = {
     ("host", "desktop", "flatpak-nvidia"),
     ("host", "desktop", "hyper-window-tiling"),
     ("host", "desktop", "sushi-preview"),
-    ("host", "desktop", "telegram-flatpak"),
     ("host", "keyboard", "kanata-build"),
     ("host", "keyboard", "toshy-gnome-context"),
     ("host", "keyboard", "toshy-kanata-chain"),

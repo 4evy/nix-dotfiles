@@ -229,38 +229,6 @@ def flatpak_nvidia() -> OperationResult:
     )
 
 
-@app.command("telegram-flatpak")
-def telegram_flatpak() -> OperationResult:
-    """Force the Telegram Flatpak through XWayland on NVIDIA systems."""
-    host = HostRunner()
-    if not _flatpak_available(host):
-        console.print("telegram-flatpak: flatpak is not available; skipping")
-        return OperationResult(msg="Flatpak is not available")
-    app_id = "org.telegram.desktop"
-    if (
-        host.user(("flatpak", "info", app_id), check=False, capture=True).returncode
-        != 0
-    ):
-        console.print(f"telegram-flatpak: {app_id} is not installed; skipping")
-        return OperationResult(msg=f"{app_id} is not installed")
-    if automation_check_mode():
-        return OperationResult(
-            changed=True, msg=f"Would configure {app_id} to use XWayland"
-        )
-    host.user((
-        "flatpak",
-        "override",
-        "--user",
-        "--nosocket=wayland",
-        "--socket=x11",
-        "--env=QT_QPA_PLATFORM=xcb",
-        app_id,
-    ))
-    host.user(("flatpak", "kill", app_id), check=False, capture=True)
-    console.print(f"telegram-flatpak: configured {app_id} to use XWayland")
-    return OperationResult(changed=True, msg=f"Configured {app_id} to use XWayland")
-
-
 def _gnome_available() -> bool:
     return which("gnome-shell") is not None and which("gnome-extensions") is not None
 

@@ -18,9 +18,6 @@ host_layer_scripts:
   - name: Flatpak maintenance
     command: [host, desktop, flatpak-maintenance]
     tags: [host, scripts, flatpak-maintenance]
-  - name: Telegram Flatpak
-    command: [host, desktop, telegram-flatpak]
-    tags: [host, scripts, telegram-flatpak]
   - name: Toshy GNOME context integration
     command: [host, keyboard, toshy-gnome-context]
     tags: [host, scripts, toshy-gnome-context]
