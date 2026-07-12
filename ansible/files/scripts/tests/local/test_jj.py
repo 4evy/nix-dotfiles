@@ -182,7 +182,7 @@ def test_jj_get_shallow_branch_fetches_only_stack_and_diff_base(
     assert tracked == [("feature", "origin")]
 
 
-def test_jj_get_pr_uses_stable_tracked_bookmark(
+def test_jj_get_pr_uses_original_head_bookmark(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
@@ -197,6 +197,7 @@ def test_jj_get_pr_uses_stable_tracked_bookmark(
         "_gh_json",
         lambda model, *_args: model.model_validate({
             "baseRefName": "main",
+            "headRefName": "contributor/push-changeid",
         }),
     )
     monkeypatch.setattr(
@@ -227,13 +228,13 @@ def test_jj_get_pr_uses_stable_tracked_bookmark(
                 "--no-tags",
                 "--",
                 "git@github.com:owner/repo.git",
-                "+refs/pull/123/head:refs/remotes/github-pr/pr/123",
+                "+refs/pull/123/head:refs/remotes/github-pr/contributor/push-changeid",
             ),
             {"cwd": workspace_root},
         ),
         (("jj", "-R", workspace_root, "git", "import"), {}),
     ]
-    assert tracked == [("pr/123", "github-pr")]
+    assert tracked == [("contributor/push-changeid", "github-pr")]
 
 
 @pytest.mark.parametrize(

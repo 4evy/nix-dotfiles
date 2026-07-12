@@ -60,6 +60,7 @@ class _GitHubRepositoryUrls(BaseModel):
 
 class _GitHubPullRequest(BaseModel):
     base_ref_name: str = Field(alias="baseRefName", min_length=1)
+    head_ref_name: str = Field(alias="headRefName", min_length=1)
 
 
 def _workspace_root() -> str | None:
@@ -196,11 +197,11 @@ def _resolve_pr(number: str, repo_arg: str | None) -> None:
         "-R",
         repo,
         "--json",
-        "baseRefName",
+        "baseRefName,headRefName",
     )
     url = _fetch_url(repo)
     remote = _settings().jj_get_pr_remote
-    bookmark = f"pr/{number}"
+    bookmark = info.head_ref_name
     refspec = f"+refs/pull/{number}/head:refs/remotes/{remote}/{bookmark}"
     shallow = _shallow()
     boundary = _shallow_boundary() if shallow else ""
