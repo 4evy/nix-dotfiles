@@ -280,6 +280,7 @@ jobs:
           IMAGE_REF: "${{ steps.image.outputs.image_ref }}"
           LOCAL_REF: "${{ steps.image.outputs.local_ref }}"
           SYFT_CMD: "${{ steps.syft.outputs.cmd }}"
+          SYFT_FILE_METADATA_SELECTION: none
         run: |
           set -euo pipefail
           mount_path=$(sudo podman image mount "${LOCAL_REF}")
