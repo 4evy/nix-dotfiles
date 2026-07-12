@@ -1,25 +1,69 @@
-from __future__ import annotations
-
 import datetime as dt
-import json
-import os
 import re
-import subprocess
 import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import Annotated, cast
+
+import questionary
+import typer
+from pydantic import BaseModel, Field, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from workstation.errors import DotfilesError
 from workstation.lib.commands import output, run, which
 from workstation.lib.files import write_if_changed
 
 _REDATE_INTERACTIVE_REVSET = "mutable() & remote_bookmarks().."
-_REDATE_INTERACTIVE_LIMIT = "20"
-_GET_USAGE = "usage: jj-get TARGET [REMOTE_OR_REPO] [BASE]"
+_REDATE_INTERACTIVE_LIMIT = 20
+
+
+class JjSettings(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    jj_workspace_root: str | None = None
+    jj_get_repo: str | None = None
+    jj_get_pr_remote: str = "github-pr"
+    jj_get_base: str | None = None
+    jj_git_fetch_depth: int = Field(1, ge=1)
+    jj_git_fetch_shallow_shim: bool = True
+    jj_git_fetch_shim_state: Path | None = None
+    jj_redate_no_prompt: bool = False
+    jj_redate_revset: str = _REDATE_INTERACTIVE_REVSET
+    jj_redate_limit: int = Field(20, ge=1)
+
+
+def _settings() -> JjSettings:
+    try:
+        return JjSettings()
+    except ValidationError as error:
+        raise DotfilesError(f"invalid jj configuration: {error}") from error
+
+
+class _GitHubOwner(BaseModel):
+    login: str = Field(min_length=1)
+
+
+class _GitHubRepository(BaseModel):
+    name: str = Field(min_length=1)
+    owner: _GitHubOwner
+
+
+class _GitHubRepositoryInfo(BaseModel):
+    name_with_owner: str = Field(alias="nameWithOwner", min_length=3)
+    parent: _GitHubRepository | None = None
+
+
+class _GitHubRepositoryUrls(BaseModel):
+    ssh_url: str | None = Field(None, alias="sshUrl")
+    url: str | None = None
+
+
+class _GitHubPullRequest(BaseModel):
+    base_ref_name: str = Field(alias="baseRefName", min_length=1)
 
 
 def _workspace_root() -> str | None:
-    return os.environ.get("JJ_WORKSPACE_ROOT")
+    return _settings().jj_workspace_root
 
 
 def _jj() -> tuple[str, ...]:
@@ -63,34 +107,28 @@ def _normalize_repo(value: str) -> str | None:
     return _github_repo(_git("remote", "get-url", value, check=False) or value)
 
 
-def _gh_json(*args: str) -> dict[str, object]:
+def _gh_json[Model: BaseModel](model: type[Model], *args: str) -> Model:
     if which("gh") is None:
         raise DotfilesError("jj-get: gh is required for PR numbers")
-    return json.loads(output(("gh", *args), cwd=_workspace_root()))
+    try:
+        return model.model_validate_json(output(("gh", *args), cwd=_workspace_root()))
+    except ValidationError as error:
+        raise DotfilesError(f"jj-get: invalid gh response: {error}") from error
 
 
 def _infer_pr_repo() -> str:
-    info = _gh_json("repo", "view", "--json", "nameWithOwner,parent")
-    parent = info.get("parent")
-    if isinstance(parent, dict):
-        parent_info = cast("dict[str, Any]", parent)
-        owner_info = parent_info.get("owner")
-        if isinstance(owner_info, dict):
-            owner = owner_info.get("login")
-            if owner and parent_info.get("name"):
-                return f"{owner}/{parent_info['name']}"
-    value = info.get("nameWithOwner")
-    if not isinstance(value, str):
-        raise DotfilesError("jj-get: could not infer GitHub repository")
-    return value
+    info = _gh_json(
+        _GitHubRepositoryInfo, "repo", "view", "--json", "nameWithOwner,parent"
+    )
+    if info.parent:
+        return f"{info.parent.owner.login}/{info.parent.name}"
+    return info.name_with_owner
 
 
 def _fetch_url(repo: str) -> str:
-    info = _gh_json("repo", "view", repo, "--json", "sshUrl,url")
-    value = info.get("sshUrl") or (
-        f"{info['url']}.git" if isinstance(info.get("url"), str) else None
-    )
-    if not isinstance(value, str):
+    info = _gh_json(_GitHubRepositoryUrls, "repo", "view", repo, "--json", "sshUrl,url")
+    value = info.ssh_url or (f"{info.url}.git" if info.url else None)
+    if value is None:
         raise DotfilesError(f"jj-get: could not resolve fetch URL for {repo}")
     return value
 
@@ -147,12 +185,11 @@ def _track_remote_bookmark(bookmark: str, remote: str) -> None:
 
 
 def _resolve_pr(number: str, repo_arg: str | None) -> None:
-    repo = _normalize_repo(
-        repo_arg or os.environ.get("JJ_GET_REPO") or _infer_pr_repo()
-    )
+    repo = _normalize_repo(repo_arg or _settings().jj_get_repo or _infer_pr_repo())
     if repo is None:
         raise DotfilesError("jj-get: invalid GitHub repository")
     info = _gh_json(
+        _GitHubPullRequest,
         "pr",
         "view",
         number,
@@ -161,17 +198,14 @@ def _resolve_pr(number: str, repo_arg: str | None) -> None:
         "--json",
         "baseRefName",
     )
-    base = info.get("baseRefName")
-    if not isinstance(base, str):
-        raise DotfilesError(f"jj-get: could not resolve PR {number} in {repo}")
     url = _fetch_url(repo)
-    remote = os.environ.get("JJ_GET_PR_REMOTE", "github-pr")
+    remote = _settings().jj_get_pr_remote
     bookmark = f"pr/{number}"
     refspec = f"+refs/pull/{number}/head:refs/remotes/{remote}/{bookmark}"
     shallow = _shallow()
     boundary = _shallow_boundary() if shallow else ""
     if shallow:
-        _fetch_shallow_stack(url, refspec, f"refs/heads/{base}")
+        _fetch_shallow_stack(url, refspec, f"refs/heads/{info.base_ref_name}")
     else:
         run(
             (
@@ -223,7 +257,7 @@ def _resolve_branch(bookmark: str, remote: str | None, base: str | None) -> None
     shallow = _shallow()
     boundary = _shallow_boundary() if shallow else ""
     if shallow:
-        base = base or os.environ.get("JJ_GET_BASE") or _infer_base(remote)
+        base = base or _settings().jj_get_base or _infer_base(remote)
         base = base.removeprefix(f"{remote}/")
         base_ref = base if base.startswith("refs/") else f"refs/heads/{base}"
         refspec = f"+refs/heads/{bookmark}:refs/remotes/{remote}/{bookmark}"
@@ -235,49 +269,54 @@ def _resolve_branch(bookmark: str, remote: str | None, base: str | None) -> None
     _track_remote_bookmark(bookmark, remote)
 
 
-def jj_get_entrypoint() -> None:
-    args = sys.argv[1:]
-    if args[:1] in (["-h"], ["--help"]):
-        print(_GET_USAGE)
-        print("  jj-get BOOKMARK [REMOTE] [BASE]")
-        print("  jj-get BOOKMARK@REMOTE [BASE]")
-        print("  jj-get PR_NUMBER [OWNER/REPO]")
-        print("  jj-get GITHUB_PR_URL")
-        return
-    if not 1 <= len(args) <= 3 or any(value.startswith("-") for value in args):
-        raise SystemExit(_GET_USAGE)
-    is_pr_number = args[0].isdigit()
+def jj_get(
+    target: Annotated[
+        str, typer.Argument(help="Bookmark, PR number, or GitHub PR URL")
+    ],
+    remote_or_repo: Annotated[
+        str | None, typer.Argument(help="Git remote or OWNER/REPO")
+    ] = None,
+    base: Annotated[
+        str | None, typer.Argument(help="Base branch for shallow fetches")
+    ] = None,
+) -> None:
+    """Fetch a bookmark or GitHub pull request into a colocated jj repository."""
+    is_pr_number = target.isdigit()
     is_pr_url = re.fullmatch(
-        r"https://github\.com/([^/]+)/([^/]+)/pull/(\d+)(?:[/?#].*)?", args[0]
+        r"https://github\.com/([^/]+)/([^/]+)/pull/(\d+)(?:[/?#].*)?", target
     )
-    if is_pr_number and len(args) > 2:
-        raise SystemExit(_GET_USAGE)
-    if is_pr_url and len(args) > 1:
-        raise SystemExit(_GET_USAGE)
-    if "@" in args[0] and len(args) > 2:
-        raise SystemExit(_GET_USAGE)
+    if is_pr_number and base is not None:
+        raise typer.BadParameter("PR numbers accept at most OWNER/REPO")
+    if is_pr_url and (remote_or_repo is not None or base is not None):
+        raise typer.BadParameter("GitHub PR URLs do not accept extra arguments")
+    if "@" in target and base is not None:
+        raise typer.BadParameter("BOOKMARK@REMOTE accepts at most BASE")
     if not _git("rev-parse", "--git-dir", check=False):
-        raise SystemExit("jj-get: this requires a colocated Git repository")
+        raise DotfilesError("jj-get: this requires a colocated Git repository")
+    if is_pr_number:
+        _resolve_pr(target, remote_or_repo)
+    elif is_pr_url:
+        _resolve_pr(
+            is_pr_url.group(3),
+            f"{is_pr_url.group(1)}/{is_pr_url.group(2)}",
+        )
+    else:
+        _resolve_branch(target, remote_or_repo, base)
+
+
+def jj_get_entrypoint() -> None:
     try:
-        if is_pr_number:
-            _resolve_pr(args[0], args[1] if len(args) == 2 else None)
-        elif is_pr_url:
-            _resolve_pr(
-                is_pr_url.group(3),
-                f"{is_pr_url.group(1)}/{is_pr_url.group(2)}",
-            )
-        else:
-            _resolve_branch(
-                args[0],
-                args[1] if len(args) > 1 else None,
-                args[2] if len(args) > 2 else None,
-            )
+        jj_get_app()
     except DotfilesError as error:
         raise SystemExit(str(error)) from error
 
 
+jj_get_app = typer.Typer(add_completion=False)
+jj_get_app.command()(jj_get)
+
+
 def _shim_state(value: str) -> None:
-    if path := os.environ.get("JJ_GIT_FETCH_SHIM_STATE"):
+    if path := _settings().jj_git_fetch_shim_state:
         write_if_changed(path, value + "\n")
 
 
@@ -294,10 +333,7 @@ def _can_shallow_fetch(remotes: list[str], branches: list[str]) -> bool:
 
 
 def _fetch_depth() -> str:
-    value = os.environ.get("JJ_GIT_FETCH_DEPTH", "1")
-    if not value.isdigit() or int(value) < 1:
-        raise DotfilesError("JJ_GIT_FETCH_DEPTH must be a positive integer")
-    return value
+    return str(_settings().jj_git_fetch_depth)
 
 
 def _fetch_remotes(requested: list[str], all_remotes: bool) -> list[str] | None:
@@ -322,7 +358,7 @@ def _jj_git_fetch() -> None:
     _shim_state("delegate")
     args = list(sys.argv[1:])
     if (
-        os.environ.get("JJ_GIT_FETCH_SHALLOW_SHIM", "1") == "0"
+        not _settings().jj_git_fetch_shallow_shim
         or args[:2] != ["git", "fetch"]
         or not _shallow()
     ):
@@ -418,58 +454,24 @@ def jj_git_fetch_entrypoint() -> None:
         raise SystemExit(str(error)) from error
 
 
-def _redate_args(args: list[str]) -> list[str]:
-    result: list[str] = []
-    while args:
-        value = args.pop(0)
-        if value in {"-h", "--help"}:
-            raise SystemExit("usage: jj-redate [-r REVSET] [REVSETS]...")
-        if value in {"-r", "--revision"}:
-            if not args:
-                raise SystemExit("jj-redate: --revision requires a value")
-            result.append(args.pop(0))
-        elif value.startswith("--revision="):
-            result.append(value.split("=", 1)[1])
-        elif value == "--":
-            result.extend(args)
-            break
-        elif value.startswith("-"):
-            raise SystemExit(f"jj-redate: unknown option: {value}")
-        else:
-            result.append(value)
-    return result
-
-
-def _gum() -> str | None:
-    path = which("gum")
-    return os.fspath(path) if path is not None else None
-
-
 def _redate_selectable_revset() -> str:
-    return os.environ.get("JJ_REDATE_REVSET", _REDATE_INTERACTIVE_REVSET)
+    return _settings().jj_redate_revset
 
 
 def _redate_selectable_limit() -> str:
-    return os.environ.get("JJ_REDATE_LIMIT", _REDATE_INTERACTIVE_LIMIT)
+    return str(_settings().jj_redate_limit)
 
 
 def _prompt(label: str, default: str) -> str:
-    gum = _gum()
     if (
-        not os.environ.get("JJ_REDATE_NO_GUM")
+        not _settings().jj_redate_no_prompt
         and sys.stdin.isatty()
         and sys.stdout.isatty()
-        and gum is not None
     ):
-        result = subprocess.run(
-            (gum, "input", "--prompt", label, "--value", default),
-            check=False,
-            stdout=subprocess.PIPE,
-            text=True,
-        )
-        if result.returncode == 0:
-            return result.stdout.rstrip("\n")
-        raise DotfilesError(f"command failed ({result.returncode}): gum input")
+        result = questionary.text(label.strip(), default=default).ask()
+        if result is None:
+            raise DotfilesError(f"no input received for {label}")
+        return result
     try:
         return input(label) or default
     except EOFError:
@@ -501,22 +503,16 @@ def _timestamp() -> str:
 
 def _confirm_redate(revisions: list[str], timestamp: str) -> bool:
     label = " ".join(revisions)
-    gum = _gum()
     if (
-        not os.environ.get("JJ_REDATE_NO_GUM")
+        not _settings().jj_redate_no_prompt
         and sys.stdin.isatty()
         and sys.stdout.isatty()
-        and gum is not None
     ):
-        result = subprocess.run(
-            (
-                gum,
-                "confirm",
-                f"Set author and committer timestamp on {label} to {timestamp}?",
-            ),
-            check=False,
+        return bool(
+            questionary.confirm(
+                f"Set author and committer timestamp on {label} to {timestamp}?"
+            ).ask()
         )
-        return result.returncode == 0
     print(
         f"Setting author and committer timestamp on {label} to {timestamp}",
         file=sys.stderr,
@@ -556,12 +552,10 @@ def _redate_selectable_items(revset: str, limit: str) -> list[tuple[str, str]]:
 
 
 def _interactive_redate_revisions() -> list[str] | None:
-    gum = _gum()
     if (
-        os.environ.get("JJ_REDATE_NO_GUM")
+        _settings().jj_redate_no_prompt
         or not sys.stdin.isatty()
         or not sys.stdout.isatty()
-        or gum is None
     ):
         return None
     revset = _redate_selectable_revset()
@@ -569,36 +563,17 @@ def _interactive_redate_revisions() -> list[str] | None:
     items = _redate_selectable_items(revset, limit)
     if not items:
         raise DotfilesError(f"jj-redate: no revisions matched {revset!r}")
-    labels = [label for label, _ in items]
-    revsets_by_label = dict(items)
-    height = str(min(max(len(items), 5), 20))
-    result = subprocess.run(
-        (
-            gum,
-            "choose",
-            "--ordered",
-            "--limit",
-            str(len(items)),
-            "--height",
-            height,
-            "--header",
-            "Select revisions to redate",
-            *labels,
-        ),
-        check=False,
-        stdout=subprocess.PIPE,
-        text=True,
+    selected = questionary.checkbox(
+        "Select revisions to redate",
+        choices=[questionary.Choice(label, value=revset) for label, revset in items],
     )
-    if result.returncode == 0:
-        selected = [line for line in result.stdout.splitlines() if line]
-        if selected:
-            return [revsets_by_label[line] for line in selected]
-        raise DotfilesError("jj-redate: no revisions selected")
-    raise DotfilesError(f"command failed ({result.returncode}): gum choose")
+    revisions = selected.ask()
+    if revisions:
+        return cast("list[str]", revisions)
+    raise DotfilesError("jj-redate: no revisions selected")
 
 
-def _redate_revisions(args: list[str]) -> list[str]:
-    revisions = _redate_args(args)
+def _redate_revisions(revisions: list[str]) -> list[str]:
     if revisions:
         return revisions
     return _interactive_redate_revisions() or ["@"]
@@ -668,13 +643,17 @@ def _descendant_timestamps(revset: str) -> list[tuple[str, str]]:
     return list(timestamps.items())
 
 
-def jj_redate_entrypoint() -> None:
+def jj_redate(
+    revsets: Annotated[
+        list[str] | None, typer.Argument(help="Additional revision sets")
+    ] = None,
+    revision: Annotated[
+        list[str] | None, typer.Option("--revision", "-r", help="Revision set")
+    ] = None,
+) -> None:
+    """Set author and committer timestamps while preserving descendants."""
     try:  # noqa: PLW0717 - one recovery boundary must restore descendant timestamps
-        arguments = list(sys.argv[1:])
-        if any(value in {"-h", "--help"} for value in arguments):
-            print("usage: jj-redate [-r REVSET] [REVSETS]...")
-            return
-        revisions = _redate_revisions(arguments)
+        revisions = _redate_revisions([*(revision or []), *(revsets or [])])
         revset = " | ".join(f"({value})" for value in revisions)
         ids = _selected_change_ids(revset)
         descendants = _descendant_timestamps(revset)
@@ -708,3 +687,11 @@ def jj_redate_entrypoint() -> None:
                     )
     except DotfilesError as error:
         raise SystemExit(str(error)) from error
+
+
+def jj_redate_entrypoint() -> None:
+    jj_redate_app()
+
+
+jj_redate_app = typer.Typer(add_completion=False)
+jj_redate_app.command()(jj_redate)

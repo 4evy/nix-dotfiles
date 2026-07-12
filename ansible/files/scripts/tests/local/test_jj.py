@@ -1,19 +1,14 @@
-from __future__ import annotations
-
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from typer.testing import CliRunner
 
 from workstation.local import jj as jj_module
-from workstation.local.jj import (
-    jj_get_entrypoint,
-    jj_git_fetch_entrypoint,
-    jj_redate_entrypoint,
-)
+from workstation.local.jj import jj_git_fetch_entrypoint
 
 
 class Tty:
@@ -22,13 +17,17 @@ class Tty:
 
 
 def test_jj_get_help_does_not_require_a_repository(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["jj-get", "--help"])
+    monkeypatch.setattr(
+        jj_module,
+        "_git",
+        lambda *_args, **_kwargs: pytest.fail("help must not inspect the repository"),
+    )
+    result = CliRunner().invoke(jj_module.jj_get_app, ["--help"])
 
-    jj_get_entrypoint()
-
-    assert capsys.readouterr().out.startswith("usage: jj-get")
+    assert result.exit_code == 0
+    assert "Usage:" in result.output
 
 
 @pytest.mark.parametrize(
@@ -39,34 +38,26 @@ def test_jj_get_help_does_not_require_a_repository(
     ],
 )
 def test_jj_get_rejects_extra_pr_arguments(
-    monkeypatch: pytest.MonkeyPatch, arguments: list[str]
+    arguments: list[str],
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["jj-get", *arguments])
+    result = CliRunner().invoke(jj_module.jj_get_app, arguments)
 
-    with pytest.raises(SystemExit, match="usage: jj-get"):
-        jj_get_entrypoint()
+    assert result.exit_code == 2
+    assert "Invalid value" in result.output
 
 
-def test_jj_get_rejects_base_after_remote_in_target(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["jj-get", "feature@upstream", "main", "ignored"],
+def test_jj_get_rejects_base_after_remote_in_target() -> None:
+    result = CliRunner().invoke(
+        jj_module.jj_get_app,
+        ["feature@upstream", "main", "ignored"],
     )
 
-    with pytest.raises(SystemExit, match="usage: jj-get"):
-        jj_get_entrypoint()
+    assert result.exit_code == 2
+    assert "BOOKMARK@REMOTE" in result.output
 
 
 def test_jj_get_accepts_pr_url_query(monkeypatch: pytest.MonkeyPatch) -> None:
     resolved: list[tuple[str, str | None]] = []
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["jj-get", "https://github.com/owner/repo/pull/123?notification_referrer=1"],
-    )
     monkeypatch.setattr(jj_module, "_git", lambda *_args, **_kwargs: ".git")
     monkeypatch.setattr(
         jj_module,
@@ -74,8 +65,12 @@ def test_jj_get_accepts_pr_url_query(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda number, repo: resolved.append((number, repo)),
     )
 
-    jj_get_entrypoint()
+    result = CliRunner().invoke(
+        jj_module.jj_get_app,
+        ["https://github.com/owner/repo/pull/123?notification_referrer=1"],
+    )
 
+    assert result.exit_code == 0
     assert resolved == [("123", "owner/repo")]
 
 
@@ -200,7 +195,9 @@ def test_jj_get_pr_uses_stable_tracked_bookmark(
     monkeypatch.setattr(
         jj_module,
         "_gh_json",
-        lambda *_args: {"baseRefName": "main"},
+        lambda model, *_args: model.model_validate({
+            "baseRefName": "main",
+        }),
     )
     monkeypatch.setattr(
         jj_module,
@@ -378,7 +375,7 @@ def test_jj_git_fetch_rejects_invalid_depth(monkeypatch: pytest.MonkeyPatch) -> 
         lambda *_args, **_kwargs: "origin",
     )
 
-    with pytest.raises(SystemExit, match="positive integer"):
+    with pytest.raises(SystemExit, match="jj_git_fetch_depth"):
         jj_git_fetch_entrypoint()
 
 
@@ -414,95 +411,21 @@ def test_jj_git_fetch_delegates_jj_string_expressions(
 
 
 def test_jj_redate_help_does_not_prompt(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setattr(sys, "argv", ["jj-redate", "--help"])
-
-    jj_redate_entrypoint()
-
-    assert capsys.readouterr().out.startswith("usage: jj-redate")
-
-
-def test_jj_redate_gum_input_keeps_prompt_on_terminal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
-
-    def fake_run(
-        argv: tuple[str, ...],
-        **kwargs: object,
-    ) -> subprocess.CompletedProcess[str]:
-        calls.append((argv, kwargs))
-        return subprocess.CompletedProcess(argv, 0, stdout="2026-07-10\n")
-
-    monkeypatch.delenv("JJ_REDATE_NO_GUM", raising=False)
-    monkeypatch.setattr(sys, "stdin", Tty())
-    monkeypatch.setattr(sys, "stdout", Tty())
     monkeypatch.setattr(
-        jj_module,
-        "which",
-        lambda name: Path("/opt/homebrew/bin/gum") if name == "gum" else None,
+        jj_module, "_redate_revisions", lambda *_args: pytest.fail("prompted")
     )
-    monkeypatch.setattr(jj_module.subprocess, "run", fake_run)
+    result = CliRunner().invoke(jj_module.jj_redate_app, ["--help"])
 
-    assert jj_module._prompt("Date (YYYY-MM-DD): ", "2026-07-10") == "2026-07-10"
-    assert calls == [
-        (
-            (
-                "/opt/homebrew/bin/gum",
-                "input",
-                "--prompt",
-                "Date (YYYY-MM-DD): ",
-                "--value",
-                "2026-07-10",
-            ),
-            {"check": False, "stdout": subprocess.PIPE, "text": True},
-        )
-    ]
-
-
-def test_jj_redate_gum_confirm_is_interactive(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
-
-    def fake_run(
-        argv: tuple[str, ...],
-        **kwargs: object,
-    ) -> subprocess.CompletedProcess[str]:
-        calls.append((argv, kwargs))
-        return subprocess.CompletedProcess(argv, 0)
-
-    monkeypatch.delenv("JJ_REDATE_NO_GUM", raising=False)
-    monkeypatch.setattr(sys, "stdin", Tty())
-    monkeypatch.setattr(sys, "stdout", Tty())
-    monkeypatch.setattr(
-        jj_module,
-        "which",
-        lambda name: Path("/opt/homebrew/bin/gum") if name == "gum" else None,
-    )
-    monkeypatch.setattr(jj_module.subprocess, "run", fake_run)
-
-    assert jj_module._confirm_redate(["@-"], "2026-07-10T03:25:00+03:00")
-    assert calls == [
-        (
-            (
-                "/opt/homebrew/bin/gum",
-                "confirm",
-                (
-                    "Set author and committer timestamp on @- to "
-                    "2026-07-10T03:25:00+03:00?"
-                ),
-            ),
-            {"check": False},
-        )
-    ]
+    assert result.exit_code == 0
+    assert "Usage:" in result.output
 
 
 def test_jj_redate_without_args_falls_back_to_working_copy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("JJ_REDATE_NO_GUM", "1")
+    monkeypatch.setenv("JJ_REDATE_NO_PROMPT", "1")
     monkeypatch.setattr(sys, "stdin", Tty())
     monkeypatch.setattr(sys, "stdout", Tty())
 
@@ -590,8 +513,6 @@ def test_jj_redate_rejects_partial_divergent_descendant(
 def test_jj_redate_without_args_opens_interactive_revision_picker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[tuple[tuple[str, ...], dict[str, object]]] = []
-
     def fake_log(revset: str, template: str, reverse: bool = False) -> str:
         assert not reverse
         assert "mutable() & remote_bookmarks().." in revset
@@ -603,57 +524,18 @@ def test_jj_redate_without_args_opens_interactive_revision_picker(
             "2026-01-02 03:00:00\t22222222\tadd sample feature\n"
         )
 
-    def fake_run(
-        argv: tuple[str, ...],
-        **kwargs: object,
-    ) -> subprocess.CompletedProcess[str]:
-        calls.append((argv, kwargs))
-        return subprocess.CompletedProcess(
-            argv,
-            0,
-            stdout=(
-                "o bbbbbbbb user@example.com 2026-01-02 03:00:00 "
-                "22222222  add sample feature\n"
-            ),
-        )
+    def checkbox(_label: str, *, choices: list[SimpleNamespace]) -> SimpleNamespace:
+        selected = choices[1]
+        return SimpleNamespace(ask=lambda: [selected.value])
 
-    monkeypatch.delenv("JJ_REDATE_NO_GUM", raising=False)
+    monkeypatch.delenv("JJ_REDATE_NO_PROMPT", raising=False)
     monkeypatch.delenv("JJ_REDATE_REVSET", raising=False)
     monkeypatch.delenv("JJ_REDATE_LIMIT", raising=False)
     monkeypatch.setattr(sys, "stdin", Tty())
     monkeypatch.setattr(sys, "stdout", Tty())
-    monkeypatch.setattr(
-        jj_module,
-        "which",
-        lambda name: Path("/opt/homebrew/bin/gum") if name == "gum" else None,
-    )
     monkeypatch.setattr(jj_module, "_log", fake_log)
-    monkeypatch.setattr(jj_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(jj_module.questionary, "checkbox", checkbox)
 
     assert jj_module._redate_revisions([]) == [
         "change_id(bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
-    ]
-    assert calls == [
-        (
-            (
-                "/opt/homebrew/bin/gum",
-                "choose",
-                "--ordered",
-                "--limit",
-                "2",
-                "--height",
-                "5",
-                "--header",
-                "Select revisions to redate",
-                (
-                    "@ aaaaaaaa user@example.com 2026-01-02 03:04:05 "
-                    "11111111  (no description set)"
-                ),
-                (
-                    "o bbbbbbbb user@example.com 2026-01-02 03:00:00 "
-                    "22222222  add sample feature"
-                ),
-            ),
-            {"check": False, "stdout": subprocess.PIPE, "text": True},
-        )
     ]
