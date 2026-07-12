@@ -59,6 +59,13 @@ host_layer_nerd_font_archive: "{{ dotfiles_cache_dir }}/JetBrainsMono.zip"
 host_layer_nerd_font_dir: >-
   {{ dotfiles_data_home }}/fonts/JetBrainsMonoNerdFont
 
+host_layer_color_emoji_font_url: >-
+  https://raw.githubusercontent.com/googlefonts/noto-emoji/main/fonts/NotoColorEmoji.ttf
+host_layer_color_emoji_font_dir: >-
+  {{ dotfiles_data_home }}/fonts/NotoColorEmoji
+host_layer_color_emoji_font_file: >-
+  {{ host_layer_color_emoji_font_dir }}/NotoColorEmoji.ttf
+
 host_layer_font_settings:
   - key: font-name
     path: /org/gnome/desktop/interface/font-name

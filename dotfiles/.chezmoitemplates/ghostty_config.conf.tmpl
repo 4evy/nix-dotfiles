@@ -6,6 +6,9 @@ confirm-close-surface = false
 cursor-style = bar
 cursor-style-blink = false
 font-family = JetBrainsMono Nerd Font Mono
+{{- if eq .chezmoi.os "linux" }}
+font-family = Noto Color Emoji Bitmap
+{{- end }}
 font-size = 14
 mouse-scroll-multiplier = precision:1,discrete:3
 quit-after-last-window-closed = true

@@ -71,6 +71,27 @@
       failed_when: >-
         'JetBrainsMonoNerdFontMono' not in host_layer_nerd_font_verify.stdout
 
+- name: Create Noto color emoji font directory
+  ansible.builtin.file:
+    path: "{{ host_layer_color_emoji_font_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - host
+    - fonts
+    - color-emoji-font
+
+- name: Install bitmap-backed Noto Color Emoji
+  ansible.builtin.get_url:
+    url: "{{ host_layer_color_emoji_font_url }}"
+    dest: "{{ host_layer_color_emoji_font_file }}"
+    mode: "0644"
+  notify: Refresh user font cache
+  tags:
+    - host
+    - fonts
+    - color-emoji-font
+
 - name: Detect writable GNOME font settings
   ansible.builtin.command:
     argv:
