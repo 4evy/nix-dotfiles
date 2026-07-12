@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import os
 import sys
@@ -10,6 +8,7 @@ from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
 from PIL import Image
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 
 from workstation.console import error_console
 from workstation.errors import DotfilesError
@@ -17,6 +16,28 @@ from workstation.lib.commands import run
 from workstation.lib.files import ensure_directory, require_file, write_if_changed
 from workstation.lib.http import download
 from workstation.lib.retry import wait_until
+
+
+class RaycastUser(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    image: str | None = None
+    avatar: str | None = None
+
+
+class RaycastOAuthToken(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    access_token: str = Field(min_length=1)
+
+
+class RaycastProfile(BaseModel):
+    current_user: RaycastUser
+    oauth_token: RaycastOAuthToken
+    avatar_url: str | None = None
+    command_aliases: list[JsonValue] = Field(default_factory=list)
 
 
 def _log(message: str) -> None:
@@ -67,7 +88,6 @@ def _restore_node(node: Path, real: Path, hook: Path) -> None:
 
 def _write_node_wrapper(node: Path, real: Path, hook: Path, key_file: Path) -> None:
     script = f"""#!/usr/bin/env python3
-from __future__ import annotations
 import os
 import sys
 real = {os.fspath(real)!r}
@@ -123,7 +143,7 @@ def _resize_avatar(source: Path, destination: Path) -> None:
         image.convert("RGBA").save(destination, format="PNG")
 
 
-def _ensure_avatar(profile: dict[str, object], app_support: Path) -> Path:
+def _ensure_avatar(profile: RaycastProfile, app_support: Path) -> Path:
     ensure_directory(app_support)
     destination = app_support / "avatar.png"
     configured = os.environ.get("RAYCAST_AVATAR_SRC")
@@ -134,7 +154,7 @@ def _ensure_avatar(profile: dict[str, object], app_support: Path) -> Path:
             return destination
         except (OSError, ValueError) as error:
             _warn(f"failed to resize configured avatar; trying profile URL: {error}")
-    url = str(profile.get("avatar_url") or "")
+    url = profile.avatar_url or ""
     if not url:
         if not destination.is_file():
             _warn("profile is missing avatar_url; continuing without avatar refresh")
@@ -181,32 +201,27 @@ def main() -> int:
         _warn(f"Raycast Beta data addon not found; skipping: {data_node}")
         return 0
     with require_file(profile_file).open("rb") as profile_handle:
-        profile = tomllib.load(profile_handle)
+        try:
+            profile = RaycastProfile.model_validate(tomllib.load(profile_handle))
+        except (tomllib.TOMLDecodeError, ValidationError) as error:
+            raise DotfilesError(f"invalid Raycast profile: {error}") from error
     require_file(hook)
     require_file(raycast_db)
     node, key_file = _extract_key(app_support, hook, beta_app)
     avatar = _ensure_avatar(profile, app_support)
-    current_user = profile.get("current_user")
-    oauth_token = profile.get("oauth_token")
-    if (
-        not isinstance(current_user, dict)
-        or not current_user.get("id")
-        or not current_user.get("name")
-    ):
-        raise DotfilesError("profile is missing current_user identity")
-    if not isinstance(oauth_token, dict) or not oauth_token.get("access_token"):
-        raise DotfilesError("profile is missing oauth_token.access_token")
+    current_user = profile.current_user
+    oauth_token = profile.oauth_token
     avatar_url = avatar.resolve().as_uri()
-    current_user["image"] = avatar_url
-    current_user["avatar"] = avatar_url
+    current_user.image = avatar_url
+    current_user.avatar = avatar_url
     run(
         (
             node,
             raycast_db,
             "profile",
             "apply",
-            json.dumps(current_user, separators=(",", ":")),
-            json.dumps(oauth_token, separators=(",", ":")),
+            current_user.model_dump_json(exclude_none=True),
+            oauth_token.model_dump_json(),
         ),
         env={
             "RAYCAST_APP_SUPPORT": os.fspath(app_support),
@@ -214,10 +229,8 @@ def main() -> int:
             "RAYCAST_KEY_FILE": os.fspath(key_file),
         },
     )
-    command_aliases = profile.get("command_aliases", [])
+    command_aliases = profile.command_aliases
     if command_aliases:
-        if not isinstance(command_aliases, list):
-            raise DotfilesError("profile command_aliases must be a list")
         run(
             (
                 node,

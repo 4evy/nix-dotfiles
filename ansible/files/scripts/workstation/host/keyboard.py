@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 import re
 import shutil
@@ -8,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 import typer
+from pydantic import BaseModel, ValidationError
 
 from workstation.automation import automation_check_mode, current_context
 from workstation.automation_models import OperationResult
@@ -34,6 +33,11 @@ from workstation.lib.http import download, get
 from workstation.lib.paths import find_repo_root
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+
+
+class GnomeExtensionInfo(BaseModel):
+    download_url: str | None = None
+    version: int | str | None = None
 
 
 def _source_root() -> Path:
@@ -119,9 +123,14 @@ def toshy_gnome_context() -> OperationResult:
             f"{origin}/extension-info/",
             params={"uuid": uuid, "shell_version": shell_version},
         )
-        metadata = response.json()
-        download_url = metadata.get("download_url")
-        version = metadata.get("version")
+        try:
+            metadata = GnomeExtensionInfo.model_validate_json(response.content)
+        except ValidationError as error:
+            raise DotfilesError(
+                f"toshy-gnome-window-context: invalid metadata for {label}: {error}"
+            ) from error
+        download_url = metadata.download_url
+        version = metadata.version
         if not download_url or version is None:
             console.print(
                 f"toshy-gnome-window-context: {label} has no compatible "

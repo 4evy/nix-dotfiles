@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import json
 import os
 from collections.abc import Sequence
 from pathlib import Path
@@ -18,6 +17,26 @@ def _discord_app(tmp_path: Path) -> tuple[Path, Path]:
     resources.mkdir(parents=True)
     (resources / "app.asar").write_bytes(b"clean Discord ASAR")
     return app, resources
+
+
+def test_gpu_configuration_preserves_unrelated_settings(tmp_path: Path) -> None:
+    settings = tmp_path / "settings.json"
+    settings.write_text(
+        json.dumps({
+            "unrelated": "preserved",
+            "chromiumSwitches": {"existing_switch": "preserved"},
+        })
+    )
+
+    discord._configure_gpu(tmp_path)
+
+    configured = json.loads(settings.read_text())
+    assert configured["unrelated"] == "preserved"
+    assert configured["enableHardwareAcceleration"] is True
+    assert configured["chromiumSwitches"] == {
+        "existing_switch": "preserved",
+        "force_high_performance_gpu": True,
+    }
 
 
 def test_linux_equilotl_finds_user_install_when_launcher_is_symlinked(

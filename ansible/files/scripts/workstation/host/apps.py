@@ -1,13 +1,11 @@
-from __future__ import annotations
-
 import hashlib
-import json
 import os
 import tempfile
 from pathlib import Path
 
 import tomlkit
 import typer
+from pydantic import BaseModel, Field, ValidationError
 from tomlkit.exceptions import ParseError
 
 from workstation.automation import automation_check_mode
@@ -26,6 +24,10 @@ from workstation.lib.paths import find_repo_root
 from workstation.lib.retry import wait_until
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+
+
+class TailscalePreferences(BaseModel):
+    run_ssh: bool = Field(False, alias="RunSSH")
 
 
 def _source_root() -> Path:
@@ -236,8 +238,10 @@ def _validate_tailscale_selinux(host: HostRunner) -> None:
         return
     preferences = host.root(("tailscale", "debug", "prefs"), check=False, capture=True)
     try:
-        ssh_enabled = bool(json.loads(preferences.stdout).get("RunSSH"))
-    except json.JSONDecodeError, AttributeError:
+        ssh_enabled = TailscalePreferences.model_validate_json(
+            preferences.stdout
+        ).run_ssh
+    except ValidationError:
         ssh_enabled = False
     if not ssh_enabled:
         return

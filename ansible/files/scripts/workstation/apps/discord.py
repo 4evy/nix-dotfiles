@@ -1,17 +1,37 @@
-from __future__ import annotations
-
-import json
 import os
 import shlex
 import sys
 from pathlib import Path
+from typing import Annotated
 
 from packaging.version import InvalidVersion, Version
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
 from workstation.errors import DotfilesError
 from workstation.lib.commands import run
 from workstation.lib.files import ensure_directory, write_if_changed
 from workstation.lib.host import user_config_home
+
+
+class ChromiumSwitches(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    force_high_performance_gpu: bool = True
+
+
+class DiscordSettings(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    enable_hardware_acceleration: bool = Field(True, alias="enableHardwareAcceleration")
+    enable_devtools: bool = Field(
+        True,
+        alias="DANGEROUS_ENABLE_DEVTOOLS_ONLY_ENABLE_IF_YOU_KNOW_WHAT_YOURE_DOING",
+    )
+    chromium_switches: Annotated[
+        ChromiumSwitches,
+        BeforeValidator(lambda value: value if isinstance(value, dict) else {}),
+    ] = Field(default_factory=ChromiumSwitches, alias="chromiumSwitches")
+
 
 DISCORD_FLAGS = (
     "--ozone-platform-hint=auto",
@@ -34,17 +54,19 @@ def _flags_from_file(path: Path) -> list[str]:
 def _configure_gpu(discord_dir: Path) -> None:
     settings = discord_dir / "settings.json"
     try:
-        value = json.loads(settings.read_text()) if settings.is_file() else {}
-    except json.JSONDecodeError as error:
+        value = (
+            DiscordSettings.model_validate_json(settings.read_bytes())
+            if settings.is_file()
+            else DiscordSettings()
+        )
+    except ValidationError as error:
         raise DotfilesError(f"invalid Discord settings JSON: {settings}") from error
-    value["enableHardwareAcceleration"] = True
-    value["DANGEROUS_ENABLE_DEVTOOLS_ONLY_ENABLE_IF_YOU_KNOW_WHAT_YOURE_DOING"] = True
-    switches = value.setdefault("chromiumSwitches", {})
-    if not isinstance(switches, dict):
-        switches = {}
-        value["chromiumSwitches"] = switches
-    switches["force_high_performance_gpu"] = True
-    write_if_changed(settings, json.dumps(value, indent=2) + "\n", "0600")
+    value.enable_hardware_acceleration = True
+    value.enable_devtools = True
+    value.chromium_switches.force_high_performance_gpu = True
+    write_if_changed(
+        settings, value.model_dump_json(by_alias=True, indent=2) + "\n", "0600"
+    )
 
 
 def _patch_location(location: Path, equilotl: Path) -> None:

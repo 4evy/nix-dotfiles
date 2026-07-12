@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import hashlib
 import os
 import platform
@@ -9,9 +7,13 @@ import tarfile
 import tempfile
 import time
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
+from githubkit import GitHub
+from githubkit.exception import GitHubException
+from pydantic import Field, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from workstation.automation import automation_check_mode
 from workstation.automation_models import OperationResult
@@ -28,7 +30,7 @@ from workstation.lib.files import (
     require_file,
     write_if_changed,
 )
-from workstation.lib.http import download, get
+from workstation.lib.http import download
 from workstation.lib.paths import find_repo_root
 
 
@@ -36,10 +38,22 @@ def _repo_root() -> Path:
     return find_repo_root(Path(__file__))
 
 
-def _nonnegative_integer(value: str, name: str) -> int:
-    if not value.isdigit():
-        raise DotfilesError(f"{name} must be a nonnegative integer: {value}")
-    return int(value)
+class InstallerSettings(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+    ghostty_tip_check_interval_seconds: int = Field(86400, ge=0)
+    ghostty_build_container_image: str = "registry.fedoraproject.org/fedora:latest"
+    helix_tip_revision: str = "14d6bc0febed9c692048271a8ae2362ac969c6e0"
+    helix_tip_check_interval_seconds: int = Field(86400, ge=0)
+    github_token: str | None = None
+    gh_token: str | None = None
+
+
+def _settings() -> InstallerSettings:
+    try:
+        return InstallerSettings()
+    except ValidationError as error:
+        raise DotfilesError(f"invalid installer configuration: {error}") from error
 
 
 def _fresh_check(
@@ -149,10 +163,8 @@ def install_ghostty_tip_linux(
     checked_at = prefix / ".ghostty-tip-checked-at"
     source_key_file = prefix / ".ghostty-tip-source-key"
     state_file = prefix / ".ghostty-tip-state-version"
-    interval = _nonnegative_integer(
-        os.environ.get("GHOSTTY_TIP_CHECK_INTERVAL_SECONDS", "86400"),
-        "GHOSTTY_TIP_CHECK_INTERVAL_SECONDS",
-    )
+    settings = _settings()
+    interval = settings.ghostty_tip_check_interval_seconds
     fresh = _fresh_check(
         executable=executable,
         checked_at=checked_at,
@@ -267,10 +279,7 @@ def install_ghostty_tip_linux(
                 f"ZIG_ARCH={_zig_architecture()}",
                 "--env",
                 "ZIG_VERSION=0.15.2",
-                os.environ.get(
-                    "GHOSTTY_BUILD_CONTAINER_IMAGE",
-                    "registry.fedoraproject.org/fedora:latest",
-                ),
+                settings.ghostty_build_container_image,
                 "python3",
                 "/tmp/ghostty-build.py",
             ),
@@ -323,13 +332,9 @@ def install_helix_tip_linux(
     """Build and install the pinned Helix tip revision."""
     cache = cache_dir
     prefix = install_prefix
-    source_ref = os.environ.get(
-        "HELIX_TIP_REVISION", "14d6bc0febed9c692048271a8ae2362ac969c6e0"
-    )
-    interval = _nonnegative_integer(
-        os.environ.get("HELIX_TIP_CHECK_INTERVAL_SECONDS", "86400"),
-        "HELIX_TIP_CHECK_INTERVAL_SECONDS",
-    )
+    settings = _settings()
+    source_ref = settings.helix_tip_revision
+    interval = settings.helix_tip_check_interval_seconds
     repo = cache / "source"
     build_log = cache / "helix-tip-build.log"
     stamp = prefix / ".helix-tip-revision"
@@ -475,13 +480,6 @@ def _helium_architecture() -> str:
     raise DotfilesError(f"unsupported Helium architecture: {architecture}")
 
 
-def _helium_asset(release: dict[str, Any], name: str) -> dict[str, Any]:
-    for asset in release.get("assets", []):
-        if asset.get("name") == name:
-            return asset
-    raise DotfilesError(f"latest Helium release does not include {name}")
-
-
 def _verified_download(path: Path, url: str, digest: str | None) -> None:
     expected = (
         digest.removeprefix("sha256:").lower()
@@ -556,17 +554,33 @@ def install_helium_linux(
     app_root = ensure_directory(app_root)
     bin_dir = ensure_directory(bin_dir)
     secrets = require_file(secrets_file)
-    release = get(
-        "https://api.github.com/repos/imputnet/helium-linux/releases/latest"
-    ).json()
-    version = release["tag_name"]
+    settings = _settings()
+    try:
+        release = (
+            GitHub(
+                settings.github_token or settings.gh_token,
+                user_agent="dotfiles-helium-installer",
+                timeout=60,
+            )
+            .rest.repos.get_latest_release("imputnet", "helium-linux")
+            .parsed_data
+        )
+    except GitHubException as error:
+        raise DotfilesError(
+            f"failed to read the latest Helium release: {error}"
+        ) from error
+    version = release.tag_name
     name = f"helium-{version}-{_helium_architecture()}_linux.tar.xz"
-    asset = _helium_asset(release, name)
+    asset = next(
+        (candidate for candidate in release.assets if candidate.name == name), None
+    )
+    if asset is None:
+        raise DotfilesError(f"latest Helium release does not include {name}")
     archive = cache / name
     app_dir = app_root / "app"
     version_file = app_dir / ".helium-version"
     if not version_file.is_file() or version_file.read_text().strip() != version:
-        _verified_download(archive, asset["browser_download_url"], asset.get("digest"))
+        _verified_download(archive, str(asset.browser_download_url), asset.digest)
         extract = fresh_directory(cache / "extract")
         with tarfile.open(archive) as source:
             extract_tar_archive(source, extract)

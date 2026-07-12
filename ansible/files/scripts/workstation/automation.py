@@ -1,8 +1,5 @@
 """Versioned machine interface for Ansible-owned Python operations."""
 
-from __future__ import annotations
-
-import json
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stdout
@@ -106,7 +103,7 @@ def run_machine_protocol(payload: str) -> OperationResponse:
     try:
         request = OperationRequest.model_validate_json(payload)
         return dispatch(request)
-    except (DotfilesError, ValidationError, json.JSONDecodeError) as error:
+    except (DotfilesError, ValidationError) as error:
         return _failure(str(error))
     except Exception as error:  # noqa: BLE001 - wire boundary must stay valid JSON.
         return _failure(f"unexpected automation failure: {error}")

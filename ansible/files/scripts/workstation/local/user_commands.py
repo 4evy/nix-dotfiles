@@ -1,7 +1,4 @@
-from __future__ import annotations
-
 import datetime as dt
-import json
 import os
 import platform
 import re
@@ -10,6 +7,7 @@ import sys
 from pathlib import Path
 
 import psutil
+from pydantic import TypeAdapter
 
 from workstation.console import console, error_console
 from workstation.errors import DotfilesError
@@ -468,7 +466,7 @@ def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
 
 def _accent_colors() -> tuple[str, str]:
     repository = find_repo_root(Path(__file__))
-    palette = json.loads(
+    palette = TypeAdapter(dict[str, dict[str, str]]).validate_json(
         (repository / "dotfiles/.chezmoitemplates/catppuccin_palette.json").read_text()
     )
     return palette["latte"]["pink"], palette["frappe"]["pink"]

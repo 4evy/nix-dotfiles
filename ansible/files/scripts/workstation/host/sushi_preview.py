@@ -1,9 +1,7 @@
-from __future__ import annotations
-
-import json
 import shutil
 from pathlib import Path
 
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from workstation.automation import automation_check_mode
@@ -24,19 +22,31 @@ class SushiSettings(BaseSettings):
     repo: str = "https://github.com/GNOME/sushi.git"
 
 
+class SushiModule(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    name: str | None = None
+    config_opts: list[JsonValue] | None = Field(None, alias="config-opts")
+
+
+class SushiManifest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    app_id: str | None = Field(None, alias="app-id")
+    modules: list[SushiModule]
+
+
 def update_manifest(path: Path, *, app_id: str, profile: str) -> None:
     try:
-        manifest = json.loads(path.read_text(encoding="utf-8"))
-        modules = manifest["modules"]
-    except (OSError, json.JSONDecodeError, KeyError, TypeError) as error:
+        manifest = SushiManifest.model_validate_json(path.read_bytes())
+    except (OSError, ValidationError) as error:
         raise DotfilesError(f"invalid Sushi Flatpak manifest: {path}") from error
-    manifest["app-id"] = app_id
-    for module in modules:
-        if not isinstance(module, dict) or module.get("name") != "sushi":
+    manifest.app_id = app_id
+    for module in manifest.modules:
+        if module.name != "sushi":
             continue
-        options = module.setdefault("config-opts", [])
-        if not isinstance(options, list):
-            raise DotfilesError("Sushi manifest config-opts must be a list")
+        options = module.config_opts or []
+        module.config_opts = options
         setting = f"-Dprofile={profile}"
         replaced = False
         for index, option in enumerate(options):
@@ -45,7 +55,10 @@ def update_manifest(path: Path, *, app_id: str, profile: str) -> None:
                 replaced = True
         if not replaced:
             options.append(setting)
-    write_if_changed(path, json.dumps(manifest, indent=2) + "\n")
+    write_if_changed(
+        path,
+        manifest.model_dump_json(by_alias=True, exclude_none=True, indent=2) + "\n",
+    )
 
 
 def install(settings: SushiSettings | None = None) -> OperationResult:
