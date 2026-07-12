@@ -111,3 +111,32 @@ def test_macos_repair_skips_network_when_equicord_is_present(
     discord._repair_macos(tmp_path)
 
     assert commands == [("chflags", "uchg", str(resources / "app.asar"))]
+
+
+def test_linux_patch_repairs_loader_from_previous_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    location = tmp_path / "discord/app-1.0.0"
+    resources = location / "resources"
+    resources.mkdir(parents=True)
+    (resources / "app.asar").write_bytes(
+        b'require("/var/home/old/.config/Equicord/equicord.asar"){"name": "discord"}'
+    )
+    (resources / "build_info.json").write_text("{}")
+    equilotl = tmp_path / "EquilotlCli-linux"
+    equilotl.write_text("#!/bin/sh\n")
+    equilotl.chmod(0o755)
+    commands: list[tuple[str, ...]] = []
+
+    def fake_run(
+        argv: Sequence[str | os.PathLike[str]], **_kwargs: object
+    ) -> CommandResult:
+        commands.append(tuple(map(str, argv)))
+        return CommandResult(0, "", "")
+
+    monkeypatch.setattr(discord, "user_config_home", lambda: tmp_path / "config")
+    monkeypatch.setattr(discord, "run", fake_run)
+
+    discord._patch_location(location, equilotl)
+
+    assert commands == [(str(equilotl), "--repair", "--location", str(location))]

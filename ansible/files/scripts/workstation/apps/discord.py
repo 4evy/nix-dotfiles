@@ -78,7 +78,8 @@ def _patch_location(location: Path, equilotl: Path) -> None:
         return
     if asar.is_file() and asar.stat().st_size <= 131072:
         content = asar.read_bytes()
-        if b'"name": "discord"' in content and b"require(" in content:
+        expected = os.fsencode(user_config_home() / "Equicord/equicord.asar")
+        if b'"name": "discord"' in content and expected in content:
             return
     run((equilotl, "--repair", "--location", location), check=False)
 
