@@ -141,6 +141,7 @@ in
         nufraw-thumbnailer
         pavucontrol
         playerctl
+        telegram-desktop
         ;
     };
 

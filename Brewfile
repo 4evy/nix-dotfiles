@@ -201,6 +201,7 @@ if OS.mac?
   cask "rustdesk"
   cask "shottr"
   cask "stats"
+  cask "telegram"
   cask "visual-studio-code"
   # Raycast Beta is installed by ansible/roles/applications/tasks/macos.yml.
 end
