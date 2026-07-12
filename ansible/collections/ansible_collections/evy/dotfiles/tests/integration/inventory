@@ -4,7 +4,7 @@
             "testhost": {
                 "ansible_connection": "local",
                 "ansible_pipelining": "yes",
-                "ansible_python_interpreter": "/var/home/e0vi/.local/share/uv/tools/ansible-core/bin/python"
+                "ansible_python_interpreter": "/var/home/evy/.local/share/uv/tools/ansible-core/bin/python"
             }
         }
     }
