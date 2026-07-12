@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import filecmp
 import os
 import shutil
@@ -55,38 +53,8 @@ def fresh_directory(path: str | Path, mode: int | str | None = None) -> Path:
 
 
 def extract_tar_archive(archive: tarfile.TarFile, destination: str | Path) -> None:
-    """Extract an archive using Python's hardened data filter on every runtime."""
-    destination_path = ensure_directory(destination)
-    data_filter = getattr(tarfile, "data_filter", None)
-    if data_filter is not None:
-        try:
-            archive.extractall(destination_path, filter="data")
-            return
-        except TypeError:
-            members = [
-                filtered
-                for member in archive.getmembers()
-                if (filtered := data_filter(member, destination_path)) is not None
-            ]
-            archive.extractall(destination_path, members=members)
-            return
-
-    root = destination_path.resolve()
-    members: list[tarfile.TarInfo] = []
-    for member in archive.getmembers():
-        target = (root / member.name).resolve()
-        if target != root and root not in target.parents:
-            raise DotfilesError(
-                f"tar member escapes extraction directory: {member.name}"
-            )
-        if member.islnk() or member.issym():
-            link = (target.parent / member.linkname).resolve()
-            if link != root and root not in link.parents:
-                raise DotfilesError(
-                    f"tar link escapes extraction directory: {member.name}"
-                )
-        members.append(member)
-    archive.extractall(destination_path, members=members)
+    """Extract an archive using Python 3.14's hardened data filter."""
+    archive.extractall(ensure_directory(destination), filter="data")
 
 
 def install_file_if_changed(

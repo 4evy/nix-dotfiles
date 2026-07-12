@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Automate upstream Toshy's interactive installer for host Ansible runs."""
 
-from __future__ import annotations
-
 import argparse
 import builtins
 import os
@@ -16,7 +14,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TypeGuard, cast
 
-RunCallable = Callable[..., subprocess.CompletedProcess[str]]
+type RunCallable = Callable[..., subprocess.CompletedProcess[str]]
 ORIGINAL_RUN = cast("RunCallable", subprocess.run)
 SUDO_SHIM_DIR = os.environ.get("TOSHY_SUDO_SHIM_DIR")
 SUDO_NAMES = {"sudo", "sudo-rs"}

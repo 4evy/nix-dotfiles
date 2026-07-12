@@ -1,7 +1,5 @@
 """Controller-side filters for declarative dotfiles state."""
 
-from __future__ import annotations
-
 import ast
 from collections.abc import Callable
 

@@ -1,7 +1,5 @@
 """Linux host-layer automation commands."""
 
-from __future__ import annotations
-
 import typer
 
 from workstation.host import apps, desktop, keyboard

@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 class DotfilesError(RuntimeError):
     """A user-facing automation failure."""
 

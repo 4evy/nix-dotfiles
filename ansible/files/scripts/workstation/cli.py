@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import typer
 
 from workstation import __version__

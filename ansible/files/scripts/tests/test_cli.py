@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typer.main import get_command
 from typer.testing import CliRunner
 

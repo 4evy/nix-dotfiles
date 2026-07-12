@@ -1,7 +1,5 @@
 """macOS workstation configuration commands."""
 
-from __future__ import annotations
-
 import typer
 
 from workstation.macos import system

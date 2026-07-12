@@ -1,7 +1,5 @@
 """Application installer and launcher commands."""
 
-from __future__ import annotations
-
 import typer
 
 from workstation.apps import ghidra_mcp, installers

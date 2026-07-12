@@ -6,8 +6,6 @@ Using the same boundary keeps our config customizations compatible with
 host-installed Toshy on Bluefin.
 """
 
-from __future__ import annotations
-
 import argparse
 import re
 from pathlib import Path

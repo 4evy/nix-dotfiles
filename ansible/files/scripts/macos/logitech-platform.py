@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Set Logitech HID++ 2.0 MULTIPLATFORM OS mode for the current host."""
 
-from __future__ import annotations
-
 import argparse
 import ctypes
 import ctypes.util

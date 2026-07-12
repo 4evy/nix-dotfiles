@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from __future__ import annotations
 
 import argparse
 import datetime as dt
@@ -41,7 +40,7 @@ LATTE_ROLE_OVERRIDES = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ThemeChoice:
     name: str
     source: str
