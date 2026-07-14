@@ -267,9 +267,22 @@ def test_program_manifest_contains_one_declaration_per_program() -> None:
 def test_ghostty_source_and_toolchain_are_pinned() -> None:
     assert ghostty.REVISION == "a887df42c56f6de86c0fe6da9c4eeca37931e083"
     assert ghostty.ZIG_VERSION == "0.15.2"
+    assert ghostty.ZIG_BUILD_JOBS == 2
     assert len(ghostty.SOURCE_SHA256) == 64
     assert set(ghostty.ZIG_SHA256) == {"x86_64-linux", "aarch64-linux"}
     assert all(len(digest) == 64 for digest in ghostty.ZIG_SHA256.values())
+
+
+def test_ghostty_build_caps_zig_concurrency() -> None:
+    assert ghostty._zig_build_command(Path("/zig")) == (
+        Path("/zig"),
+        "build",
+        "-j2",
+        "-p",
+        "/usr",
+        "-Doptimize=ReleaseFast",
+        f"-Dversion-string={ghostty.VERSION}",
+    )
 
 
 def test_ghostty_download_rejects_wrong_checksum(

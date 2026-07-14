@@ -15,6 +15,7 @@ VERSION = "1.3.2-dev.a887df4"
 SOURCE_URL = f"https://github.com/ghostty-org/ghostty/archive/{REVISION}.tar.gz"
 SOURCE_SHA256 = "fb4b2f9ffa0af125983041fdbe4ef94d3fa79fb9f2d22b9c213c0e3847a866b6"
 ZIG_VERSION = "0.15.2"
+ZIG_BUILD_JOBS = 2
 ZIG_SHA256 = {
     "x86_64-linux": "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239",
     "aarch64-linux": "958ed7d1e00d0ea76590d27666efbf7a932281b3d7ba0c6b01b0ff26498f667f",
@@ -35,6 +36,18 @@ def _zig_architecture() -> str:
     if architecture in {"aarch64", "arm64"}:
         return "aarch64-linux"
     fail(f"unsupported Ghostty build architecture: {architecture}")
+
+
+def _zig_build_command(zig: Path) -> tuple[str | Path, ...]:
+    return (
+        zig,
+        "build",
+        f"-j{ZIG_BUILD_JOBS}",
+        "-p",
+        "/usr",
+        "-Doptimize=ReleaseFast",
+        f"-Dversion-string={VERSION}",
+    )
 
 
 def install(context: BuildContext) -> None:
@@ -77,18 +90,7 @@ def install(context: BuildContext) -> None:
 
         environment = dict(os.environ)
         environment["PATH"] = f"{zig.parent}:{environment['PATH']}"
-        runner.run(
-            [
-                zig,
-                "build",
-                "-p",
-                "/usr",
-                "-Doptimize=ReleaseFast",
-                f"-Dversion-string={VERSION}",
-            ],
-            cwd=source,
-            env=environment,
-        )
+        runner.run(_zig_build_command(zig), cwd=source, env=environment)
 
     executable = Path("/usr/bin/ghostty")
     require_readable_file(executable)

@@ -24,6 +24,9 @@
 !ansible/
 !ansible/**
 
+!patches/
+!patches/**
+
 !dotfiles/
 !dotfiles/**
 
