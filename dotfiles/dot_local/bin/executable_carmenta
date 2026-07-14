@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Carmenta may be built in a Nix development shell and retain store paths in
+# its RUNPATH. Prefer the host runtime so an older Nix glibc is not mixed with
+# the host's GTK and GLib libraries after those store paths are collected.
+host_library_path=/lib64:/usr/lib64:/lib:/usr/lib
+export LD_LIBRARY_PATH="${host_library_path}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+
+exec "$HOME/.local/libexec/carmenta-bin" --disable-gifs --close-on-select "$@"
