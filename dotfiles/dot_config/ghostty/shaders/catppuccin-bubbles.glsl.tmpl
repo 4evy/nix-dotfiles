@@ -31,10 +31,10 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         1.10,
         (screen_uv.x + screen_uv.y) * 0.5
     );
-    float glow_strength = background_luma < 0.5 ? 0.021 : 0.045;
+    float glow_strength = background_luma < 0.5 ? 0.019 : 0.120;
     float glow = bleed * glow_strength;
 
     // Apply after terminal rendering so the flavor survives full-screen TUIs.
-    vec3 color = mix(terminal.rgb, pink, clamp(glow, 0.0, 0.045));
+    vec3 color = mix(terminal.rgb, pink, clamp(glow, 0.0, 0.120));
     fragColor = vec4(color, terminal.a);
 }
