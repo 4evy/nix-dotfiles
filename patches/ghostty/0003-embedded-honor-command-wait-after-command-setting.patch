@@ -1,7 +1,7 @@
-From 1123d2f04fa2132932ae87a49a1f8cc9eaee1730 Mon Sep 17 00:00:00 2001
+From 1927e179e9c17e7d65c9912a9839559ee029e8e5 Mon Sep 17 00:00:00 2001
 From: 4evy <git@evy.pink>
 Date: Sun, 12 Jul 2026 18:35:57 +0300
-Subject: [PATCH 3/5] embedded: honor command wait-after-command setting
+Subject: [PATCH 3/6] embedded: honor command wait-after-command setting
 
 Propagate the surface option instead of forcing command surfaces to remain open. Temporary editor surfaces need to close as soon as their command exits.
 ---
@@ -9,7 +9,7 @@ Propagate the surface option instead of forcing command surfaces to remain open.
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
-index 7310159cc..78482fc75 100644
+index 7310159..78482fc 100644
 --- a/src/apprt/embedded.zig
 +++ b/src/apprt/embedded.zig
 @@ -532,7 +532,7 @@ pub const Surface = struct {

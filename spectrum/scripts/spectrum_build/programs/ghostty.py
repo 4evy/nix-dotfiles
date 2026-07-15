@@ -11,10 +11,10 @@ from spectrum_build.integrations.http import download
 from spectrum_build.programs.models import CustomProgram
 from workstation.lib.files import extract_tar_archive, write_if_changed
 
-REVISION = "a887df42c56f6de86c0fe6da9c4eeca37931e083"
-VERSION = "1.3.2-dev.a887df4"
+REVISION = "c5a21edfcbc2d5b46540ad91b7980aca31f5f1f3"
+VERSION = "1.3.2-dev.c5a21ed"
 SOURCE_URL = f"https://github.com/ghostty-org/ghostty/archive/{REVISION}.tar.gz"
-SOURCE_SHA256 = "fb4b2f9ffa0af125983041fdbe4ef94d3fa79fb9f2d22b9c213c0e3847a866b6"
+SOURCE_SHA256 = "84123887f93254387a333831cb544cbb23fb1f63eb9980db4ca94463f929c376"
 ZIG_VERSION = "0.15.2"
 ZIG_BUILD_JOBS = 2
 ZIG_SHA256 = {

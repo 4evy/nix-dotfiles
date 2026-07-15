@@ -33,13 +33,13 @@ from workstation.lib.files import (
 from workstation.lib.http import download
 from workstation.lib.paths import find_repo_root
 
-GHOSTTY_REVISION = "a887df42c56f6de86c0fe6da9c4eeca37931e083"
-GHOSTTY_VERSION = "1.3.2-dev.a887df4"
+GHOSTTY_REVISION = "c5a21edfcbc2d5b46540ad91b7980aca31f5f1f3"
+GHOSTTY_VERSION = "1.3.2-dev.c5a21ed"
 GHOSTTY_SOURCE_URL = (
     f"https://github.com/ghostty-org/ghostty/archive/{GHOSTTY_REVISION}.tar.gz"
 )
 GHOSTTY_SOURCE_SHA256 = (
-    "fb4b2f9ffa0af125983041fdbe4ef94d3fa79fb9f2d22b9c213c0e3847a866b6"
+    "84123887f93254387a333831cb544cbb23fb1f63eb9980db4ca94463f929c376"
 )
 GHOSTTY_ZIG_SHA256 = {
     "x86_64-linux": "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239",

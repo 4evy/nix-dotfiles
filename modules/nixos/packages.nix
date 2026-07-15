@@ -11,13 +11,13 @@ let
     pkgs.unstable.zlib.dev
   ];
   codex = pkgs.eupkgs.codex;
-  ghosttyRevision = "a887df42c56f6de86c0fe6da9c4eeca37931e083";
+  ghosttyRevision = "c5a21edfcbc2d5b46540ad91b7980aca31f5f1f3";
   ghosttyVersion = "1.3.2-dev.${builtins.substring 0 7 ghosttyRevision}";
   ghosttySource = pkgs.fetchFromGitHub {
     owner = "ghostty-org";
     repo = "ghostty";
     rev = ghosttyRevision;
-    hash = "sha256-1Zz65SCk3rkJ9+Q0MmyNOTNiDSLBRIHRd3IvFM4iNXw=";
+    hash = "sha256-NO+KKDcx5Q6AQX1uFsATSZU1nIIvxuj5suEG6/wrJ4w=";
   };
   ghosttyPatched = pkgs.unstable.ghostty.overrideAttrs (
     finalAttrs: _: {
@@ -32,6 +32,7 @@ let
         ../../patches/ghostty/0003-embedded-honor-command-wait-after-command-setting.patch
         ../../patches/ghostty/0004-gtk-edit-scrollback-in-a-temporary-surface.patch
         ../../patches/ghostty/0005-macos-edit-scrollback-in-a-temporary-surface.patch
+        ../../patches/ghostty/0006-core-let-link-clicks-bypass-mouse-capture.patch
       ];
     }
   );

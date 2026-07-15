@@ -1,9 +1,9 @@
 class GhosttyPatched < Formula
   desc "Fast, native terminal emulator with dotfiles scrollback patches"
   homepage "https://ghostty.org"
-  url "https://github.com/ghostty-org/ghostty/archive/a887df42c56f6de86c0fe6da9c4eeca37931e083.tar.gz"
-  version "1.3.2-dev.a887df4"
-  sha256 "fb4b2f9ffa0af125983041fdbe4ef94d3fa79fb9f2d22b9c213c0e3847a866b6"
+  url "https://github.com/ghostty-org/ghostty/archive/c5a21edfcbc2d5b46540ad91b7980aca31f5f1f3.tar.gz"
+  version "1.3.2-dev.c5a21ed"
+  sha256 "84123887f93254387a333831cb544cbb23fb1f63eb9980db4ca94463f929c376"
   license "MIT"
 
   depends_on "zig@0.15" => :build

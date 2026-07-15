@@ -1,0 +1,244 @@
+From eec7872f8bcb5360f3f4c3f74f4e3f3bdc53ce35 Mon Sep 17 00:00:00 2001
+From: 4evy <git@evy.pink>
+Date: Wed, 15 Jul 2026 17:39:54 +0300
+Subject: [PATCH 6/6] core: prioritize modified link clicks over mouse capture
+
+Recognize Shift as an optional addition to configured link modifiers so Ctrl+Shift-click works consistently. When mouse reporting is active, intercept a modified press only when it begins over a detected link, keep motion local for drag cancellation, and swallow the matching release.
+---
+ src/Surface.zig          | 62 +++++++++++++++++++++++++++++++---------
+ src/input/Link.zig       | 33 +++++++++++++++++++++
+ src/renderer/generic.zig |  5 +++-
+ src/renderer/link.zig    |  7 +----
+ 4 files changed, 86 insertions(+), 21 deletions(-)
+
+diff --git a/src/Surface.zig b/src/Surface.zig
+index 2b0433681..7fae5adf6 100644
+--- a/src/Surface.zig
++++ b/src/Surface.zig
+@@ -244,6 +244,10 @@ const Mouse = struct {
+     /// True if the mouse position is currently over a link.
+     over_link: bool = false,
+ 
++    /// True when the current left press began on a link while the platform
++    /// link activation modifier was held.
++    link_click: bool = false,
++
+     /// The last x/y in the cursor position for links. We use this to
+     /// only process link hover events when the mouse actually moves cells.
+     link_point: ?terminal.point.Coordinate = null,
+@@ -2719,11 +2723,10 @@ pub fn keyCallback(
+         // Update our modifiers, this will update mouse mods too
+         self.modsChanged(event.mods);
+ 
+-        // We only refresh links if
+-        // 1. mouse reporting is off
+-        // OR
+-        // 2. mouse reporting is on and we are not reporting shift to the terminal
++        // We refresh links if mouse reporting is off, the link activation
++        // modifier is held, or shift is overriding mouse capture.
+         if (self.io.terminal.flags.mouse_event == .none or
++            self.mouse.mods.ctrlOrSuper() or
+             (self.mouse.mods.shift and !self.mouseShiftCapture(false)))
+         {
+             // Refresh our link state
+@@ -3779,6 +3782,20 @@ pub fn mouseButtonCallback(
+     // bottleneck.
+     const shift_capture = self.mouseShiftCapture(true);
+ 
++    // Link activation takes priority over application mouse reporting, but
++    // only when this press is actually over a link. Preserve this state until
++    // release so motion and release reports aren't sent without a press.
++    if (button == .left and action == .press) {
++        self.mouse.link_click = false;
++        if (mods.ctrlOrSuper()) link_click: {
++            self.renderer_state.mutex.lock();
++            defer self.renderer_state.mutex.unlock();
++
++            const pos = self.rt_surface.getCursorPos() catch break :link_click;
++            self.mouse.link_click = (try self.linkAtPos(pos)) != null;
++        }
++    }
++
+     // Shift-click continues the previous mouse state if we have a selection.
+     // cursorPosCallback will also do a mouse report so we don't need to do any
+     // of the logic below.
+@@ -3821,6 +3838,9 @@ pub fn mouseButtonCallback(
+     }
+ 
+     if (button == .left and action == .release) {
++        const link_click = self.mouse.link_click;
++        self.mouse.link_click = false;
++
+         self.renderer_state.mutex.lock();
+         defer self.renderer_state.mutex.unlock();
+ 
+@@ -3874,7 +3894,9 @@ pub fn mouseButtonCallback(
+         // Handle link clicking. We want to do this before we do mouse
+         // reporting or any other mouse handling because a successfully
+         // clicked link will swallow the event.
+-        if (self.mouse.over_link and !self.mouse.selection_gesture.left_click_dragged) {
++        if ((self.mouse.over_link or link_click) and
++            !self.mouse.selection_gesture.left_click_dragged)
++        {
+             // We are holding the renderer lock, but this should just be
+             // a cached value.
+             const pos = release_pos orelse try self.rt_surface.getCursorPos();
+@@ -3885,6 +3907,11 @@ pub fn mouseButtonCallback(
+             }
+         }
+ 
++        // If the press was swallowed, its release must be swallowed too even
++        // if the modifier was released, the text changed, or a drag canceled
++        // activation.
++        if (link_click) return true;
++
+         // Handle prompt clicking. If we released our mouse on a prompt
+         // and we support some kind of click events, then we need to
+         // move to it.
+@@ -3900,6 +3927,10 @@ pub fn mouseButtonCallback(
+         self.renderer_state.mutex.lock();
+         defer self.renderer_state.mutex.unlock();
+         if (self.isMouseReporting()) report: {
++            // This press belongs to Ghostty's link gesture. Selection and drag
++            // tracking below still run so moving away cancels activation.
++            if (self.mouse.link_click) break :report;
++
+             // If we have shift-pressed and we aren't allowed to capture it,
+             // then we do not do a mouse report.
+             if (mods.shift and !shift_capture) break :report;
+@@ -4295,7 +4326,10 @@ fn linkAtPos(
+     const mouse_mods = self.mouseModsWithCapture(self.mouse.mods);
+ 
+     // If we have the proper modifiers set then we can check for OSC8 links.
+-    if (mouse_mods.equal(input.ctrlOrSuper(.{}))) hyperlink: {
++    if (input.Link.Highlight.matchMods(
++        input.ctrlOrSuper(.{}),
++        mouse_mods,
++    )) hyperlink: {
+         const rac = mouse_pin.rowAndCell();
+         const cell = rac.cell;
+         if (!cell.hyperlink) break :hyperlink;
+@@ -4339,10 +4373,7 @@ fn linkAtPin(
+ 
+     for (self.config.links) |link| {
+         // Skip highlight/mods check when mouse_mods is null (double-click mode)
+-        if (mouse_mods) |mods| switch (link.highlight) {
+-            .always, .hover => {},
+-            .always_mods, .hover_mods => |v| if (!v.equal(mods)) continue,
+-        };
++        if (mouse_mods) |mods| if (!link.highlight.active(true, mods)) continue;
+ 
+         var it = strmap.searchIterator(link.regex);
+         while (true) {
+@@ -4594,14 +4625,13 @@ pub fn cursorPosCallback(
+     // OR
+     // 2. the cursor position has changed (either we have no previous state, or the state has
+     //    changed)
+-    // AND
+-    // 1. mouse reporting is off
+-    // OR
+-    // 2. mouse reporting is on and we are not reporting shift to the terminal
++    // AND mouse reporting is off, the link activation modifier is held, or
++    // shift is overriding mouse capture.
+     if ((over_link or
+         self.mouse.link_point == null or
+         (self.mouse.link_point != null and !self.mouse.link_point.?.eql(pos_vp))) and
+         (self.io.terminal.flags.mouse_event == .none or
++            self.mouse.mods.ctrlOrSuper() or
+             (self.mouse.mods.shift and !self.mouseShiftCapture(false))))
+     {
+         // If we were previously over a link, we always update. We do this so that if the text
+@@ -4611,6 +4641,10 @@ pub fn cursorPosCallback(
+ 
+     // Do a mouse report
+     if (self.isMouseReporting()) report: {
++        // A link press was intercepted by Ghostty, so keep all motion in the
++        // local selection gesture until the matching release.
++        if (self.mouse.link_click) break :report;
++
+         // Shift overrides mouse "grabbing" in the window, taken from Kitty.
+         // This only applies if there is a mouse button pressed so that
+         // movement reports are not affected.
+diff --git a/src/input/Link.zig b/src/input/Link.zig
+index 37b45dbd1..730fedf35 100644
+--- a/src/input/Link.zig
++++ b/src/input/Link.zig
+@@ -49,8 +49,41 @@ pub const Highlight = union(enum) {
+     /// detected.
+     always_mods: Mods,
+     hover_mods: Mods,
++
++    /// Returns true when this highlight is active for the given mouse state.
++    pub fn active(self: Highlight, hovering: bool, mods: Mods) bool {
++        return switch (self) {
++            .always => true,
++            .always_mods => |required| matchMods(required, mods),
++            .hover => hovering,
++            .hover_mods => |required| hovering and matchMods(required, mods),
++        };
++    }
++
++    /// Returns true when the actual modifiers satisfy a link requirement.
++    /// Shift is allowed in addition to configured modifiers because it is the
++    /// standard mouse-capture override and shouldn't disable a link binding.
++    pub fn matchMods(required: Mods, actual: Mods) bool {
++        if (required.equal(actual)) return true;
++        if (required.shift or !actual.shift) return false;
++        return required.equal(actual.unset(.{ .shift = true }));
++    }
+ };
+ 
++test "highlight allows additional shift" {
++    const testing = std.testing;
++
++    const ctrl_hover: Highlight = .{ .hover_mods = .{ .ctrl = true } };
++    try testing.expect(ctrl_hover.active(true, .{ .ctrl = true }));
++    try testing.expect(ctrl_hover.active(true, .{ .ctrl = true, .shift = true }));
++    try testing.expect(!ctrl_hover.active(false, .{ .ctrl = true, .shift = true }));
++    try testing.expect(!ctrl_hover.active(true, .{ .ctrl = true, .alt = true }));
++
++    const shift_hover: Highlight = .{ .hover_mods = .{ .shift = true } };
++    try testing.expect(shift_hover.active(true, .{ .shift = true }));
++    try testing.expect(!shift_hover.active(true, .{ .ctrl = true, .shift = true }));
++}
++
+ /// Returns a new oni.Regex that can be used to match the link.
+ pub fn oniRegex(self: *const Link) !oni.Regex {
+     return try oni.Regex.init(
+diff --git a/src/renderer/generic.zig b/src/renderer/generic.zig
+index 14b790369..66a0ccb66 100644
+--- a/src/renderer/generic.zig
++++ b/src/renderer/generic.zig
+@@ -1259,7 +1259,10 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
+                     const vp = state.mouse.point orelse break :osc8 .empty;
+ 
+                     // If the right mods aren't pressed, then we can't match.
+-                    if (!state.mouse.mods.equal(inputpkg.ctrlOrSuper(.{})))
++                    if (!inputpkg.Link.Highlight.matchMods(
++                        inputpkg.ctrlOrSuper(.{}),
++                        state.mouse.mods,
++                    ))
+                         break :osc8 .empty;
+ 
+                     break :osc8 self.terminal_state.linkCells(
+diff --git a/src/renderer/link.zig b/src/renderer/link.zig
+index 11ecc87ae..659217044 100644
+--- a/src/renderer/link.zig
++++ b/src/renderer/link.zig
+@@ -28,12 +28,7 @@ pub const Link = struct {
+         mouse_viewport: ?point.Coordinate,
+         mouse_mods: inputpkg.Mods,
+     ) bool {
+-        return switch (self.highlight) {
+-            .always => true,
+-            .always_mods => |v| mouse_mods.equal(v),
+-            .hover => mouse_viewport != null,
+-            .hover_mods => |v| mouse_viewport != null and mouse_mods.equal(v),
+-        };
++        return self.highlight.active(mouse_viewport != null, mouse_mods);
+     }
+ };
+ 
+-- 
+2.55.0
+
