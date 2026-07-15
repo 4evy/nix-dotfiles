@@ -3,12 +3,28 @@ import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
-from typer.testing import CliRunner
+
+if TYPE_CHECKING:
+    from cyclopts import App
 
 from workstation.local import jj as jj_module
 from workstation.local.jj import jj_git_fetch_entrypoint
+
+
+def _invoke(
+    cli: App, arguments: list[str], capsys: pytest.CaptureFixture[str]
+) -> tuple[int, str]:
+    try:
+        cli(arguments)
+    except SystemExit as error:
+        exit_code = error.code if isinstance(error.code, int) else 1
+    else:
+        exit_code = 0
+    captured = capsys.readouterr()
+    return exit_code, captured.out + captured.err
 
 
 class Tty:
@@ -18,16 +34,17 @@ class Tty:
 
 def test_jj_get_help_does_not_require_a_repository(
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(
         jj_module,
         "_git",
         lambda *_args, **_kwargs: pytest.fail("help must not inspect the repository"),
     )
-    result = CliRunner().invoke(jj_module.jj_get_app, ["--help"])
+    exit_code, output = _invoke(jj_module.jj_get_app, ["--help"], capsys)
 
-    assert result.exit_code == 0
-    assert "Usage:" in result.output
+    assert exit_code == 0
+    assert "Usage:" in output
 
 
 @pytest.mark.parametrize(
@@ -39,24 +56,31 @@ def test_jj_get_help_does_not_require_a_repository(
 )
 def test_jj_get_rejects_extra_pr_arguments(
     arguments: list[str],
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    result = CliRunner().invoke(jj_module.jj_get_app, arguments)
+    exit_code, output = _invoke(jj_module.jj_get_app, arguments, capsys)
 
-    assert result.exit_code == 2
-    assert "Invalid value" in result.output
+    assert exit_code == 1
+    assert "Invalid value" in output
 
 
-def test_jj_get_rejects_base_after_remote_in_target() -> None:
-    result = CliRunner().invoke(
+def test_jj_get_rejects_base_after_remote_in_target(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code, output = _invoke(
         jj_module.jj_get_app,
         ["feature@upstream", "main", "ignored"],
+        capsys,
     )
 
-    assert result.exit_code == 2
-    assert "BOOKMARK@REMOTE" in result.output
+    assert exit_code == 1
+    assert "BOOKMARK@REMOTE" in output
 
 
-def test_jj_get_accepts_pr_url_query(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_jj_get_accepts_pr_url_query(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     resolved: list[tuple[str, str | None]] = []
     monkeypatch.setattr(jj_module, "_git", lambda *_args, **_kwargs: ".git")
     monkeypatch.setattr(
@@ -65,12 +89,13 @@ def test_jj_get_accepts_pr_url_query(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda number, repo: resolved.append((number, repo)),
     )
 
-    result = CliRunner().invoke(
+    exit_code, output = _invoke(
         jj_module.jj_get_app,
         ["https://github.com/owner/repo/pull/123?notification_referrer=1"],
+        capsys,
     )
 
-    assert result.exit_code == 0
+    assert exit_code == 0, output
     assert resolved == [("123", "owner/repo")]
 
 
@@ -413,14 +438,15 @@ def test_jj_git_fetch_delegates_jj_string_expressions(
 
 def test_jj_redate_help_does_not_prompt(
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(
         jj_module, "_redate_revisions", lambda *_args: pytest.fail("prompted")
     )
-    result = CliRunner().invoke(jj_module.jj_redate_app, ["--help"])
+    exit_code, output = _invoke(jj_module.jj_redate_app, ["--help"], capsys)
 
-    assert result.exit_code == 0
-    assert "Usage:" in result.output
+    assert exit_code == 0
+    assert "Usage:" in output
 
 
 def test_jj_redate_without_args_falls_back_to_working_copy(
@@ -511,6 +537,65 @@ def test_jj_redate_rejects_partial_divergent_descendant(
         jj_module._descendant_timestamps("selected")
 
 
+def test_jj_redate_signs_oldest_first_and_batches_matching_timestamps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        jj_module,
+        "_timestamp_run",
+        lambda timestamp, *args: calls.append((timestamp, *args)),
+    )
+
+    jj_module._sign_redated_changes(
+        ["selected-one", "selected-two"],
+        [
+            ("descendant-one", "2026-01-02T02:00:00.000+02:00"),
+            ("descendant-two", "2026-01-02T02:00:00.000+02:00"),
+            ("descendant-three", "2026-01-03T03:00:00.000+02:00"),
+        ],
+        "2026-01-01T01:00:00+02:00",
+    )
+
+    assert calls == [
+        (
+            "2026-01-01T01:00:00+02:00",
+            "--quiet",
+            "sign",
+            "-r",
+            "change_id(selected-one) | change_id(selected-two)",
+        ),
+        (
+            "2026-01-02T02:00:00.000+02:00",
+            "--quiet",
+            "sign",
+            "-r",
+            "change_id(descendant-one) | change_id(descendant-two)",
+        ),
+        (
+            "2026-01-03T03:00:00.000+02:00",
+            "--quiet",
+            "sign",
+            "-r",
+            "change_id(descendant-three)",
+        ),
+    ]
+
+
+def test_jj_redate_signature_verification_checks_divergent_commits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_log(revset: str, template: str, reverse: bool = False) -> str:
+        assert not reverse
+        assert "signature" in template
+        return "signed\nunsigned\n" if revset == "change_id(divergent)" else "signed\n"
+
+    monkeypatch.setattr(jj_module, "_log", fake_log)
+
+    assert jj_module._verify_signatures(["signed"])
+    assert not jj_module._verify_signatures(["signed", "divergent"])
+
+
 def test_jj_redate_without_args_opens_interactive_revision_picker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -525,7 +610,9 @@ def test_jj_redate_without_args_opens_interactive_revision_picker(
             "2026-01-02 03:00:00\t22222222\tadd sample feature\n"
         )
 
-    def checkbox(_label: str, *, choices: list[SimpleNamespace]) -> SimpleNamespace:
+    def checkbox(
+        _label: str, *, choices: list[SimpleNamespace], **_kwargs: object
+    ) -> SimpleNamespace:
         selected = choices[1]
         return SimpleNamespace(ask=lambda: [selected.value])
 
@@ -540,3 +627,59 @@ def test_jj_redate_without_args_opens_interactive_revision_picker(
     assert jj_module._redate_revisions([]) == [
         "change_id(bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
     ]
+
+
+def test_jj_redate_picker_rows_adapt_to_terminal_width() -> None:
+    item = jj_module._RedateItem(
+        change="a" * 32,
+        marker="@",
+        short_change="aaaaaaaa",
+        email="user@example.com",
+        timestamp="2026-01-02 03:04:05",
+        short_commit="11111111",
+        summary="a deliberately long description that needs to fit narrow terminals",
+    )
+
+    wide = jj_module._redate_choice_title(item, 100)
+    narrow = jj_module._redate_choice_title(item, 40)
+
+    assert wide[0] == ("class:redate-working-copy", "@ ")
+    assert wide[1] == ("class:redate-change", "aaaaaaaa")
+    assert any(style == "class:redate-time" for style, _text in wide)
+    assert not any(style == "class:redate-time" for style, _text in narrow)
+    assert "…" in "".join(text for _style, text in narrow)
+
+
+def test_jj_redate_picker_keeps_exact_metadata_in_description(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    item = jj_module._RedateItem(
+        change="a" * 32,
+        marker="",
+        short_change="aaaaaaaa",
+        email="user@example.com",
+        timestamp="2026-01-02 03:04:05",
+        short_commit="11111111",
+        summary="add sample feature",
+    )
+    monkeypatch.setattr(
+        jj_module.shutil,
+        "get_terminal_size",
+        lambda **_kwargs: os.terminal_size((80, 24)),
+    )
+
+    choice = jj_module._redate_choices([item])[0]
+
+    assert choice.value == f"change_id({'a' * 32})"
+    assert (
+        choice.description
+        == "user@example.com  ·  commit 11111111  ·  2026-01-02 03:04:05"
+    )
+
+
+def test_jj_redate_cancel_does_not_fall_back_to_working_copy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(jj_module, "_interactive_redate_revisions", list)
+
+    assert jj_module._redate_revisions([]) == []
