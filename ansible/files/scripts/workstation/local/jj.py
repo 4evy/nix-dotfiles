@@ -22,21 +22,19 @@ from workstation.lib.files import write_if_changed
 _REDATE_INTERACTIVE_REVSET = "mutable() & remote_bookmarks().."
 _REDATE_INTERACTIVE_LIMIT = 20
 _REDATE_INSTRUCTION = "(↑↓ move · space toggle · enter confirm)"
-_REDATE_STYLE = questionary.Style(
-    [
-        ("qmark", "fg:ansimagenta bold"),
-        ("question", "bold"),
-        ("answer", "fg:ansimagenta bold"),
-        ("pointer", "fg:ansimagenta bold"),
-        ("selected", "fg:ansimagenta bold"),
-        ("instruction", "fg:ansibrightblack"),
-        ("validation-toolbar", "fg:ansired"),
-        ("redate-working-copy", "fg:ansimagenta bold"),
-        ("redate-change", "fg:ansicyan bold"),
-        ("redate-empty", "fg:ansibrightblack italic"),
-        ("redate-time", "fg:ansibrightblack"),
-    ]
-)
+_REDATE_STYLE = questionary.Style([
+    ("qmark", "fg:ansimagenta bold"),
+    ("question", "bold"),
+    ("answer", "fg:ansimagenta bold"),
+    ("pointer", "fg:ansimagenta bold"),
+    ("selected", "fg:ansimagenta bold"),
+    ("instruction", "fg:ansibrightblack"),
+    ("validation-toolbar", "fg:ansired"),
+    ("redate-working-copy", "fg:ansimagenta bold"),
+    ("redate-change", "fg:ansicyan bold"),
+    ("redate-empty", "fg:ansibrightblack italic"),
+    ("redate-time", "fg:ansibrightblack"),
+])
 
 
 @dataclass(frozen=True)
@@ -684,9 +682,7 @@ def _redate_choice_title(
     summary = _truncate_redate_summary(item.summary, summary_width)
     summary_padding = max(summary_width - Text(summary).cell_len, 0)
     summary_style = (
-        "class:redate-empty"
-        if item.summary == "(no description set)"
-        else "class:text"
+        "class:redate-empty" if item.summary == "(no description set)" else "class:text"
     )
     title = [
         ("class:redate-working-copy", marker),
@@ -695,12 +691,10 @@ def _redate_choice_title(
         (summary_style, summary),
     ]
     if show_time:
-        title.extend(
-            [
-                ("class:text", " " * (summary_padding + 2)),
-                ("class:redate-time", friendly_time),
-            ]
-        )
+        title.extend([
+            ("class:text", " " * (summary_padding + 2)),
+            ("class:redate-time", friendly_time),
+        ])
     return title
 
 
@@ -773,9 +767,7 @@ def _verify(ids: list[str], timestamp: str) -> bool:
 
 
 def _verify_descendant_timestamps(descendants: list[tuple[str, str]]) -> bool:
-    template = (
-        'committer.timestamp().format("%Y-%m-%dT%H:%M:%S%.3f%:z") ++ "\\n"'
-    )
+    template = 'committer.timestamp().format("%Y-%m-%dT%H:%M:%S%.3f%:z") ++ "\\n"'
     for change, timestamp in descendants:
         values = _log(f"change_id({change})", template).splitlines()
         if not values or any(value != timestamp for value in values):
