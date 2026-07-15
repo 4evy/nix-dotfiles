@@ -6,7 +6,7 @@
     config.allowUnfree = true;
     overlays = [
       (
-        final: prev:
+        _: prev:
         let
           unstable = import inputs.nixpkgs-unstable {
             inherit (prev.stdenvNoCC.hostPlatform) system;

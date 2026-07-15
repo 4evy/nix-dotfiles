@@ -92,8 +92,9 @@ just doctor all     # check every known workflow dependency
 ```bash
 just status          # show bootc and image metadata
 just install         # switch to the published Spectrum image
-just build           # build localhost/spectrum:local without cache
-just spectrum-dev    # build the local image using cached layers
+just build           # build localhost/spectrum:local using cached layers
+just build-clean     # explicitly rebuild every image layer
+just spectrum-dev    # compatibility name for the cached local build
 just switch          # rebuild and switch/stage the local image
 just upgrade         # rebuild the local image and stage a bootc upgrade
 just reboot          # reboot through systemd
@@ -119,10 +120,18 @@ Focused checks:
 
 ```bash
 go test ./...
+just python-complexity
+just python-dead-code
 uv run --locked pytest
 uv run spectrum-build check
-cd packages/hyper-window-tiling && bun run check
+bun run --filter hyper-window-tiling check
 ```
+
+Python command surfaces use Cyclopts as their single CLI framework. Function
+signatures and docstrings declare commands and help; `Parameter`, `Group`, and
+environment configuration declare validation, aliases, and settings. Small
+bootstrap scripts that must run before project dependencies are installed stay
+on the standard library's `argparse`.
 
 ### Nix and Ansible
 

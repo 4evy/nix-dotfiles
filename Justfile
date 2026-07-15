@@ -9,7 +9,6 @@ remote_ref := env("SPECTRUM_REMOTE_REF", "ghcr.io/4evy/" + image_name + ":latest
 base_image := env("SPECTRUM_BLUEFIN_BASE_IMAGE", "ghcr.io/ublue-os/bluefin-nvidia-open:stable@sha256:1e7a59c83f104652bd06308f0a6439669cb3ea327d4e968695af85c67abea352")
 base_image_name := env("SPECTRUM_BLUEFIN_BASE_IMAGE_NAME", "bluefin-nvidia-open")
 base_image_tag := env("SPECTRUM_BLUEFIN_BASE_IMAGE_TAG", "stable")
-build_no_cache := env("SPECTRUM_BUILD_NO_CACHE", "true")
 compose := env("COMPOSE", "podman-compose")
 ansible_playbooks := "ansible/playbooks/bootstrap.yml ansible/playbooks/userland.yml ansible/playbooks/host.yml ansible/playbooks/site.yml"
 podman := env("PODMAN", "podman")
@@ -99,7 +98,7 @@ doctor profile="setup":
         fi
         ;;
       lint | check)
-        commands=(chezmoi git gofmt go hadolint jq just nix-instantiate nixfmt prettier shellcheck shfmt taplo stylua uv golangci-lint ansible-galaxy ansible-playbook ansible-test ansible-lint actionlint luacheck yamllint)
+        commands=(chezmoi deadnix git gofmt go hadolint jq just nix-instantiate nixfmt prettier shellcheck shfmt taplo stylua uv golangci-lint ansible-galaxy ansible-playbook ansible-test ansible-lint actionlint luacheck yamllint)
         if [[ -f packages/hyper-window-tiling/package.json ]]; then
           commands+=(bun)
         fi
@@ -123,7 +122,7 @@ doctor profile="setup":
         commands=(watchexec)
         ;;
       all)
-        commands=(sudo "${podman_command%% *}" bash chezmoi curl git gofmt hadolint jq just nix-instantiate nixfmt prettier shellcheck shfmt taplo stylua uv go golangci-lint ansible-galaxy ansible-playbook ansible-test ansible-lint actionlint luacheck yamllint watchexec "${compose_command%% *}")
+        commands=(sudo "${podman_command%% *}" bash chezmoi curl deadnix git gofmt hadolint jq just nix-instantiate nixfmt prettier shellcheck shfmt taplo stylua uv go golangci-lint ansible-galaxy ansible-playbook ansible-test ansible-lint actionlint luacheck yamllint watchexec "${compose_command%% *}")
         if [[ $host_os == linux ]]; then
           commands+=(bootc systemctl)
         fi
@@ -244,13 +243,32 @@ reboot: (doctor 'reboot')
 [macos]
 reboot: (_linux-only 'reboot')
 
-# Build the local Spectrum bootc image. Set no_cache=false to reuse layers.
+# Build the local Spectrum bootc image, reusing cached layers.
 [arg('target', help='Image reference to tag locally')]
-[arg('no_cache', pattern='true|yes|1|on|false|no|0|off', help='true/false, yes/no, 1/0, or on/off')]
 [group('spectrum')]
 [linux]
+build target=local_ref: (_build target 'false')
+
+[arg('target', help='Image reference to tag locally')]
+[group('spectrum')]
+[macos]
+build target=local_ref: (_linux-only 'build')
+
+# Rebuild the local Spectrum bootc image without using cached layers.
+[arg('target', help='Image reference to tag locally')]
+[group('spectrum')]
+[linux]
+build-clean target=local_ref: (_build target 'true')
+
+[arg('target', help='Image reference to tag locally')]
+[group('spectrum')]
+[macos]
+build-clean target=local_ref: (_linux-only 'build-clean')
+
+[linux]
+[private]
 [script]
-build target=local_ref no_cache=build_no_cache: (doctor 'build')
+_build target no_cache: (doctor 'build')
     target={{ quote(target) }}
     no_cache={{ quote(no_cache) }}
     base_image={{ quote(base_image) }}
@@ -270,6 +288,7 @@ build target=local_ref no_cache=build_no_cache: (doctor 'build')
     fi
 
     build_args=(
+      --layers=true \
       --pull=newer \
       --tag "$target" \
       --build-arg "BLUEFIN_BASE_IMAGE=$base_image" \
@@ -278,9 +297,9 @@ build target=local_ref no_cache=build_no_cache: (doctor 'build')
       --build-arg "IMAGE_NAME=$image_name" \
       --build-arg "IMAGE_TAG=$local_tag" \
       --build-arg "IMAGE_REF=ostree-image:docker://$target" \
-      --build-arg "IMAGE_CREATED=$image_created" \
       --build-arg "IMAGE_REVISION=$image_revision" \
       --build-arg "IMAGE_VERSION=$image_version" \
+      --label "org.opencontainers.image.created=$image_created" \
       --label "org.opencontainers.image.base.name=$base_image_ref" \
       --label "org.opencontainers.image.base.digest=$base_image_digest" \
       --file spectrum/Containerfile \
@@ -328,17 +347,16 @@ build target=local_ref no_cache=build_no_cache: (doctor 'build')
       -u SSH_AUTH_SOCK \
       "${podman_command[@]}" build "${build_args[@]}"
 
-[arg('target', help='Image reference to tag locally')]
-[arg('no_cache', pattern='true|yes|1|on|false|no|0|off', help='true/false, yes/no, 1/0, or on/off')]
-[group('spectrum')]
-[macos]
-build target=local_ref no_cache=build_no_cache: (_linux-only 'build')
-
-# Build Spectrum quickly for local iteration, reusing cached layers.
+# Compatibility name for the cached local Spectrum build.
 [arg('target', help='Image reference to tag locally')]
 [group('spectrum')]
 [linux]
-spectrum-dev target=local_ref: (build target 'false')
+spectrum-dev target=local_ref: (build target)
+
+[arg('target', help='Image reference to tag locally')]
+[group('spectrum')]
+[macos]
+spectrum-dev target=local_ref: (_linux-only 'spectrum-dev')
 
 # Validate Spectrum build scripts without building the image.
 [group('spectrum')]
@@ -1060,7 +1078,16 @@ _lint-files: (doctor 'lint')
     ((${#xml_files[@]} == 0)) || check_xml "${xml_files[@]}"
     ((${#python_files[@]} == 0)) || uv run --locked ruff check --force-exclude "${python_files[@]}"
     ((${#shell_files[@]} == 0)) || shellcheck -x "${shell_files[@]}"
-    ((${#nix_files[@]} == 0)) || for file in "${nix_files[@]}"; do nix-instantiate --parse "$file" >/dev/null; done
+    if ((${#nix_files[@]} > 0)); then
+      for file in "${nix_files[@]}"; do
+        nix-instantiate --parse "$file" >/dev/null
+      done
+      deadnix_files=()
+      for file in "${nix_files[@]}"; do
+        [[ "$file" == hosts/linux/hardware-configuration.nix ]] || deadnix_files+=("$file")
+      done
+      ((${#deadnix_files[@]} == 0)) || deadnix --fail "${deadnix_files[@]}"
+    fi
     ((${#lua_files[@]} == 0)) || luacheck --globals Command cx ya -- "${lua_files[@]}"
 
     if ((${#template_files[@]} > 0 || ${#python_input_template_files[@]} > 0 || ${#xml_input_template_files[@]} > 0)); then
@@ -1126,9 +1153,10 @@ _check-spectrum: (doctor 'spectrum') _check-spectrum-build
 
 [private]
 [script]
-_check-python:
+_check-python: python-complexity python-dead-code
     uv lock --check
     uv sync --locked --check
+    uv run --locked deptry .
     uv run --locked ty check
     bytecode_dir=$(mktemp -d)
     build_dir=$(mktemp -d)
@@ -1136,6 +1164,26 @@ _check-python:
     PYTHONPYCACHEPREFIX="$bytecode_dir" uv run --locked python -m compileall -q ansible/files/scripts dotfiles/.chezmoiscripts internal/chromiumbrowser/scripts packages/toshy spectrum/scripts
     uv run --locked pytest
     uv build --out-dir "$build_dir" --no-build-logs
+
+# Scan every tracked or untracked, non-ignored Python source file for dead code.
+[group('dev')]
+[script]
+python-dead-code:
+    python_files=()
+    while IFS= read -r -d '' file; do
+      [[ -f "$file" ]] && python_files+=("$file")
+    done < <(git ls-files -co --exclude-standard -z -- '*.py')
+    ((${#python_files[@]} == 0)) || uv run --locked vulture "${python_files[@]}"
+
+# Reject cognitively complex functions in every first-party Python source file.
+[group('dev')]
+[script]
+python-complexity:
+    python_files=()
+    while IFS= read -r -d '' file; do
+      [[ -f "$file" ]] && python_files+=("$file")
+    done < <(git ls-files -co --exclude-standard -z -- '*.py')
+    ((${#python_files[@]} == 0)) || uv run --locked complexipy --failed --plain "${python_files[@]}"
 
 [private]
 _check-go: (doctor 'go')
@@ -1163,10 +1211,9 @@ _check-github-actions:
 
 [private]
 [script]
-[working-directory('packages/hyper-window-tiling')]
 _check-bun: (doctor 'bun')
-    bun install --frozen-lockfile
-    bun run check
+    bun install --frozen-lockfile --filter hyper-window-tiling
+    bun run --filter hyper-window-tiling check
 
 # Lint repository source files and run project validation.
 [group('dev')]
