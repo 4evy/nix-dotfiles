@@ -24,7 +24,6 @@ _ALLOWED_COMMANDS = {
     ("apps", "install-ghostty-tip-linux"),
     ("apps", "install-helium-linux"),
     ("apps", "install-helium-macos"),
-    ("apps", "install-helix-tip-linux"),
     ("host", "apps", "rustdesk-tailscale"),
     ("host", "apps", "tailscale-bluefin"),
     ("host", "desktop", "flatpak-maintenance"),

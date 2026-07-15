@@ -18,7 +18,7 @@ from workstation.automation import automation_check_mode
 from workstation.automation_models import OperationResult
 from workstation.console import console, error_console
 from workstation.errors import DotfilesError
-from workstation.lib.commands import output, require_commands, run, which
+from workstation.lib.commands import require_commands, run, which
 from workstation.lib.files import (
     ensure_directory,
     extract_tar_archive,
@@ -106,8 +106,6 @@ class InstallerSettings(BaseSettings):
 
     ghostty_tip_check_interval_seconds: int = Field(86400, ge=0)
     ghostty_build_container_image: str = "registry.fedoraproject.org/fedora:latest"
-    helix_tip_revision: str = "14d6bc0febed9c692048271a8ae2362ac969c6e0"
-    helix_tip_check_interval_seconds: int = Field(86400, ge=0)
     github_token: str | None = None
     gh_token: str | None = None
 
@@ -407,146 +405,6 @@ def install_ghostty_tip_linux(
         changed=True,
         msg=f"Installed native Ghostty tip release build into {install_prefix}",
         data={"source_key": GHOSTTY_REVISION},
-    )
-
-
-def _is_full_sha(value: str) -> bool:
-    return re.fullmatch(r"[0-9a-f]{40}", value) is not None
-
-
-def _checkout_helix(repo: Path, source_ref: str) -> str:
-    if not (repo / ".git").is_dir():
-        remove_path(repo)
-        run(("git", "init", repo))
-        run((
-            "git",
-            "-C",
-            repo,
-            "remote",
-            "add",
-            "origin",
-            "https://github.com/helix-editor/helix.git",
-        ))
-    if _is_full_sha(source_ref):
-        available = run(
-            ("git", "-C", repo, "cat-file", "-e", f"{source_ref}^{{commit}}"),
-            check=False,
-            capture=True,
-        )
-        if available.returncode != 0:
-            run(("git", "-C", repo, "fetch", "--depth=1", "origin", source_ref))
-        checkout = source_ref
-    else:
-        run((
-            "git",
-            "-C",
-            repo,
-            "fetch",
-            "--depth=1",
-            "--prune",
-            "origin",
-            f"+refs/heads/{source_ref}:refs/remotes/origin/{source_ref}",
-        ))
-        checkout = f"origin/{source_ref}"
-    run(("git", "-C", repo, "checkout", "--force", checkout))
-    return output(("git", "-C", repo, "rev-parse", "HEAD"))
-
-
-def _build_helix(repo: Path, prefix: Path, build_log: Path) -> None:
-    runtime = prefix / "libexec/runtime"
-    remove_path(runtime)
-    _run_logged_build(
-        (
-            "cargo",
-            "install",
-            "--path",
-            "helix-term",
-            "--locked",
-            "--profile",
-            "opt",
-            "--force",
-            "--root",
-            prefix,
-        ),
-        build_log,
-        label="Helix",
-        cwd=repo,
-        env={"HELIX_DEFAULT_RUNTIME": os.fspath(runtime)},
-    )
-    remove_path(repo / "runtime/grammars/sources")
-    replace_directory(repo / "runtime", runtime)
-
-
-def install_helix_tip_linux(
-    cache_dir: Path,
-    install_prefix: Path,
-) -> OperationResult:
-    """Build and install the pinned Helix tip revision."""
-    cache = cache_dir
-    prefix = install_prefix
-    settings = _settings()
-    source_ref = settings.helix_tip_revision
-    interval = settings.helix_tip_check_interval_seconds
-    repo = cache / "source"
-    build_log = cache / "helix-tip-build.log"
-    state_path = prefix / ".helix-tip-state.json"
-    executable = prefix / "bin/hx"
-    state = BuildState.read(state_path)
-    requested_source_current = (
-        state is not None
-        and state.inputs == {"source_ref": source_ref}
-        and (not _is_full_sha(source_ref) or state.revision == source_ref)
-    )
-    fresh = (
-        requested_source_current
-        and state is not None
-        and state.is_fresh(interval)
-        and executable.is_file()
-        and os.access(executable, os.X_OK)
-    )
-    if automation_check_mode():
-        return OperationResult(
-            changed=not fresh,
-            msg=(
-                "Helix tip is current"
-                if fresh
-                else f"Would install Helix tip {source_ref}"
-            ),
-            data={"source_ref": source_ref},
-        )
-    require_commands("cargo", "git")
-    cache = ensure_directory(cache)
-    prefix = ensure_directory(prefix)
-    if fresh:
-        console.print(
-            f"Helix tip was checked less than {interval} seconds ago; skipping."
-        )
-        return OperationResult(
-            msg="Helix tip was checked recently", data={"source_ref": source_ref}
-        )
-    revision = _checkout_helix(repo, source_ref)
-    if executable.is_file() and state is not None and state.revision == revision:
-        BuildState.write(
-            state_path,
-            revision,
-            inputs={"source_ref": source_ref},
-        )
-        console.print(f"Helix tip already current at {revision}.")
-        return OperationResult(
-            msg=f"Helix tip is already current at {revision}",
-            data={"revision": revision},
-        )
-    _build_helix(repo, prefix, build_log)
-    BuildState.write(
-        state_path,
-        revision,
-        inputs={"source_ref": source_ref},
-    )
-    console.print(f"Installed Helix tip {revision} into {prefix}.")
-    return OperationResult(
-        changed=True,
-        msg=f"Installed Helix tip {revision} into {prefix}",
-        data={"revision": revision},
     )
 
 

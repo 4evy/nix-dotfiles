@@ -1,0 +1,132 @@
+---
+- name: Create Helix build and installation directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ applications_helix_cache_dir }}"
+    - "{{ applications_helix_install_prefix }}"
+    - "{{ applications_helix_install_prefix }}/libexec"
+  tags:
+    - apps
+    - helix
+
+- name: Check out pinned Helix source
+  ansible.builtin.git:
+    repo: https://github.com/helix-editor/helix.git
+    dest: "{{ applications_helix_source_dir }}"
+    version: "{{ applications_helix_revision }}"
+    force: true
+  register: applications_helix_source
+  tags:
+    - apps
+    - helix
+
+- name: Check installed Helix executable
+  ansible.builtin.stat:
+    path: "{{ applications_helix_executable }}"
+  register: applications_helix_installed
+  tags:
+    - apps
+    - helix
+
+- name: Check installed Helix runtime
+  ansible.builtin.stat:
+    path: "{{ applications_helix_runtime_dir }}"
+  register: applications_helix_runtime
+  tags:
+    - apps
+    - helix
+
+- name: Remove stale Helix runtime before rebuild
+  ansible.builtin.file:
+    path: "{{ applications_helix_runtime_dir }}"
+    state: absent
+  when:
+    - not ansible_check_mode
+    - >-
+      applications_helix_source is changed
+      or not applications_helix_installed.stat.executable | default(false)
+      or not applications_helix_runtime.stat.isdir | default(false)
+  tags:
+    - apps
+    - helix
+
+- name: Build pinned Helix executable
+  ansible.builtin.command:
+    argv:
+      - cargo
+      - install
+      - --path
+      - helix-term
+      - --locked
+      - --profile
+      - opt
+      - --force
+      - --root
+      - "{{ applications_helix_install_prefix }}"
+    chdir: "{{ applications_helix_source_dir }}"
+  environment:
+    HELIX_DEFAULT_RUNTIME: "{{ applications_helix_runtime_dir }}"
+    PATH: "{{ dotfiles_home_dir }}/.cargo/bin:{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - >-
+      applications_helix_source is changed
+      or not applications_helix_installed.stat.executable | default(false)
+      or not applications_helix_runtime.stat.isdir | default(false)
+  tags:
+    - apps
+    - helix
+
+- name: Install pinned Helix runtime
+  ansible.builtin.copy:
+    src: "{{ applications_helix_source_dir }}/runtime/"
+    dest: "{{ applications_helix_runtime_dir }}/"
+    remote_src: true
+    mode: preserve
+  when:
+    - not ansible_check_mode
+    - >-
+      applications_helix_source is changed
+      or not applications_helix_installed.stat.executable | default(false)
+      or not applications_helix_runtime.stat.isdir | default(false)
+  tags:
+    - apps
+    - helix
+
+- name: Remove Helix grammar source checkouts from installed runtime
+  ansible.builtin.file:
+    path: "{{ applications_helix_runtime_dir }}/grammars/sources"
+    state: absent
+  when:
+    - not ansible_check_mode
+    - >-
+      applications_helix_source is changed
+      or not applications_helix_installed.stat.executable | default(false)
+      or not applications_helix_runtime.stat.isdir | default(false)
+  tags:
+    - apps
+    - helix
+
+- name: Check staged Helix executable
+  ansible.builtin.stat:
+    path: "{{ applications_helix_executable }}"
+  register: applications_helix_staged
+  tags:
+    - apps
+    - helix
+
+- name: Require staged Helix executable
+  ansible.builtin.assert:
+    that:
+      - applications_helix_staged.stat.executable | default(false)
+    fail_msg: >-
+      Helix build did not produce the expected executable at
+      {{ applications_helix_executable }}.
+  when: not ansible_check_mode
+  tags:
+    - apps
+    - helix

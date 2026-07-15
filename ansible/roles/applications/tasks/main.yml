@@ -83,17 +83,7 @@
     - ghostty
 
 - name: Install native Helix tip build
-  evy.dotfiles.operation:
-    executable: "{{ dotfiles_bin_dir }}/dotfiles-scripts"
-    command:
-      - apps
-      - install-helix-tip-linux
-      - "{{ dotfiles_cache_dir }}/helix"
-      - "{{ dotfiles_data_dir }}/helix-tip"
-    context: "{{ dotfiles_automation_context }}"
-    chdir: "{{ dotfiles_repo_root }}"
-    environment:
-      PATH: "{{ dotfiles_home_dir }}/.cargo/bin:{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
+  ansible.builtin.import_tasks: helix.yml
   when: common_is_linux or common_is_macos
   tags:
     - apps
