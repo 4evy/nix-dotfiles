@@ -4,10 +4,14 @@ on:
   pull_request:
     paths:
       - .github/workflows/bun.yaml
+      - bun.lock
+      - package.json
       - packages/hyper-window-tiling/**
   push:
     paths:
       - .github/workflows/bun.yaml
+      - bun.lock
+      - package.json
       - packages/hyper-window-tiling/**
   workflow_dispatch: null
 
@@ -41,9 +45,7 @@ jobs:
           bun-version: 1.3.14
 
       - name: Install Dependencies
-        working-directory: packages/${{ matrix.package }}
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --filter ${{ matrix.package }}
 
       - name: Check Package
-        working-directory: packages/${{ matrix.package }}
-        run: bun run check
+        run: bun run --filter ${{ matrix.package }} check

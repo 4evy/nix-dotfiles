@@ -1,5 +1,6 @@
 {
   "private": true,
+  "workspaces": ["packages/hyper-window-tiling"],
   "scripts": {
     "check:ghostty-swirl": "tsc -p dotfiles/dot_local/bin/tsconfig.json && biome check --config-path=dotfiles/dot_local/bin/biome.jsonc dotfiles/dot_local/bin/executable_ghostty-dreamy-swirl.ts",
     "format:ghostty-swirl": "biome check --write --config-path=dotfiles/dot_local/bin/biome.jsonc dotfiles/dot_local/bin/executable_ghostty-dreamy-swirl.ts"

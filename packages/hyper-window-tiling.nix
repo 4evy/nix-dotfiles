@@ -6,27 +6,29 @@
   writableTmpDirAsHomeHook,
 }:
 let
-  root = ./hyper-window-tiling;
+  repositoryRoot = ../.;
+  packageRoot = ./hyper-window-tiling;
   pluginId = "hyper-window-tiling";
   extensionUuid = "hyper-window-tiling@4evy.local";
   pname = "hyper-window-tiling";
   version = "1.0.0";
 
   src = lib.fileset.toSource {
-    inherit root;
+    root = repositoryRoot;
     fileset = lib.fileset.unions [
-      (root + /bun.lock)
-      (root + /gnome/metadata.json)
-      (root + /gnome/schemas)
-      (root + /kde/metadata.json)
-      (root + /package.json)
-      (root + /src)
-      (root + /tsconfig.json)
+      (repositoryRoot + /bun.lock)
+      (repositoryRoot + /package.json)
+      (packageRoot + /gnome/metadata.json)
+      (packageRoot + /gnome/schemas)
+      (packageRoot + /kde/metadata.json)
+      (packageRoot + /package.json)
+      (packageRoot + /src)
+      (packageRoot + /tsconfig.json)
     ];
   };
 
   nodeModulesHash = {
-    "x86_64-linux" = "sha256-vtirCtBKF1HLTj9lwXxNef+AWXhY1Sl2SmnEZcK97ak=";
+    "x86_64-linux" = "sha256-RhXJXYE15AcDU8uz6HLF6KY0gupXok4jzyxH2R6DXok=";
   };
   bunOS = "linux";
   bunCPU =
@@ -40,6 +42,10 @@ let
   node_modules = stdenv.mkDerivation {
     pname = "${pname}-node_modules";
     inherit version src;
+
+    postUnpack = ''
+      sourceRoot="$sourceRoot/packages/hyper-window-tiling"
+    '';
 
     impureEnvVars = lib.fetchers.proxyImpureEnvVars ++ [
       "GIT_PROXY_COMMAND"
@@ -58,7 +64,7 @@ let
       runHook preBuild
 
       export BUN_INSTALL_CACHE_DIR=$(mktemp -d)
-      bun install --no-progress --frozen-lockfile --backend=copyfile --os=${bunOS} --cpu=${bunCPU}
+      bun install --no-progress --frozen-lockfile --filter ${pname} --backend=copyfile --os=${bunOS} --cpu=${bunCPU}
 
       runHook postBuild
     '';
@@ -67,7 +73,7 @@ let
       runHook preInstall
 
       mkdir -p $out
-      cp -R node_modules $out/node_modules
+      cp -R ../../node_modules $out/node_modules
 
       runHook postInstall
     '';
@@ -82,8 +88,8 @@ let
   buildPhaseFor = script: ''
     runHook preBuild
 
-    cp -R ${node_modules}/node_modules node_modules
-    patchShebangs node_modules
+    cp -R ${node_modules}/node_modules ../../node_modules
+    patchShebangs ../../node_modules
     bun run ${script}
 
     runHook postBuild
@@ -93,6 +99,10 @@ in
   gnome = stdenv.mkDerivation {
     pname = "gnome-shell-extension-hyper-window-tiling";
     inherit version src;
+
+    postUnpack = ''
+      sourceRoot="$sourceRoot/packages/hyper-window-tiling"
+    '';
 
     nativeBuildInputs = [
       bun
@@ -120,6 +130,10 @@ in
   kde = stdenv.mkDerivation {
     pname = "kwin-script-hyper-window-tiling";
     inherit version src;
+
+    postUnpack = ''
+      sourceRoot="$sourceRoot/packages/hyper-window-tiling"
+    '';
 
     nativeBuildInputs = [
       bun

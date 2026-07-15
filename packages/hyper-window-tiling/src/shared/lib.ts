@@ -97,7 +97,10 @@ export const CYCLE_LAYOUT_PRESETS = {
     'move-down': ['bottom-half', 'bottom-two-thirds', 'bottom-third'],
     'move-right': ['right-half', 'right-two-thirds', 'last-third'],
     'move-max-almost': ['almost-maximize', 'center'],
-} as const satisfies Record<CycleBindingName, readonly LayoutPreset[]>;
+} as const satisfies Record<
+    CycleBindingName,
+    readonly [LayoutPreset, ...LayoutPreset[]]
+>;
 
 export const CYCLE_BINDING_NAMES = Object.keys(
     CYCLE_LAYOUT_PRESETS,

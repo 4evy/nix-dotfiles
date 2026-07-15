@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import type { LayoutPreset, Rect } from './lib.js';
 import {
     advanceCycle,
-    CYCLE_BINDING_NAMES,
     CYCLE_LAYOUT_PRESETS,
     createCycleState,
     fitLayoutPresetRectToMinimumSize,
@@ -227,23 +226,6 @@ describe('resolveLayoutPresetRect', () => {
                 expect(rect.y + rect.height).toBeLessThanOrEqual(
                     workArea.y + workArea.height,
                 );
-            }
-        }
-    });
-
-    test('every configured binding references a non-empty known preset cycle', () => {
-        expect(CYCLE_BINDING_NAMES).toEqual([
-            'move-up',
-            'move-left',
-            'move-down',
-            'move-right',
-            'move-max-almost',
-        ]);
-
-        for (const bindingName of CYCLE_BINDING_NAMES) {
-            expect(CYCLE_LAYOUT_PRESETS[bindingName].length).toBeGreaterThan(0);
-            for (const preset of CYCLE_LAYOUT_PRESETS[bindingName]) {
-                expect(ALL_PRESETS).toContain(preset);
             }
         }
     });
