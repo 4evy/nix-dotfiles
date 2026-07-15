@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -83,12 +84,13 @@ func (c *Client) JSON(url string, out any) error {
 	return json.Unmarshal(resp.Body(), out)
 }
 
-func (c *Client) DownloadFile(url, path string) error {
+func (c *Client) DownloadFile(url, path string) (err error) {
 	resp, err := c.rawGet(url)
 	if err != nil {
 		return err
 	}
-	defer resp.RawBody().Close()
+	body := resp.RawBody()
+	defer func() { err = errors.Join(err, body.Close()) }()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -96,8 +98,8 @@ func (c *Client) DownloadFile(url, path string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Cleanup()
-	_, copyErr := io.Copy(file, resp.RawBody())
+	defer func() { err = errors.Join(err, file.Cleanup()) }()
+	_, copyErr := io.Copy(file, body)
 	if copyErr != nil {
 		return copyErr
 	}
@@ -121,8 +123,10 @@ func (c *Client) rawGet(url string) (*resty.Response, error) {
 		return nil, err
 	}
 	if resp.IsError() {
-		defer resp.RawBody().Close()
-		return nil, fmt.Errorf("GET %s: %s", url, resp.Status())
+		return nil, errors.Join(
+			fmt.Errorf("GET %s: %s", url, resp.Status()),
+			resp.RawBody().Close(),
+		)
 	}
 	return resp, nil
 }

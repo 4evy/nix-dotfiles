@@ -37,15 +37,6 @@ type environment struct {
 	CaptureTimeoutSecs string `env:"DOTFILES_PROCESS_CAPTURE_TIMEOUT_SECS"`
 }
 
-func PathOf(bin string) (string, bool) {
-	if IsPathLike(bin) {
-		info, err := os.Stat(bin)
-		return bin, err == nil && IsExecutableFile(info)
-	}
-	path, err := exec.LookPath(ExecutableName(bin))
-	return path, err == nil
-}
-
 func PathOfWithPath(bin, paths string) (string, bool) {
 	if IsPathLike(bin) {
 		info, err := os.Stat(bin)

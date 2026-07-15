@@ -2,6 +2,7 @@ package archiveutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -13,12 +14,12 @@ import (
 	"github.com/mholt/archives"
 )
 
-func ExtractZipFile(ctx context.Context, zipPath, dst string) error {
+func ExtractZipFile(ctx context.Context, zipPath, dst string) (err error) {
 	file, err := os.Open(zipPath)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { err = errors.Join(err, file.Close()) }()
 
 	return extractArchive(ctx, archives.Zip{}, file, dst)
 }
@@ -37,7 +38,12 @@ func ExtractTarXz(ctx context.Context, source io.Reader, dst string) error {
 	}, source, dst)
 }
 
-func extractArchive(ctx context.Context, extractor archives.Extractor, source io.Reader, dst string) error {
+func extractArchive(
+	ctx context.Context,
+	extractor archives.Extractor,
+	source io.Reader,
+	dst string,
+) (err error) {
 	if err := os.MkdirAll(dst, 0o755); err != nil {
 		return err
 	}
@@ -45,13 +51,13 @@ func extractArchive(ctx context.Context, extractor archives.Extractor, source io
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { err = errors.Join(err, root.Close()) }()
 	return extractor.Extract(ctx, source, func(ctx context.Context, file archives.FileInfo) error {
 		return extractArchiveFile(root, file)
 	})
 }
 
-func extractArchiveFile(root *os.Root, file archives.FileInfo) error {
+func extractArchiveFile(root *os.Root, file archives.FileInfo) (err error) {
 	if !file.Mode().IsRegular() && !file.IsDir() {
 		return nil
 	}
@@ -62,7 +68,7 @@ func extractArchiveFile(root *os.Root, file archives.FileInfo) error {
 	if err != nil {
 		return err
 	}
-	defer source.Close()
+	defer func() { err = errors.Join(err, source.Close()) }()
 	return extractEntry(root, file.NameInArchive, file.Mode(), source)
 }
 
@@ -112,14 +118,6 @@ func safeLocalPath(name string) (string, error) {
 		return "", fmt.Errorf("archive entry escapes destination: %s", name)
 	}
 	return candidate, nil
-}
-
-func safeTarget(dst, name string) (string, error) {
-	candidate, err := safeLocalPath(name)
-	if err != nil || candidate == "" {
-		return candidate, err
-	}
-	return filepath.Join(dst, candidate), nil
 }
 
 func permOrDefault(mode fs.FileMode, fallback fs.FileMode) fs.FileMode {

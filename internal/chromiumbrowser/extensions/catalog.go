@@ -11,12 +11,7 @@ import (
 //go:embed extensions.toml
 var catalogData []byte
 
-type (
-	Catalog              = chromiumext.Catalog
-	ChromeStoreExtension = chromiumext.ChromeStoreExtension
-	UpdateURLExtension   = chromiumext.UpdateURLExtension
-	DownloadedExtension  = chromiumext.DownloadedExtension
-)
+type Catalog = chromiumext.Catalog
 
 func LoadCatalog() (Catalog, error) {
 	var catalog Catalog
@@ -27,12 +22,4 @@ func LoadCatalog() (Catalog, error) {
 		return catalog, err
 	}
 	return catalog, nil
-}
-
-func validExtensionID(id string) bool {
-	return chromiumext.ValidExtensionID(id)
-}
-
-func validExternalVersion(version string) bool {
-	return chromiumext.ValidExternalVersion(version)
 }

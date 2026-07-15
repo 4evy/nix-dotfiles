@@ -32,21 +32,6 @@ func Install(options Options) (Result, error) {
 	})
 }
 
-func patchUnpackedExtension(path string) error {
-	return chromiumext.PatchUnpackedExtension(
-		path,
-		[]chromiumext.BundlePatch{SuppressInstallOptionsPagePatch},
-	)
-}
-
-func chromeStoreCRXDownloadURL(updateURL, id string) (string, error) {
-	return chromiumext.ChromeStoreCRXDownloadURL(updateURL, id)
-}
-
-func chromeStoreVersionFromCRXURL(id, crxURL string) (string, error) {
-	return chromiumext.ChromeStoreVersionFromCRXURL(id, crxURL)
-}
-
 func UnpackedExtensionID(path string) string {
 	return chromiumext.UnpackedExtensionID(path)
 }

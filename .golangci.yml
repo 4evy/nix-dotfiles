@@ -6,8 +6,6 @@ run:
 
 linters:
   default: standard
-  disable:
-    - errcheck
   enable:
     - bodyclose
     - copyloopvar

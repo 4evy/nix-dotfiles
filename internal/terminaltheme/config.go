@@ -1,6 +1,7 @@
 package terminaltheme
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -97,9 +98,9 @@ func (c configSpec) args(extraArgs []string, theme Theme) ([]string, func(), err
 	}
 	cleanup := func() { _ = os.Remove(file.Name()) }
 	if _, err := file.WriteString(patched); err != nil {
-		file.Close()
+		closeErr := file.Close()
 		cleanup()
-		return nil, nil, err
+		return nil, nil, errors.Join(err, closeErr)
 	}
 	if err := file.Close(); err != nil {
 		cleanup()

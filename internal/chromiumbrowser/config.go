@@ -1,13 +1,11 @@
 package chromiumbrowser
 
 import (
-	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/4evy/dotfiles/internal/common/userdirs"
-	"github.com/pelletier/go-toml/v2"
 )
 
 type Config struct {
@@ -63,17 +61,6 @@ type PreferenceAcceleratorConfig struct {
 	Path        string `toml:"path"`
 	CommandID   string `toml:"command_id"`
 	Accelerator string `toml:"accelerator"`
-}
-
-func LoadConfig(data []byte, name string) (Config, error) {
-	var config Config
-	if err := toml.Unmarshal(data, &config); err != nil {
-		return Config{}, fmt.Errorf("parse %s Chromium browser config: %w", name, err)
-	}
-	if err := config.validate(name); err != nil {
-		return Config{}, err
-	}
-	return config, nil
 }
 
 func (config Config) Browser() Browser {
@@ -158,56 +145,6 @@ func (config PreferenceDefaultsConfig) PatchVariations(variations map[string]any
 	for _, value := range config.VariationValues {
 		variations[value.Path] = value.Value
 	}
-}
-
-func (config Config) validate(name string) error {
-	if config.ExecutableName == "" {
-		return fmt.Errorf("%s Chromium browser config is missing executable_name", name)
-	}
-	for _, flag := range config.Linux.WrapperFlags {
-		if flag == "" {
-			return fmt.Errorf("%s Chromium browser config contains an empty linux.wrapper_flags entry", name)
-		}
-	}
-	for mode, paths := range config.Paths {
-		if strings.TrimSpace(mode) == "" {
-			return fmt.Errorf("%s Chromium browser config contains an empty paths mode", name)
-		}
-		if paths.ProfileDir == "" {
-			return fmt.Errorf("%s Chromium browser config is missing paths.%s.profile_dir", name, mode)
-		}
-		for _, dir := range paths.ExternalExtensionDirs {
-			if dir == "" {
-				return fmt.Errorf("%s Chromium browser config contains an empty paths.%s.external_extension_dirs entry", name, mode)
-			}
-		}
-	}
-	for _, value := range config.Preferences.Values {
-		if value.Path == "" {
-			return fmt.Errorf("%s Chromium browser config contains a preference value without a path", name)
-		}
-	}
-	for _, value := range config.Preferences.LocalStateValues {
-		if value.Path == "" {
-			return fmt.Errorf("%s Chromium browser config contains a local state value without a path", name)
-		}
-	}
-	for _, value := range config.Preferences.VariationValues {
-		if value.Path == "" {
-			return fmt.Errorf("%s Chromium browser config contains a variation value without a path", name)
-		}
-	}
-	for _, accelerator := range config.Preferences.Accelerators {
-		if accelerator.Path == "" || accelerator.CommandID == "" || accelerator.Accelerator == "" {
-			return fmt.Errorf("%s Chromium browser config contains an incomplete preference accelerator", name)
-		}
-	}
-	for _, pattern := range config.Preferences.Cookies.Allow {
-		if strings.TrimSpace(pattern) == "" {
-			return fmt.Errorf("%s Chromium browser config contains an empty cookie allow pattern", name)
-		}
-	}
-	return nil
 }
 
 func expandPathTemplate(path string) string {

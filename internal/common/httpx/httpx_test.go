@@ -11,14 +11,9 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-func TestDefaultRestyClientHasTimeoutAndRetries(t *testing.T) {
+func TestDefaultRestyClientHasTimeout(t *testing.T) {
 	client := defaultRestyClient()
 	assert.Equal(t, client.GetClient().Timeout, defaultTimeout)
-	assert.Equal(t, client.RetryCount, 3)
-}
-
-func TestRetryableClientAllowsExplicitNoTimeout(t *testing.T) {
-	assert.Equal(t, RetryableClient(0).Timeout, time.Duration(0))
 }
 
 func TestRestyClientRetriesServerErrors(t *testing.T) {

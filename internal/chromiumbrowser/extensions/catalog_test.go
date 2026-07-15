@@ -7,30 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-)
 
-func TestCatalogIsValid(t *testing.T) {
-	catalog, err := LoadCatalog()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(catalog.ChromeStore) == 0 {
-		t.Fatal("Chrome Store extensions are empty")
-	}
-	if len(catalog.CRX) == 0 {
-		t.Fatal("CRX extensions are empty")
-	}
-	if len(catalog.UpdateURL) == 0 {
-		t.Fatal("update URL extensions are empty")
-	}
-}
+	"github.com/4evy/dotfiles/internal/common/chromiumext"
+)
 
 func TestValidExtensionIDMatchesChromiumIDShape(t *testing.T) {
 	for _, id := range []string{
 		"aeblfdkhhhdcdjpifhhbdiojplfjncoa",
 		"lkbebcjgcmobigpeffafkodonchffocl",
 	} {
-		if !validExtensionID(id) {
+		if !chromiumext.ValidExtensionID(id) {
 			t.Fatalf("validExtensionID(%q) = false", id)
 		}
 	}
@@ -41,7 +27,7 @@ func TestValidExtensionIDMatchesChromiumIDShape(t *testing.T) {
 		"aeblfdkhhhdcdjpifhhbdiojplfjncoq",
 		"AEBLFDKHHHDCDJPIFHHBDIOJPLFJNCOA",
 	} {
-		if validExtensionID(id) {
+		if chromiumext.ValidExtensionID(id) {
 			t.Fatalf("validExtensionID(%q) = true", id)
 		}
 	}
@@ -49,13 +35,13 @@ func TestValidExtensionIDMatchesChromiumIDShape(t *testing.T) {
 
 func TestValidExternalVersionMatchesChromiumExternalVersionShape(t *testing.T) {
 	for _, version := range []string{"1", "1.2", "8.12.24.34"} {
-		if !validExternalVersion(version) {
+		if !chromiumext.ValidExternalVersion(version) {
 			t.Fatalf("validExternalVersion(%q) = false", version)
 		}
 	}
 
 	for _, version := range []string{"", "1.", ".1", "1.beta", "1..2"} {
-		if validExternalVersion(version) {
+		if chromiumext.ValidExternalVersion(version) {
 			t.Fatalf("validExternalVersion(%q) = true", version)
 		}
 	}
@@ -64,29 +50,16 @@ func TestValidExternalVersionMatchesChromiumExternalVersionShape(t *testing.T) {
 func TestUnpackedExtensionIDMatchesChromiumPathID(t *testing.T) {
 	path := "/var/home/4evy/.cache/dotfiles/ansible/helium-browser/extensions/unpacked/aeblfdkhhhdcdjpifhhbdiojplfjncoa"
 	want := "eemjflinlmihebpkelplffenpkclceef"
-	if got := UnpackedExtensionID(path); got != want {
+	if got := chromiumext.UnpackedExtensionID(path); got != want {
 		t.Fatalf("UnpackedExtensionID(%q) = %q, want %q", path, got, want)
 	}
-	if got := UnpackedExtensionID(path + "/../aeblfdkhhhdcdjpifhhbdiojplfjncoa"); got != want {
+	if got := chromiumext.UnpackedExtensionID(path + "/../aeblfdkhhhdcdjpifhhbdiojplfjncoa"); got != want {
 		t.Fatalf("UnpackedExtensionID with redundant path segments = %q, want %q", got, want)
 	}
 }
 
-func TestChromeStoreVersionFromCRXURL(t *testing.T) {
-	got, err := chromeStoreVersionFromCRXURL(
-		"aeblfdkhhhdcdjpifhhbdiojplfjncoa",
-		"https://clients2.googleusercontent.com/crx/blobs/example/AEBLFDKHHHDCDJPIFHHBDIOJPLFJNCOA_8_12_24_34.crx",
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := "8.12.24.34"; got != want {
-		t.Fatalf("version = %q, want %q", got, want)
-	}
-}
-
 func TestChromeStoreCRXDownloadURL(t *testing.T) {
-	got, err := chromeStoreCRXDownloadURL(
+	got, err := chromiumext.ChromeStoreCRXDownloadURL(
 		"https://clients2.google.com/service/update2/crx",
 		"aeblfdkhhhdcdjpifhhbdiojplfjncoa",
 	)
@@ -202,7 +175,10 @@ func TestPatchUnpackedExtensionSuppressesInstallOptionsPage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := patchUnpackedExtension(root); err != nil {
+	if err := chromiumext.PatchUnpackedExtension(
+		root,
+		[]chromiumext.BundlePatch{SuppressInstallOptionsPagePatch},
+	); err != nil {
 		t.Fatal(err)
 	}
 

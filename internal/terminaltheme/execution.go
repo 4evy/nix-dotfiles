@@ -218,7 +218,7 @@ func resolveNodeShebang(executable string, args []string) (string, []string, err
 	if err != nil {
 		return executable, args, nil
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	header := make([]byte, 64)
 	n, err := file.Read(header)

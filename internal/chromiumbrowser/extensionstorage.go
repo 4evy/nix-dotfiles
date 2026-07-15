@@ -168,7 +168,12 @@ func writeStorageValues(profileDir, area string, entry extensionSettings) error 
 	})
 }
 
-func withStorage(profileDir, area, extensionID string, operation func(*leveldb.DB) error) error {
+func withStorage(
+	profileDir,
+	area,
+	extensionID string,
+	operation func(*leveldb.DB) error,
+) (err error) {
 	path := filepath.Join(profileDir, area, extensionID)
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		return fmt.Errorf("create storage directory %s: %w", path, err)
@@ -177,7 +182,7 @@ func withStorage(profileDir, area, extensionID string, operation func(*leveldb.D
 	if err != nil {
 		return fmt.Errorf("open storage %s: %w", path, err)
 	}
-	defer db.Close()
+	defer func() { err = errors.Join(err, db.Close()) }()
 	return operation(db)
 }
 

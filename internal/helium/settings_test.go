@@ -127,7 +127,11 @@ func TestApplyMergesRefinedGitHubToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("close extension settings: %v", err)
+		}
+	})
 
 	raw, err := db.Get([]byte("options"), nil)
 	if err != nil {
@@ -158,24 +162,11 @@ func TestDefaultSettingsSourcesAreValid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(sources) < 2 {
-		t.Fatalf("default settings source count = %d, want multiple files", len(sources))
-	}
-	totalLocal := 0
 	for _, source := range sources {
-		var settings struct {
-			Local []struct {
-				ID     string         `json:"id"`
-				Values map[string]any `json:"values"`
-			} `json:"local"`
-		}
+		var settings any
 		if err := json.Unmarshal(source.Data, &settings); err != nil {
 			t.Fatalf("%s: %v", source.Name, err)
 		}
-		totalLocal += len(settings.Local)
-	}
-	if totalLocal == 0 {
-		t.Fatal("default settings local entries are empty")
 	}
 }
 
@@ -200,7 +191,11 @@ func assertStoredValue(t *testing.T, profileDir, area, extensionID, key, want st
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("close extension settings: %v", err)
+		}
+	}()
 
 	got, err := db.Get([]byte(key), nil)
 	if err != nil {

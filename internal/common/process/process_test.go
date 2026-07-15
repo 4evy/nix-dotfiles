@@ -45,7 +45,9 @@ func pathOfWithPathScript(ts *testscript.TestScript, neg bool, args []string) {
 	if !ok || got != want {
 		ts.Fatalf("PathOfWithPath = %q, %v; want %q, true", got, ok, want)
 	}
-	fmt.Fprintln(ts.Stdout(), got)
+	if _, err := fmt.Fprintln(ts.Stdout(), got); err != nil {
+		ts.Fatalf("write stdout: %v", err)
+	}
 }
 
 func rejectPathLikeBinScript(ts *testscript.TestScript, neg bool, args []string) {
@@ -56,13 +58,12 @@ func rejectPathLikeBinScript(ts *testscript.TestScript, neg bool, args []string)
 		ts.Fatalf("usage: rejectpathlikebin PATH")
 	}
 	path := scriptPath(ts, args[0])
-	if got, ok := PathOf(path); ok {
-		ts.Fatalf("PathOf = %q, true; want false", got)
-	}
 	if got, ok := PathOfWithPath(path, ""); ok {
 		ts.Fatalf("PathOfWithPath = %q, true; want false", got)
 	}
-	fmt.Fprintln(ts.Stdout(), filepath.Base(path))
+	if _, err := fmt.Fprintln(ts.Stdout(), filepath.Base(path)); err != nil {
+		ts.Fatalf("write stdout: %v", err)
+	}
 }
 
 func scriptPath(ts *testscript.TestScript, path string) string {

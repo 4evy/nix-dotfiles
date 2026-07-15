@@ -7,23 +7,10 @@ import (
 	"testing"
 )
 
-func TestSafeTargetAllowsRelativeArchivePath(t *testing.T) {
-	root := t.TempDir()
-	target, err := safeTarget(root, "root/child/file.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := filepath.Join(root, "root", "child", "file.txt")
-	if target != want {
-		t.Fatalf("target = %q, want %q", target, want)
-	}
-}
-
-func TestSafeTargetRejectsEscapingArchivePath(t *testing.T) {
-	root := t.TempDir()
+func TestSafeLocalPathRejectsEscapingArchivePath(t *testing.T) {
 	for _, name := range []string{"../file.txt", `..\file.txt`, "root/../../file.txt", "/tmp/file.txt"} {
 		t.Run(name, func(t *testing.T) {
-			_, err := safeTarget(root, name)
+			_, err := safeLocalPath(name)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -44,7 +31,11 @@ func TestExtractEntryRejectsSymlinkEscape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer root.Close()
+	t.Cleanup(func() {
+		if err := root.Close(); err != nil {
+			t.Errorf("close root: %v", err)
+		}
+	})
 
 	err = extractEntry(root, "link/escape.txt", 0o644, strings.NewReader("owned"))
 	if err == nil {

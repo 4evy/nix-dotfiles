@@ -15,7 +15,7 @@ func detectTerminalTheme(timeout time.Duration) (TerminalThemeMode, bool) {
 	if err != nil {
 		return Dark, false
 	}
-	defer tty.Close()
+	defer func() { _ = tty.Close() }()
 
 	state, err := sttyOutput(tty, "-g")
 	if err != nil {
@@ -24,7 +24,7 @@ func detectTerminalTheme(timeout time.Duration) (TerminalThemeMode, bool) {
 	if err := sttyRun(tty, "raw", "-echo", "min", "0", "time", "1"); err != nil {
 		return Dark, false
 	}
-	defer sttyRun(tty, strings.TrimSpace(string(state)))
+	defer func() { _ = sttyRun(tty, strings.TrimSpace(string(state))) }()
 
 	if _, err := tty.Write([]byte("\x1b]11;?\a")); err != nil {
 		return Dark, false

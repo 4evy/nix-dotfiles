@@ -39,12 +39,14 @@ func TestKDLThemeReplacement(t *testing.T) {
 	}
 }
 
-func TestConfiguredProgramNames(t *testing.T) {
-	got := strings.Join(ConfiguredProgramNames(), ",")
-	for _, want := range []string{"btop", "codex", "ghostty", "helix"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("program names %q missing %q", got, want)
-		}
+func TestDefaultRunnerManifestIsValid(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	manifest, err := loadRunnerManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest.Runners) == 0 {
+		t.Fatal("default runner manifest is empty")
 	}
 }
 

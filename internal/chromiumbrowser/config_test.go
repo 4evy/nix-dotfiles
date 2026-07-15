@@ -4,14 +4,16 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"gotest.tools/v3/assert"
 )
 
-func TestLoadConfigBuildsBrowserFromTOML(t *testing.T) {
+func TestConfigBuildsBrowserFromTOML(t *testing.T) {
 	t.Setenv("HOME", "/home/browser-test")
 	t.Setenv("XDG_CONFIG_HOME", "/xdg/config")
 
-	config, err := LoadConfig([]byte(`
+	var config Config
+	err := toml.Unmarshal([]byte(`
 name = "Example"
 log_prefix = "example-browser"
 executable_name = "example-browser"
@@ -58,7 +60,7 @@ value = true
 
 	[preferences.cookies]
 	allow = ["[*.]example.com"]
-	`), "test config")
+	`), &config)
 	assert.NilError(t, err)
 
 	browser := config.Browser()
@@ -107,15 +109,4 @@ value = true
 		patch(variations)
 	}
 	assert.Equal(t, variations["example.browser.variation_enabled"], true)
-}
-
-func TestLoadConfigRejectsIncompletePreferenceAccelerators(t *testing.T) {
-	_, err := LoadConfig([]byte(`
-executable_name = "example-browser"
-
-[[preferences.accelerators]]
-path = "example.browser.custom_accelerators"
-command_id = "1"
-`), "test config")
-	assert.ErrorContains(t, err, "incomplete preference accelerator")
 }

@@ -70,42 +70,10 @@ func RemoveDirIfExists(path string) error {
 	return err
 }
 
-func CopyDirRecursive(src, dst string) error {
-	return CopyPath(src, dst)
-}
-
 func CopyPath(src, dst string) error {
 	return cp.Copy(src, dst, cp.Options{
 		OnSymlink: func(string) cp.SymlinkAction {
 			return cp.Shallow
 		},
 	})
-}
-
-func MoveDir(src, dst string) error {
-	if err := os.Rename(src, dst); err == nil {
-		return nil
-	}
-	if err := CopyDirRecursive(src, dst); err != nil {
-		return err
-	}
-	return os.RemoveAll(src)
-}
-
-func Normalize(path string) string {
-	if filepath.IsAbs(path) {
-		return filepath.Clean(path)
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = "."
-	}
-	return filepath.Clean(filepath.Join(cwd, path))
-}
-
-func RelativeUnder(root, path string) bool {
-	root = Normalize(root)
-	path = Normalize(path)
-	rel, err := filepath.Rel(root, path)
-	return err == nil && rel != "." && filepath.IsLocal(rel)
 }
