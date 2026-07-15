@@ -1,9 +1,13 @@
 """macOS workstation configuration commands."""
 
-import typer
+from cyclopts import App
 
 from workstation.macos import system
 
-app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
-app.command("karabiner-vhid")(system.configure_karabiner_vhid)
-app.command("kanata")(system.configure_kanata)
+app = App(
+    help="Configure macOS system integration.",
+    version_flags=[],
+    result_action="return_none",
+)
+app.command(system.configure_karabiner_vhid, name="karabiner-vhid")
+app.command(system.configure_kanata, name="kanata")

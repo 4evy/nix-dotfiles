@@ -1,11 +1,10 @@
 import os
 import re
-import shutil
 import sys
 import tempfile
 from pathlib import Path
 
-import typer
+from cyclopts import App
 from pydantic import BaseModel, ValidationError
 
 from workstation.automation import automation_check_mode, current_context
@@ -17,6 +16,7 @@ from workstation.lib.files import (
     ensure_directory,
     fresh_directory,
     install_file_if_changed,
+    remove_path,
     require_directory,
     require_file,
     write_if_changed,
@@ -32,7 +32,11 @@ from workstation.lib.host import (
 from workstation.lib.http import download, get
 from workstation.lib.paths import find_repo_root
 
-app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+app = App(
+    help="Configure Kanata and Toshy.",
+    version_flags=[],
+    result_action="return_none",
+)
 
 
 class GnomeExtensionInfo(BaseModel):
@@ -50,7 +54,7 @@ def _kanata_staging_dir() -> Path:
     return (data_dir or user_data_home() / "dotfiles") / "host/bin-staging/kanata"
 
 
-@app.command("kanata-build")
+@app.command(name="kanata-build")
 def build_kanata() -> OperationResult:
     """Build a staged Kanata binary with command support."""
     executable = _kanata_staging_dir() / "root/bin/kanata"
@@ -102,7 +106,53 @@ def _gnome_shell_major() -> str:
     return match.group()
 
 
-@app.command("toshy-gnome-context")
+def _install_gnome_context_extension(
+    uuid: str,
+    label: str,
+    *,
+    shell_version: str,
+    origin: str,
+    cache: Path,
+) -> bool:
+    response = get(
+        f"{origin}/extension-info/",
+        params={"uuid": uuid, "shell_version": shell_version},
+    )
+    try:
+        metadata = GnomeExtensionInfo.model_validate_json(response.content)
+    except ValidationError as error:
+        raise DotfilesError(
+            f"toshy-gnome-window-context: invalid metadata for {label}: {error}"
+        ) from error
+    if not metadata.download_url or metadata.version is None:
+        console.print(
+            f"toshy-gnome-window-context: {label} has no compatible "
+            f"GNOME Shell {shell_version} build; skipping"
+        )
+        return False
+    archive = cache / f"{uuid}-{metadata.version}.shell-extension.zip"
+    download(f"{origin}{metadata.download_url}", archive)
+    installed_uuid = output((
+        "gnome-extensions",
+        "install",
+        "--force",
+        "--print-uuid",
+        archive,
+    ))
+    if installed_uuid != uuid:
+        raise DotfilesError(
+            "toshy-gnome-window-context: installed UUID "
+            f"{installed_uuid} did not match {uuid}"
+        )
+    run(("gnome-extensions", "enable", uuid), check=False, capture=True)
+    enable_gnome_extensions(uuid)
+    console.print(
+        f"toshy-gnome-window-context: installed {label} for GNOME Shell {shell_version}"
+    )
+    return uuid != "appindicatorsupport@rgcjonas.gmail.com"
+
+
+@app.command(name="toshy-gnome-context")
 def toshy_gnome_context() -> OperationResult:
     """Install compatible GNOME window-context extensions for Toshy."""
     if which("gnome-shell") is None or which("gnome-extensions") is None:
@@ -119,44 +169,12 @@ def toshy_gnome_context() -> OperationResult:
     cache = ensure_directory(user_cache_home() / "dotfiles/gnome-extensions")
     installed_window_context = 0
     for uuid, label in GNOME_EXTENSIONS.items():
-        response = get(
-            f"{origin}/extension-info/",
-            params={"uuid": uuid, "shell_version": shell_version},
-        )
-        try:
-            metadata = GnomeExtensionInfo.model_validate_json(response.content)
-        except ValidationError as error:
-            raise DotfilesError(
-                f"toshy-gnome-window-context: invalid metadata for {label}: {error}"
-            ) from error
-        download_url = metadata.download_url
-        version = metadata.version
-        if not download_url or version is None:
-            console.print(
-                f"toshy-gnome-window-context: {label} has no compatible "
-                f"GNOME Shell {shell_version} build; skipping"
-            )
-            continue
-        archive = cache / f"{uuid}-{version}.shell-extension.zip"
-        download(f"{origin}{download_url}", archive)
-        installed_uuid = output((
-            "gnome-extensions",
-            "install",
-            "--force",
-            "--print-uuid",
-            archive,
-        ))
-        if installed_uuid != uuid:
-            raise DotfilesError(
-                "toshy-gnome-window-context: installed UUID "
-                f"{installed_uuid} did not match {uuid}"
-            )
-        run(("gnome-extensions", "enable", uuid), check=False, capture=True)
-        enable_gnome_extensions(uuid)
-        if uuid != "appindicatorsupport@rgcjonas.gmail.com":
-            installed_window_context += 1
-        console.print(
-            f"toshy-gnome-window-context: installed {label} for GNOME Shell {shell_version}"
+        installed_window_context += _install_gnome_context_extension(
+            uuid,
+            label,
+            shell_version=shell_version,
+            origin=origin,
+            cache=cache,
         )
     if installed_window_context == 0:
         raise DotfilesError(
@@ -252,7 +270,89 @@ def _merge_toshy(
     )
 
 
-@app.command("toshy-kanata-chain")
+def _checkout_toshy(repository: Path, revision: str) -> None:
+    if (repository / ".git").is_dir():
+        run((
+            "git",
+            "-C",
+            repository,
+            "fetch",
+            "--depth",
+            "1",
+            "--filter=blob:none",
+            "origin",
+            revision,
+        ))
+        run(("git", "-C", repository, "checkout", "--force", "FETCH_HEAD"))
+        return
+    remove_path(repository)
+    run((
+        "git",
+        "clone",
+        "--depth",
+        "1",
+        "--filter=blob:none",
+        "--no-checkout",
+        "--branch",
+        revision,
+        "https://github.com/RedBearAK/Toshy.git",
+        repository,
+    ))
+    run(("git", "-C", repository, "checkout", "--force", revision))
+
+
+def _run_toshy_installer(
+    config: Path,
+    source: Path,
+    automation: Path,
+    repository: Path,
+) -> None:
+    if _has_toshy_slices(config) and os.environ.get("TOSHY_RUN_INSTALLER") != "1":
+        return
+    console.print(
+        "toshy-kanata-chain: launching upstream Toshy barebones installer "
+        "with dotfiles automation."
+    )
+    with tempfile.TemporaryDirectory(prefix="toshy-automation-") as temporary:
+        automation_dir = Path(temporary)
+        arguments = ["install", "--barebones-config"]
+        distro = os.environ.get("TOSHY_DISTRO_OVERRIDE")
+        if distro:
+            arguments.extend(("--override-distro", distro))
+        elif Path("/run/ostree-booted").exists() or which("rpm-ostree") is not None:
+            arguments.extend(("--override-distro", "silverblue"))
+        if os.environ.get("TOSHY_SKIP_NATIVE") == "1":
+            arguments.append("--skip-native")
+        if os.environ.get("TOSHY_NO_DBUS_PYTHON") == "1":
+            arguments.append("--no-dbus-python")
+        install_file_if_changed(
+            source / "sudo-shim.py", automation_dir / "sudo", "0755"
+        )
+        host_sudo = which("sudo")
+        if host_sudo is None:
+            raise DotfilesError("toshy-kanata-chain: sudo is not available on the host")
+        prefix = ":".join((
+            os.fspath(automation_dir),
+            "/run/wrappers/bin",
+            "/usr/sbin",
+            "/usr/bin",
+            "/sbin",
+            "/bin",
+            "/usr/local/sbin",
+            "/usr/local/bin",
+            os.environ.get("PATH", ""),
+        ))
+        run(
+            (sys.executable, automation, repository / "setup_toshy.py", *arguments),
+            env={
+                "PATH": prefix,
+                "TOSHY_SUDO": os.fspath(host_sudo),
+                "TOSHY_SUDO_SHIM_DIR": os.fspath(automation_dir),
+            },
+        )
+
+
+@app.command(name="toshy-kanata-chain")
 def toshy_kanata_chain() -> OperationResult:
     """Install Toshy and merge the Kanata-only dotfiles slices."""
     if automation_check_mode():
@@ -272,81 +372,8 @@ def toshy_kanata_chain() -> OperationResult:
         require_file(slices / name)
     config = user_config_home() / "toshy/toshy_config.py"
 
-    if (toshy_repo / ".git").is_dir():
-        run((
-            "git",
-            "-C",
-            toshy_repo,
-            "fetch",
-            "--depth",
-            "1",
-            "--filter=blob:none",
-            "origin",
-            toshy_ref,
-        ))
-        run(("git", "-C", toshy_repo, "checkout", "--force", "FETCH_HEAD"))
-    else:
-        if toshy_repo.exists():
-            shutil.rmtree(toshy_repo)
-        run((
-            "git",
-            "clone",
-            "--depth",
-            "1",
-            "--filter=blob:none",
-            "--no-checkout",
-            "--branch",
-            toshy_ref,
-            "https://github.com/RedBearAK/Toshy.git",
-            toshy_repo,
-        ))
-        run(("git", "-C", toshy_repo, "checkout", "--force", toshy_ref))
-
-    force_install = os.environ.get("TOSHY_RUN_INSTALLER") == "1"
-    if not _has_toshy_slices(config) or force_install:
-        console.print(
-            "toshy-kanata-chain: launching upstream Toshy barebones installer "
-            "with dotfiles automation."
-        )
-        with tempfile.TemporaryDirectory(prefix="toshy-automation-") as temporary:
-            automation_dir = Path(temporary)
-            arguments = ["install", "--barebones-config"]
-            distro = os.environ.get("TOSHY_DISTRO_OVERRIDE")
-            if distro:
-                arguments.extend(("--override-distro", distro))
-            elif Path("/run/ostree-booted").exists() or which("rpm-ostree") is not None:
-                arguments.extend(("--override-distro", "silverblue"))
-            if os.environ.get("TOSHY_SKIP_NATIVE") == "1":
-                arguments.append("--skip-native")
-            if os.environ.get("TOSHY_NO_DBUS_PYTHON") == "1":
-                arguments.append("--no-dbus-python")
-            install_file_if_changed(
-                source / "sudo-shim.py", automation_dir / "sudo", "0755"
-            )
-            host_sudo = which("sudo")
-            if host_sudo is None:
-                raise DotfilesError(
-                    "toshy-kanata-chain: sudo is not available on the host"
-                )
-            prefix = ":".join((
-                os.fspath(automation_dir),
-                "/run/wrappers/bin",
-                "/usr/sbin",
-                "/usr/bin",
-                "/sbin",
-                "/bin",
-                "/usr/local/sbin",
-                "/usr/local/bin",
-                os.environ.get("PATH", ""),
-            ))
-            run(
-                (sys.executable, automation, toshy_repo / "setup_toshy.py", *arguments),
-                env={
-                    "PATH": prefix,
-                    "TOSHY_SUDO": os.fspath(host_sudo),
-                    "TOSHY_SUDO_SHIM_DIR": os.fspath(automation_dir),
-                },
-            )
+    _checkout_toshy(toshy_repo, toshy_ref)
+    _run_toshy_installer(config, source, automation, toshy_repo)
     _merge_toshy(config, merger, slices, source)
     restart = which("toshy-services-restart")
     if restart is not None:
@@ -374,12 +401,20 @@ class CheckReporter:
     def warn(self, message: str) -> None:
         error_console.print(f"WARN: {message}")
 
+    def check(self, condition: bool, success: str, failure: str | None = None) -> None:
+        message = success if condition else (failure or success)
+        (self.ok if condition else self.fail)(message)
+
 
 def _unit_content(*arguments: str) -> str:
     return run(("systemctl", *arguments), check=False, capture=True).stdout
 
 
-@app.command("toshy-kanata-check")
+def _unit_ok(*arguments: str) -> bool:
+    return run(("systemctl", *arguments), check=False, capture=True).returncode == 0
+
+
+@app.command(name="toshy-kanata-check")
 def toshy_kanata_check() -> OperationResult:
     """Verify the complete Kanata-to-Toshy device chain."""
     report = CheckReporter()
@@ -388,44 +423,39 @@ def toshy_kanata_check() -> OperationResult:
         ((), "kanata-main.service"),
         (("--user",), "toshy-config.service"),
     ):
-        active = (
-            run(
-                ("systemctl", *scope, "is-active", "--quiet", unit),
-                check=False,
-                capture=True,
-            ).returncode
-            == 0
-        )
-        (report.ok if active else report.fail)(
-            f"{unit} is {'active' if active else 'not active'}"
+        active = _unit_ok(*scope, "is-active", "--quiet", unit)
+        report.check(
+            active,
+            f"{unit} is active",
+            f"{unit} is not active",
         )
     kanata_unit = _unit_content("cat", "kanata-main.service")
-    if "PrivateUsers=true" in kanata_unit:
-        report.fail(
-            "kanata-main.service uses PrivateUsers=true, which can hide input/uinput groups"
-        )
-    else:
-        report.ok(
-            "kanata-main.service does not isolate host input/uinput groups with PrivateUsers"
-        )
+    report.check(
+        "PrivateUsers=true" not in kanata_unit,
+        "kanata-main.service does not isolate host input/uinput groups with PrivateUsers",
+        "kanata-main.service uses PrivateUsers=true, which can hide input/uinput groups",
+    )
 
     repo_config = repository / "dotfiles/dot_config/kanata/kanata.kbd"
     host_config = Path("/etc/kanata/kanata.kbd")
-    if (
+    configs_match = (
         repo_config.is_file()
         and host_config.is_file()
         and repo_config.read_bytes() == host_config.read_bytes()
-    ):
-        report.ok(f"{host_config} matches the dotfiles Kanata config")
-    else:
-        report.fail(f"{host_config} does not match {repo_config}")
+    )
+    report.check(
+        configs_match,
+        f"{host_config} matches the dotfiles Kanata config",
+        f"{host_config} does not match {repo_config}",
+    )
     device = Path("/run/kanata-main/main")
-    if device.is_symlink() and os.fspath(device.resolve()).startswith(
-        "/dev/input/event"
-    ):
-        report.ok(f"{device} points to {device.resolve()}")
-    else:
-        report.fail(f"{device} is missing or points to an unexpected target")
+    device_target = device.resolve() if device.is_symlink() else None
+    report.check(
+        device_target is not None
+        and os.fspath(device_target).startswith("/dev/input/event"),
+        f"{device} points to {device_target}",
+        f"{device} is missing or points to an unexpected target",
+    )
 
     toshy_config = user_config_home() / "toshy/toshy_config.py"
     required_fragments = (
@@ -435,12 +465,14 @@ def toshy_kanata_check() -> OperationResult:
         "/run/kanata-main/main",
         "dotfiles-kanata-main",
     )
-    if toshy_config.is_file() and all(
+    has_config = toshy_config.is_file() and all(
         fragment in toshy_config.read_text() for fragment in required_fragments
-    ):
-        report.ok("Toshy config includes dotfiles Kanata device slice")
-    else:
-        report.fail("Toshy config does not include the dotfiles Kanata device slice")
+    )
+    report.check(
+        has_config,
+        "Toshy config includes dotfiles Kanata device slice",
+        "Toshy config does not include the dotfiles Kanata device slice",
+    )
     service = _unit_content("--user", "cat", "toshy-config.service")
     checks = (
         (
@@ -453,25 +485,15 @@ def toshy_kanata_check() -> OperationResult:
         ),
     )
     for fragment, message in checks:
-        (report.ok if fragment in service else report.fail)(message)
-    enabled = (
-        run(
-            (
-                "systemctl",
-                "--user",
-                "is-enabled",
-                "--quiet",
-                "toshy-kanata-device.path",
-            ),
-            check=False,
-            capture=True,
-        ).returncode
-        == 0
+        report.check(fragment in service, message)
+    report.check(
+        _unit_ok("--user", "is-enabled", "--quiet", "toshy-kanata-device.path"),
+        "toshy-kanata-device.path is enabled",
     )
-    (report.ok if enabled else report.fail)("toshy-kanata-device.path is enabled")
     path_unit = _unit_content("--user", "cat", "toshy-kanata-device.path")
-    (report.ok if "PathChanged=/run/kanata-main/main" in path_unit else report.fail)(
-        "toshy-kanata-device.path watches the Kanata virtual device"
+    report.check(
+        "PathChanged=/run/kanata-main/main" in path_unit,
+        "toshy-kanata-device.path watches the Kanata virtual device",
     )
     refresh = _unit_content("--user", "cat", "toshy-kanata-device.service")
     recover_fragments = (
@@ -479,34 +501,21 @@ def toshy_kanata_check() -> OperationResult:
         "[ -e /run/kanata-main/main ]",
         "restart toshy-config.service",
     )
-    (
-        report.ok
-        if all(value in refresh for value in recover_fragments)
-        else report.fail
-    )("toshy-kanata-device.service can recover a failed Toshy service")
-    input_remapper = (
-        run(
-            ("systemctl", "cat", "input-remapper.service"), check=False, capture=True
-        ).returncode
-        == 0
+    report.check(
+        all(value in refresh for value in recover_fragments),
+        "toshy-kanata-device.service can recover a failed Toshy service",
     )
+    input_remapper = _unit_ok("cat", "input-remapper.service")
     if input_remapper and os.environ.get("DOTFILES_KEEP_INPUT_REMAPPER") == "1":
         report.warn(
             "input-remapper.service exists and keep flag is set; skipping conflict check"
         )
     elif input_remapper:
-        active = (
-            run(
-                ("systemctl", "is-active", "--quiet", "input-remapper.service"),
-                check=False,
-                capture=True,
-            ).returncode
-            == 0
-        )
-        (report.fail if active else report.ok)(
-            "input-remapper.service is active and can compete with Kanata/Toshy"
-            if active
-            else "input-remapper.service is not active"
+        active = _unit_ok("is-active", "--quiet", "input-remapper.service")
+        report.check(
+            not active,
+            "input-remapper.service is not active",
+            "input-remapper.service is active and can compete with Kanata/Toshy",
         )
     else:
         report.ok("input-remapper.service is not installed")

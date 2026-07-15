@@ -3,4 +3,4 @@ class DotfilesError(RuntimeError):
 
 
 class UsageError(DotfilesError):
-    """Invalid command-line usage outside the main Typer command tree."""
+    """Invalid command-line usage outside the main Cyclopts command tree."""

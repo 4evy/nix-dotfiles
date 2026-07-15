@@ -1,12 +1,14 @@
 """Linux host-layer automation commands."""
 
-import typer
+from cyclopts import App
 
 from workstation.host import apps, desktop, keyboard
 
-app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
-app.add_typer(
-    apps.app, name="apps", help="Configure host networking and remote desktop."
+app = App(
+    help="Configure the Linux host layer.",
+    version_flags=[],
+    result_action="return_none",
 )
-app.add_typer(desktop.app, name="desktop", help="Configure Linux desktop integrations.")
-app.add_typer(keyboard.app, name="keyboard", help="Configure Kanata and Toshy.")
+app.command(apps.app, name="apps")
+app.command(desktop.app, name="desktop")
+app.command(keyboard.app, name="keyboard")

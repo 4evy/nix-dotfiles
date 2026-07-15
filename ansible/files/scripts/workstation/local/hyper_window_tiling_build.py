@@ -1,24 +1,26 @@
 import os
 import platform
-import shutil
 import tempfile
 from pathlib import Path
-from typing import Annotated
 
-import typer
+from cyclopts import App
 from filelock import FileLock
 
 from workstation import __version__
 from workstation.console import error_console
 from workstation.errors import DotfilesError
 from workstation.lib.commands import require_commands, run
-from workstation.lib.files import install_file_if_changed, require_file
+from workstation.lib.files import install_file_if_changed, remove_path, require_file
 from workstation.lib.paths import state_path_for_home
 
 PACKAGE_PATH = Path("packages/hyper-window-tiling")
 GNOME_UUID = "hyper-window-tiling@4evy.local"
 
-app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+app = App(
+    help="Build the shared GNOME and KDE window-tiling package.",
+    version_flags=[],
+    result_action="return_none",
+)
 
 
 def normalize_os(name: str) -> str:
@@ -125,30 +127,30 @@ def build_package(
             temporary_root = Path(temporary)
             _stage_gnome(package_root, temporary_root / "gnome" / GNOME_UUID)
             _stage_kde(package_root, temporary_root / "kde/hyper-window-tiling")
-            if stage_root.is_symlink() or stage_root.is_file():
-                stage_root.unlink()
-            elif stage_root.exists():
-                shutil.rmtree(stage_root)
+            remove_path(stage_root)
             temporary_root.replace(stage_root)
     return stage_root
 
 
-@app.command("build")
+@app.command(name="build")
 def build(
-    source_dir: Annotated[
-        Path | None,
-        typer.Option("--source-dir", help="Chezmoi source directory."),
-    ] = None,
-    home_dir: Annotated[
-        Path | None,
-        typer.Option("--home-dir", help="Home directory used for staged output."),
-    ] = None,
-    os_name: Annotated[
-        str | None,
-        typer.Option("--os", help="Override the target operating-system name."),
-    ] = None,
+    *,
+    source_dir: Path | None = None,
+    home_dir: Path | None = None,
+    os_name: str | None = None,
 ) -> None:
-    """Build and atomically stage both desktop integrations."""
+    """Build and atomically stage both desktop integrations.
+
+    Parameters
+    ----------
+    source_dir
+        Chezmoi source directory.
+    home_dir
+        Home directory used for staged output.
+    os_name
+        Override the target operating-system name.
+
+    """
     home = home_dir or Path(os.environ.get("CHEZMOI_HOME_DIR") or Path.home())
     source_value = source_dir
     if source_value is None and os.environ.get("CHEZMOI_SOURCE_DIR"):
@@ -160,32 +162,29 @@ def build(
         os_name=target_os,
     )
     if result is not None:
-        typer.echo(result)
-
-
-def version_callback(value: bool) -> None:
-    if value:
-        typer.echo(f"hyper-window-tiling-build version {__version__}")
-        raise typer.Exit()
+        print(result)
 
 
 def alias(
-    source_dir: Annotated[Path | None, typer.Option("--source-dir")] = None,
-    home_dir: Annotated[Path | None, typer.Option("--home-dir")] = None,
-    os_name: Annotated[str | None, typer.Option("--os")] = None,
-    version: Annotated[
-        bool,
-        typer.Option("--version", callback=version_callback, is_eager=True),
-    ] = False,
+    *,
+    source_dir: Path | None = None,
+    home_dir: Path | None = None,
+    os_name: str | None = None,
 ) -> None:
     """Build the shared GNOME and KDE window-tiling package."""
-    del version
     build(source_dir=source_dir, home_dir=home_dir, os_name=os_name)
+
+
+alias_app = App(
+    default_command=alias,
+    version=f"hyper-window-tiling-build version {__version__}",
+    result_action="return_none",
+)
 
 
 def entrypoint() -> None:
     try:
-        typer.run(alias)
+        alias_app()
     except DotfilesError as error:
         error_console.print(f"[bold red]hyper-window-tiling-build:[/bold red] {error}")
         raise SystemExit(1) from error

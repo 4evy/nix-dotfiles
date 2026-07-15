@@ -15,21 +15,10 @@ from workstation.errors import DotfilesError
 from workstation.lib.commands import CommandResult, require_commands, run, which
 from workstation.lib.files import require_executable
 
-
-def user_cache_home() -> Path:
-    return user_cache_path()
-
-
-def user_config_home() -> Path:
-    return user_config_path()
-
-
-def user_data_home() -> Path:
-    return user_data_path()
-
-
-def user_state_home() -> Path:
-    return user_state_path()
+user_cache_home = user_cache_path
+user_config_home = user_config_path
+user_data_home = user_data_path
+user_state_home = user_state_path
 
 
 def in_container() -> bool:

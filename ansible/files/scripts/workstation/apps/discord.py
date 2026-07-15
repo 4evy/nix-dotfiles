@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from typing import Annotated
 
+from cyclopts import App, Parameter
 from packaging.version import InvalidVersion, Version
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
@@ -203,14 +204,17 @@ def _repair_macos(package_bin: Path) -> None:
     _set_macos_asar_lock(resources, locked=True)
 
 
-def main(argv: list[str] | None = None) -> int:
-    arguments = list(sys.argv[1:] if argv is None else argv)
+def main(
+    *arguments: Annotated[str, Parameter(allow_leading_hyphen=True)],
+    repair_only: bool = False,
+) -> int:
+    """Launch Discord with Equicord, or repair the current installation."""
     config_home = user_config_home()
     discord_dir = config_home / "discord"
     discord_host = discord_dir / "Discord"
     package_bin = Path(sys.argv[0]).resolve().parent
     equilotl = _linux_equilotl(package_bin)
-    if arguments[:1] == ["--repair-only"]:
+    if repair_only:
         if sys.platform == "darwin":
             _repair_macos(package_bin)
             return 0
@@ -249,8 +253,15 @@ def main(argv: list[str] | None = None) -> int:
     return result.returncode
 
 
+app = App(
+    default_command=main,
+    version_flags=[],
+    result_action="return_int_as_exit_code_else_zero",
+)
+
+
 def entrypoint() -> None:
     try:
-        raise SystemExit(main())
+        app()
     except DotfilesError as error:
         raise SystemExit(str(error)) from error

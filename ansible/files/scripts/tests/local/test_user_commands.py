@@ -1,4 +1,3 @@
-import sys
 from typing import TYPE_CHECKING
 
 from workstation.local import user_commands
@@ -43,9 +42,7 @@ def test_shottr_install_keeps_existing_activation_without_force(
     activated: list[str] = []
     monkeypatch.setattr(user_commands, "_shottr_is_activated", lambda _domain: True)
     monkeypatch.setattr(user_commands, "_activate_shottr_license", activated.append)
-    monkeypatch.setattr(sys, "argv", ["shottr-license", "install"])
-
-    user_commands.shottr_license_entrypoint()
+    user_commands.shottr_license("install")
 
     assert activated == []
 
@@ -57,8 +54,6 @@ def test_shottr_force_install_reactivates_existing_license(
     monkeypatch.setattr(user_commands, "_shottr_is_activated", lambda _domain: True)
     monkeypatch.setattr(user_commands, "_shottr_license_key", lambda: "license-key")
     monkeypatch.setattr(user_commands, "_activate_shottr_license", activated.append)
-    monkeypatch.setattr(sys, "argv", ["shottr-license", "install"])
-
-    user_commands.shottr_license_entrypoint(force=True)
+    user_commands.shottr_license("install", force=True)
 
     assert activated == ["license-key"]

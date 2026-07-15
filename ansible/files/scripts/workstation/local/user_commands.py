@@ -5,8 +5,10 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Annotated, Literal
 
 import psutil
+from cyclopts import App, Group, Parameter, validators
 from pydantic import TypeAdapter
 
 from workstation.console import console, error_console
@@ -26,91 +28,109 @@ def _exec(
     os.execvpe(executable, (executable, *arguments), environment or os.environ)
 
 
-def alt_tab_license_entrypoint() -> None:
-    service = "com.lwouis.alt-tab-macos.license"
-    values = {
-        "licenseKey": "0000-0000-0000-0000-0000-0000",
-        "instanceId": "evy-instance-0",
-        "variantId": "pro_lifetime",
-    }
-    action = sys.argv[1] if len(sys.argv) == 2 else ""
-    if action == "install":
-        for account, value in values.items():
-            run(
+_ALT_TAB_SERVICE = "com.lwouis.alt-tab-macos.license"
+_ALT_TAB_VALUES = {
+    "licenseKey": "0000-0000-0000-0000-0000-0000",
+    "instanceId": "evy-instance-0",
+    "variantId": "pro_lifetime",
+}
+_ALT_TAB_DEFAULT_KEYS = ("lastValidation", "lastValidationResult", "customerEmail")
+
+
+def _install_alt_tab_license() -> None:
+    for account, value in _ALT_TAB_VALUES.items():
+        run(
+            (
+                "security",
+                "add-generic-password",
+                "-A",
+                "-U",
+                "-s",
+                _ALT_TAB_SERVICE,
+                "-a",
+                account,
+                "-w",
+                value,
+            ),
+            capture=True,
+        )
+    defaults = (
+        ("lastValidation", "float", str(int(dt.datetime.now(dt.UTC).timestamp()))),
+        ("lastValidationResult", "bool", "true"),
+        ("customerEmail", "string", "alt@evy.pink"),
+    )
+    for key, kind, value in defaults:
+        run(("defaults", "write", _ALT_TAB_SERVICE, key, f"-{kind}", value))
+    error_console.print("alt-tab-license: license installed; restart AltTab to apply")
+
+
+def _remove_alt_tab_license() -> None:
+    for account in _ALT_TAB_VALUES:
+        run(
+            (
+                "security",
+                "delete-generic-password",
+                "-s",
+                _ALT_TAB_SERVICE,
+                "-a",
+                account,
+            ),
+            check=False,
+            capture=True,
+        )
+    for key in _ALT_TAB_DEFAULT_KEYS:
+        run(("defaults", "delete", _ALT_TAB_SERVICE, key), check=False, capture=True)
+    error_console.print(
+        "alt-tab-license: license removed; restart AltTab to revert to trial"
+    )
+
+
+def _show_alt_tab_license() -> None:
+    console.print("keychain items:")
+    for account in _ALT_TAB_VALUES:
+        value = (
+            output(
                 (
                     "security",
-                    "add-generic-password",
-                    "-A",
-                    "-U",
+                    "find-generic-password",
                     "-s",
-                    service,
+                    _ALT_TAB_SERVICE,
                     "-a",
                     account,
                     "-w",
-                    value,
-                ),
-                capture=True,
-            )
-        defaults = (
-            (
-                "lastValidation",
-                "float",
-                str(int(dt.datetime.now(dt.UTC).timestamp())),
-            ),
-            ("lastValidationResult", "bool", "true"),
-            ("customerEmail", "string", "alt@evy.pink"),
-        )
-        for key, kind, value in defaults:
-            run(("defaults", "write", service, key, f"-{kind}", value))
-        error_console.print(
-            "alt-tab-license: license installed; restart AltTab to apply"
-        )
-        return
-    if action == "remove":
-        for account in values:
-            run(
-                (
-                    "security",
-                    "delete-generic-password",
-                    "-s",
-                    service,
-                    "-a",
-                    account,
                 ),
                 check=False,
-                capture=True,
             )
-        for key in ("lastValidation", "lastValidationResult", "customerEmail"):
-            run(("defaults", "delete", service, key), check=False, capture=True)
-        error_console.print(
-            "alt-tab-license: license removed; restart AltTab to revert to trial"
+            or "none"
         )
-        return
-    if action == "status":
-        console.print("keychain items:")
-        for account in values:
-            value = (
-                output(
-                    (
-                        "security",
-                        "find-generic-password",
-                        "-s",
-                        service,
-                        "-a",
-                        account,
-                        "-w",
-                    ),
-                    check=False,
-                )
-                or "none"
-            )
-            console.print(f"  {account + ':':<12} {value}")
-        console.print(f"\ndefaults ({service}):")
-        for key in ("lastValidation", "lastValidationResult", "customerEmail"):
-            value = output(("defaults", "read", service, key), check=False) or "none"
-            console.print(f"  {key + ':':<22} {value}")
-        return
-    raise SystemExit("Usage: alt-tab-license <install|remove|status>")
+        console.print(f"  {account + ':':<12} {value}")
+    console.print(f"\ndefaults ({_ALT_TAB_SERVICE}):")
+    for key in _ALT_TAB_DEFAULT_KEYS:
+        value = (
+            output(("defaults", "read", _ALT_TAB_SERVICE, key), check=False) or "none"
+        )
+        console.print(f"  {key + ':':<22} {value}")
+
+
+def alt_tab_license(action: Literal["install", "remove", "status"]) -> None:
+    """Install, remove, or display the AltTab license state."""
+    actions = {
+        "install": _install_alt_tab_license,
+        "remove": _remove_alt_tab_license,
+        "status": _show_alt_tab_license,
+    }
+    actions[action]()
+
+
+_alt_tab_license_app = App(
+    default_command=alt_tab_license,
+    version_flags=[],
+    result_action="return_none",
+)
+
+
+def alt_tab_license_entrypoint() -> None:
+    _alt_tab_license_app()
 
 
 def _shottr_license_key() -> str:
@@ -201,9 +221,11 @@ def _shottr_is_activated(domain: str) -> bool:
     return bool(stored_license and vault)
 
 
-def shottr_license_entrypoint(*, force: bool = False) -> None:
+def shottr_license(
+    action: Literal["install", "status"], *, force: bool = False
+) -> None:
+    """Install or display the Shottr license state."""
     domain = "cc.ffitch.shottr"
-    action = sys.argv[1] if len(sys.argv) == 2 else ""
     if action == "install":
         if _shottr_is_activated(domain) and not force:
             error_console.print(
@@ -221,8 +243,6 @@ def shottr_license_entrypoint(*, force: bool = False) -> None:
             console.print("shottr-license: installed")
         else:
             console.print("shottr-license: not installed")
-        return
-    raise SystemExit("Usage: shottr-license <install|status> [--force]")
 
 
 def _real_codex(home: Path, wrapper: Path) -> Path:
@@ -279,6 +299,13 @@ def _print_command(*arguments: str) -> str:
     return result.stdout
 
 
+def _print_if_available(command: str, *arguments: str) -> bool:
+    if which(command) is None:
+        return False
+    _print_command(command, *arguments)
+    return True
+
+
 def _matching_lines(
     text: str,
     pattern: str,
@@ -302,18 +329,19 @@ def _lspci_display_devices(text: str) -> str:
     return "\n".join(dict.fromkeys(selected))
 
 
-def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
+def _audit_system() -> None:
     _section("system")
-    if which("hostnamectl"):
-        _print_command("hostnamectl")
+    _print_if_available("hostnamectl")
     console.print(
         f"session={os.environ.get('XDG_SESSION_TYPE', 'unknown')} "
         f"desktop={os.environ.get('XDG_CURRENT_DESKTOP', 'unknown')}"
     )
     console.print(f"kernel={platform.release()}")
     for command in ("rpm-ostree", "bootc"):
-        if which(command):
-            _print_command(command, "status")
+        _print_if_available(command, "status")
+
+
+def _audit_graphics() -> None:
     _section("graphics")
     if which("lspci"):
         console.print(_lspci_display_devices(output(("lspci", "-nnk"), check=False)))
@@ -327,19 +355,12 @@ def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
             )
         )
     for device in Path("/sys/class/drm").glob("card[0-9]/device"):
-        vendor = (
-            (device / "vendor").read_text().strip()
-            if (device / "vendor").is_file()
-            else ""
-        )
-        identifier = (
-            (device / "device").read_text().strip()
-            if (device / "device").is_file()
-            else ""
-        )
+        vendor_path = device / "vendor"
+        device_path = device / "device"
+        vendor = vendor_path.read_text().strip() if vendor_path.is_file() else ""
+        identifier = device_path.read_text().strip() if device_path.is_file() else ""
         console.print(f"{device} vendor={vendor} device={identifier}")
-    if which("nvidia-smi"):
-        _print_command("nvidia-smi")
+    _print_if_available("nvidia-smi")
     if which("rpm"):
         packages = _matching_lines(
             output(("rpm", "-qa"), check=False),
@@ -349,19 +370,20 @@ def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
         )
         console.print("\n".join(sorted(packages.splitlines())))
 
+
+def _audit_graphics_apis() -> None:
     _section("graphics-apis")
     for command, arguments in (
         ("glxinfo", ("-B",)),
         ("eglinfo", ("-B",)),
         ("vainfo", ("--display", "wayland")),
     ):
-        if which(command):
-            _print_command(command, *arguments)
-    if which("vulkaninfo"):
-        _print_command("vulkaninfo", "--summary")
-    else:
+        _print_if_available(command, *arguments)
+    if not _print_if_available("vulkaninfo", "--summary"):
         console.print("vulkaninfo not available")
 
+
+def _audit_flatpak_gl() -> None:
     _section("flatpak-gl")
     if which("flatpak"):
         _print_command("flatpak", "--gl-drivers")
@@ -380,9 +402,11 @@ def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
         console.print(
             "\n".join(line for line in runtimes.splitlines() if pattern.search(line))
         )
+
+
+def _audit_power_and_desktop() -> None:
     _section("power")
-    if which("powerprofilesctl"):
-        _print_command("powerprofilesctl", "get")
+    _print_if_available("powerprofilesctl", "get")
     for path in (
         Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"),
         Path("/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference"),
@@ -392,10 +416,8 @@ def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
 
     _section("pressure")
     for command, arguments in (("uptime", ()), ("free", ("-h",))):
-        if which(command):
-            _print_command(command, *arguments)
-    if which("systemd-inhibit"):
-        _print_command("systemd-inhibit", "--list", "--no-pager")
+        _print_if_available(command, *arguments)
+    _print_if_available("systemd-inhibit", "--list", "--no-pager")
     memory = psutil.virtual_memory()
     console.print(f"load={os.getloadavg()} memory_used={memory.percent:.1f}%")
 
@@ -407,8 +429,7 @@ def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
     _section("gnome")
     if gsettings_available():
         _print_command("gsettings", "get", "org.gnome.shell", "enabled-extensions")
-    if which("gnome-extensions"):
-        _print_command("gnome-extensions", "list", "--enabled")
+    _print_if_available("gnome-extensions", "list", "--enabled")
     if which("journalctl"):
         journal = output(
             ("journalctl", "--user", "-b", "--no-pager", "-p", "warning..alert"),
@@ -424,6 +445,8 @@ def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
             )
         )
 
+
+def _audit_processes_and_logs() -> None:
     _section("chromium")
     if which("ps"):
         process_table = output(
@@ -462,6 +485,15 @@ def desktop_perf_audit_entrypoint() -> None:  # noqa: C901, PLR0912
             check=False,
         )
         console.print("\n".join(table.splitlines()[:30]))
+
+
+def desktop_perf_audit_entrypoint() -> None:
+    _audit_system()
+    _audit_graphics()
+    _audit_graphics_apis()
+    _audit_flatpak_gl()
+    _audit_power_and_desktop()
+    _audit_processes_and_logs()
 
 
 def _accent_colors() -> tuple[str, str]:
@@ -525,13 +557,25 @@ def _gnome_accent_apply() -> None:
             )
 
 
-def gnome_catppuccin_accent_entrypoint() -> None:
-    mode = sys.argv[1] if len(sys.argv) == 2 else "--once"
-    if mode not in {"--once", "--watch"}:
-        raise SystemExit("usage: gnome-catppuccin-accent [--once|--watch]")
+_GNOME_ACCENT_MODE = Group("Mode", validator=validators.LimitedChoice(max=1))
+
+
+def gnome_catppuccin_accent(
+    *,
+    once: Annotated[
+        bool,
+        Parameter(group=_GNOME_ACCENT_MODE, negative=""),
+    ] = False,
+    watch: Annotated[
+        bool,
+        Parameter(group=_GNOME_ACCENT_MODE, negative=""),
+    ] = False,
+) -> None:
+    """Apply the GNOME accent once or watch for color-scheme changes."""
+    del once
     _gnome_accent_apply()
     executable = which("gsettings")
-    if mode == "--watch" and executable is not None:
+    if watch and executable is not None:
         process = subprocess.Popen(
             (
                 executable,
@@ -546,6 +590,17 @@ def gnome_catppuccin_accent_entrypoint() -> None:
             for _line in process.stdout:
                 _gnome_accent_apply()
         raise SystemExit(process.wait())
+
+
+_gnome_accent_app = App(
+    default_command=gnome_catppuccin_accent,
+    version_flags=[],
+    result_action="return_none",
+)
+
+
+def gnome_catppuccin_accent_entrypoint() -> None:
+    _gnome_accent_app()
 
 
 def python_entrypoint() -> None:

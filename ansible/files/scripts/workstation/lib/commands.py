@@ -40,6 +40,27 @@ def require_commands(*names: str) -> None:
             raise DotfilesError(f"required command is not available: {name}")
 
 
+def _configure_output(
+    kwargs: dict[str, object],
+    *,
+    capture: bool,
+    output_mode: Literal["inherit", "stderr", "discard"],
+) -> None:
+    if output_mode == "discard":
+        kwargs.update(stdout=subprocess.DEVNULL, stderr=None)
+    elif not capture:
+        kwargs.update(
+            stdout=sys.stderr if output_mode == "stderr" else None,
+            stderr=None,
+        )
+
+
+def _process_error(error: ProcessExecutionError, arguments: list[str]) -> DotfilesError:
+    details = error.stderr.strip() or error.stdout.strip()
+    message = f"command failed ({error.retcode}): {' '.join(arguments)}"
+    return DotfilesError(f"{message}\n{details}" if details else message)
+
+
 def run(
     argv: Sequence[str | os.PathLike[str]],
     *,
@@ -70,12 +91,7 @@ def run(
     }
     if input_text is not None:
         kwargs["stdin"] = input_text
-    if output_mode == "discard":
-        kwargs["stdout"] = subprocess.DEVNULL
-        kwargs["stderr"] = None
-    elif not capture:
-        kwargs["stdout"] = sys.stderr if output_mode == "stderr" else None
-        kwargs["stderr"] = None
+    _configure_output(kwargs, capture=capture, output_mode=output_mode)
     try:
         returncode, stdout, stderr = command.run((), **kwargs)
     except ProcessTimedOut as error:
@@ -83,11 +99,7 @@ def run(
             f"command timed out after {timeout} seconds: {' '.join(arguments)}"
         ) from error
     except ProcessExecutionError as error:
-        details = error.stderr.strip() or error.stdout.strip()
-        message = f"command failed ({error.retcode}): {' '.join(arguments)}"
-        if details:
-            message = f"{message}\n{details}"
-        raise DotfilesError(message) from error
+        raise _process_error(error, arguments) from error
     return CommandResult(returncode, stdout or "", stderr or "")
 
 

@@ -18,7 +18,7 @@ options:
   command:
     description:
       - Existing C(dotfiles-scripts) command and arguments.
-      - Typer performs the same discovery and type conversion as the human CLI.
+      - Cyclopts performs the same discovery and type conversion as the human CLI.
     type: list
     elements: str
     required: true

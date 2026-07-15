@@ -5,8 +5,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stdout
 from contextvars import ContextVar
 
+from cyclopts.exceptions import CycloptsError
 from pydantic import ValidationError
-from typer.main import get_command
 
 from workstation.automation_models import (
     AutomationContext,
@@ -74,7 +74,7 @@ def _require_allowed_command(command: list[str]) -> None:
 
 
 def dispatch(request: OperationRequest) -> OperationResponse:
-    """Execute a command through Typer's existing parser and normalize its result."""
+    """Execute a command through the shared parser and normalize its result."""
     if request.command[0] == "_ansible-v1":
         raise DotfilesError("the machine endpoint cannot invoke itself")
     _require_allowed_command(request.command)
@@ -82,11 +82,8 @@ def dispatch(request: OperationRequest) -> OperationResponse:
     from workstation.cli import app
 
     with _request_scope(request):
-        result = get_command(app).main(
-            args=request.command,
-            prog_name="dotfiles-scripts",
-            standalone_mode=False,
-        )
+        command_function, bound, _ = app.parse_args(request.command)
+        result = command_function(*bound.args, **bound.kwargs)
     if not isinstance(result, OperationResult):
         raise DotfilesError(
             f"automation command did not return OperationResult: {command}"
@@ -103,7 +100,7 @@ def run_machine_protocol(payload: str) -> OperationResponse:
     try:
         request = OperationRequest.model_validate_json(payload)
         return dispatch(request)
-    except (DotfilesError, ValidationError) as error:
+    except (CycloptsError, DotfilesError, ValidationError) as error:
         return _failure(str(error))
     except Exception as error:  # noqa: BLE001 - wire boundary must stay valid JSON.
         return _failure(f"unexpected automation failure: {error}")

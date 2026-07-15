@@ -2,7 +2,7 @@ import os
 import platform
 from pathlib import Path
 
-import typer
+from cyclopts import App
 
 from workstation.automation import automation_check_mode
 from workstation.automation_models import OperationResult
@@ -26,7 +26,11 @@ from workstation.lib.host import (
 from workstation.lib.paths import find_repo_root
 from workstation.local.hyper_window_tiling_build import build_package
 
-app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+app = App(
+    help="Configure Linux desktop integrations.",
+    version_flags=[],
+    result_action="return_none",
+)
 
 
 def _scope_run(
@@ -45,7 +49,7 @@ def _flatpak_available(host: HostRunner) -> bool:
     return host.has_command("flatpak")
 
 
-@app.command("flatpak-maintenance")
+@app.command(name="flatpak-maintenance")
 def flatpak_maintenance() -> OperationResult:
     """Repair user/system Flatpak installations and prune unused refs."""
     if automation_check_mode():
@@ -204,7 +208,7 @@ def _install_nvidia_runtimes(host: HostRunner, installation: str) -> bool:
     return changed
 
 
-@app.command("flatpak-nvidia")
+@app.command(name="flatpak-nvidia")
 def flatpak_nvidia() -> OperationResult:
     """Install NVIDIA GL and VA-API runtimes for both Flatpak installations."""
     host = HostRunner()
@@ -351,7 +355,7 @@ def _install_kde(build_root: Path) -> bool:
     return True
 
 
-@app.command("hyper-window-tiling")
+@app.command(name="hyper-window-tiling")
 def hyper_window_tiling() -> OperationResult:
     """Build and install the GNOME and KDE window-tiling integrations."""
     if automation_check_mode():
@@ -384,7 +388,7 @@ def hyper_window_tiling() -> OperationResult:
     )
 
 
-@app.command("sushi-preview")
+@app.command(name="sushi-preview")
 def install_sushi_preview() -> OperationResult:
     """Build and install the pinned GNOME Sushi Flatpak."""
     return sushi_preview.install()

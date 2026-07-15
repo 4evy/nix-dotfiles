@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 import tomlkit
-import typer
+from cyclopts import App
 from pydantic import BaseModel, Field, ValidationError
 from tomlkit.exceptions import ParseError
 
@@ -23,7 +23,11 @@ from workstation.lib.host import HostRunner, user_config_home, user_data_home
 from workstation.lib.paths import find_repo_root
 from workstation.lib.retry import wait_until
 
-app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+app = App(
+    help="Configure host networking and remote desktop.",
+    version_flags=[],
+    result_action="return_none",
+)
 
 
 class TailscalePreferences(BaseModel):
@@ -64,6 +68,19 @@ def _module_installed(name: str) -> bool:
     return any(line.split()[0:1] == [name] for line in modules.splitlines())
 
 
+def _policy_state(
+    policy_dir: Path,
+    module: str,
+    source_names: tuple[str, ...],
+    hash_file: Path,
+) -> tuple[str, bool]:
+    digest = _policy_hash(policy_dir, source_names)
+    installed_digest = (
+        hash_file.read_text(encoding="utf-8").strip() if hash_file.is_file() else None
+    )
+    return digest, not _module_installed(module) or installed_digest != digest
+
+
 def _build_install_policy(
     *,
     policy_dir: Path,
@@ -79,10 +96,7 @@ def _build_install_policy(
             "Spectrum image to build the SELinux policy"
         )
         return False
-    digest = _policy_hash(policy_dir, source_names)
-    needs_install = not _module_installed(module) or not hash_file.is_file()
-    if hash_file.is_file() and hash_file.read_text(encoding="utf-8").strip() != digest:
-        needs_install = True
+    digest, needs_install = _policy_state(policy_dir, module, source_names, hash_file)
     if not needs_install:
         return False
     with tempfile.TemporaryDirectory(prefix=f"{module}-selinux-") as temporary:
@@ -121,6 +135,35 @@ def _tailscale_ssh_sessions_active() -> bool:
     )
 
 
+def _tailscale_reload_blocked(allow_reload: bool) -> bool:
+    if allow_reload or not _tailscale_ssh_sessions_active():
+        return False
+    error_console.print(
+        "tailscale-bluefin: active Tailscale SSH session detected; deferring "
+        "SELinux changes to avoid interrupting it"
+    )
+    error_console.print(
+        "tailscale-bluefin: rerun locally, after disconnecting SSH, or set "
+        "DOTFILES_TAILSCALE_ALLOW_LIVE_RELOAD=1 to force it"
+    )
+    return True
+
+
+def _restart_tailscaled(dropin: Path, *, required: bool, allow_reload: bool) -> None:
+    if not required or _tailscale_reload_blocked(allow_reload):
+        return
+    if run(("systemctl", "restart", "tailscaled"), check=False).returncode == 0:
+        return
+    dropin.unlink(missing_ok=True)
+    run(("systemctl", "daemon-reload"))
+    run(("systemctl", "reset-failed", "tailscaled"), check=False)
+    run(("systemctl", "start", "tailscaled"), check=False)
+    raise DotfilesError(
+        "tailscale-bluefin: confined tailscaled restart failed; removed "
+        "SELinuxContext drop-in and restarted the unconfined service"
+    )
+
+
 def _configure_tailscale_selinux() -> None:
     if not _selinux_enabled():
         return
@@ -129,29 +172,14 @@ def _configure_tailscale_selinux() -> None:
     for name in sources:
         require_file(policy_dir / name)
     hash_file = Path("/var/lib/tailscale/dotfiles-selinux-policy.sha256")
-    digest = _policy_hash(policy_dir, sources)
-    policy_change = not _module_installed("tailscaled") or not hash_file.is_file()
-    if hash_file.is_file() and hash_file.read_text(encoding="utf-8").strip() != digest:
-        policy_change = True
+    _digest, policy_change = _policy_state(policy_dir, "tailscaled", sources, hash_file)
     dropin = Path("/etc/systemd/system/tailscaled.service.d/10-selinux-context.conf")
     desired = "[Service]\nSELinuxContext=system_u:system_r:tailscaled_t:s0\n"
     dropin_change = (
         not dropin.is_file() or dropin.read_text(encoding="utf-8") != desired
     )
     allow_reload = os.environ.get("DOTFILES_TAILSCALE_ALLOW_LIVE_RELOAD") == "1"
-    if (
-        (policy_change or dropin_change)
-        and not allow_reload
-        and _tailscale_ssh_sessions_active()
-    ):
-        error_console.print(
-            "tailscale-bluefin: active Tailscale SSH session detected; deferring "
-            "SELinux policy/drop-in changes to avoid interrupting it"
-        )
-        error_console.print(
-            "tailscale-bluefin: rerun locally, after disconnecting SSH, or set "
-            "DOTFILES_TAILSCALE_ALLOW_LIVE_RELOAD=1 to force it"
-        )
+    if (policy_change or dropin_change) and _tailscale_reload_blocked(allow_reload):
         return
     installed = _build_install_policy(
         policy_dir=policy_dir,
@@ -189,24 +217,7 @@ def _configure_tailscale_selinux() -> None:
     )
     expected = "system_u:system_r:tailscaled_t:s0"
     restart = not active or dropin_change or _service_context("tailscaled") != expected
-    if restart and not allow_reload and _tailscale_ssh_sessions_active():
-        error_console.print(
-            "tailscale-bluefin: active Tailscale SSH session detected; "
-            "deferring tailscaled restart to avoid interrupting it"
-        )
-        return
-    if (
-        restart
-        and run(("systemctl", "restart", "tailscaled"), check=False).returncode != 0
-    ):
-        dropin.unlink(missing_ok=True)
-        run(("systemctl", "daemon-reload"))
-        run(("systemctl", "reset-failed", "tailscaled"), check=False)
-        run(("systemctl", "start", "tailscaled"), check=False)
-        raise DotfilesError(
-            "tailscale-bluefin: confined tailscaled restart failed; removed "
-            "SELinuxContext drop-in and restarted the unconfined service"
-        )
+    _restart_tailscaled(dropin, required=restart, allow_reload=allow_reload)
     context = _service_context("tailscaled")
     if context != expected:
         raise DotfilesError(
@@ -215,7 +226,7 @@ def _configure_tailscale_selinux() -> None:
         )
 
 
-@app.command("tailscale-system", hidden=True)
+@app.command(name="tailscale-system", show=False)
 def tailscale_system() -> None:
     if os.geteuid() != 0:
         raise DotfilesError("tailscale-system must run as root")
@@ -261,7 +272,7 @@ def _validate_tailscale_selinux(host: HostRunner) -> None:
     )
 
 
-@app.command("tailscale-bluefin")
+@app.command(name="tailscale-bluefin")
 def tailscale_bluefin() -> OperationResult:
     """Configure Tailscale and its SELinux domain on immutable Fedora hosts."""
     if automation_check_mode():
@@ -459,7 +470,7 @@ def _configure_rustdesk_selinux() -> None:
         )
 
 
-@app.command("rustdesk-system", hidden=True)
+@app.command(name="rustdesk-system", show=False)
 def rustdesk_system() -> None:
     if os.geteuid() != 0:
         raise DotfilesError("rustdesk-system must run as root")
@@ -533,7 +544,7 @@ def _install_rustdesk_desktop() -> None:
         run(("update-desktop-database", applications), check=False, capture=True)
 
 
-@app.command("rustdesk-tailscale")
+@app.command(name="rustdesk-tailscale")
 def rustdesk_tailscale() -> OperationResult:
     """Configure native RustDesk for direct Tailscale access and Wayland capture."""
     if which("rustdesk") is None:

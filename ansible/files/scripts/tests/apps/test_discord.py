@@ -19,6 +19,20 @@ def _discord_app(tmp_path: Path) -> tuple[Path, Path]:
     return app, resources
 
 
+def test_cli_declares_repair_mode_and_discord_passthrough() -> None:
+    command, bound, _ = discord.app.parse_args([
+        "--repair-only",
+        "--",
+        "--start-minimized",
+    ])
+
+    assert command is discord.main
+    assert bound.arguments == {
+        "arguments": ("--start-minimized",),
+        "repair_only": True,
+    }
+
+
 def test_gpu_configuration_preserves_unrelated_settings(tmp_path: Path) -> None:
     settings = tmp_path / "settings.json"
     settings.write_text(

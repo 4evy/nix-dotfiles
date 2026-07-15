@@ -2,9 +2,9 @@ import os
 import sys
 from importlib import import_module
 from pathlib import Path
-from typing import Annotated
+from typing import Literal
 
-import typer
+from cyclopts import App
 
 from workstation.apps.discord import main as discord_main
 from workstation.console import error_console
@@ -15,45 +15,40 @@ from workstation.lib.paths import find_repo_root
 from workstation.local.raycast import main as raycast_patch
 from workstation.local.user_commands import (
     _gnome_accent_apply,
-    alt_tab_license_entrypoint,
-    shottr_license_entrypoint,
+    alt_tab_license as update_alt_tab_license,
+    shottr_license as update_shottr_license,
 )
 
-app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+app = App(
+    help="Run Chezmoi lifecycle integrations.",
+    version_flags=[],
+    result_action="return_none",
+)
 
 
-@app.command("alt-tab-license")
+@app.command(name="alt-tab-license")
 def alt_tab_license() -> None:
     """Show the installed AltTab license state."""
-    original = sys.argv
-    try:
-        sys.argv = [original[0], "status"]
-        alt_tab_license_entrypoint()
-    finally:
-        sys.argv = original
+    update_alt_tab_license("status")
 
 
-@app.command("shottr-license")
+@app.command(name="shottr-license")
 def shottr_license(
-    action: str = typer.Argument("status"),
-    force: Annotated[bool, typer.Option("--force")] = False,
+    action: Literal["install", "status"] = "status",
+    *,
+    force: bool = False,
 ) -> None:
     """Install or show the Shottr license state."""
-    original = sys.argv
-    try:
-        sys.argv = [original[0], action]
-        shottr_license_entrypoint(force=force)
-    finally:
-        sys.argv = original
+    update_shottr_license(action, force=force)
 
 
-@app.command("raycast-beta-patch")
+@app.command(name="raycast-beta-patch")
 def raycast_beta_patch() -> None:
     """Refresh the Raycast Beta local user profile."""
     raycast_patch()
 
 
-@app.command("gnome-accent")
+@app.command(name="gnome-accent")
 def gnome_accent() -> None:
     """Refresh Catppuccin GTK accent CSS and its user service."""
     _gnome_accent_apply()
@@ -72,7 +67,7 @@ def gnome_accent() -> None:
         )
 
 
-@app.command("desktop-integrations")
+@app.command(name="desktop-integrations")
 def desktop_integrations() -> None:
     """Apply the desktop-related subset of the Ansible host playbook."""
     source = Path(
@@ -106,12 +101,12 @@ def desktop_integrations() -> None:
     )
 
 
-@app.command("discord-equicord")
+@app.command(name="discord-equicord")
 def discord_equicord() -> None:
     """Repair Equicord after Discord replaces its application bundle."""
-    returncode = discord_main(["--repair-only"])
+    returncode = discord_main(repair_only=True)
     if returncode != 0:
-        raise typer.Exit(returncode)
+        raise SystemExit(returncode)
 
 
 def _extensions(path: Path) -> list[str]:
@@ -123,7 +118,7 @@ def _extensions(path: Path) -> list[str]:
     return result
 
 
-@app.command("vscode-extensions")
+@app.command(name="vscode-extensions")
 def vscode_extensions() -> None:
     """Install configured VS Code extensions that are currently missing."""
     if which("code") is None:
@@ -143,7 +138,7 @@ def vscode_extensions() -> None:
             run(("code", "--install-extension", extension, "--force"))
 
 
-@app.command("yazi-init")
+@app.command(name="yazi-init")
 def yazi_init() -> None:
     """Install the Yazi plugins declared in package.toml."""
     if which("ya") is None:
@@ -187,7 +182,7 @@ def _fzf_zsh(target: Path) -> None:
     write_if_changed(target, content.replace(marker, replacement))
 
 
-@app.command("shell-init")
+@app.command(name="shell-init")
 def shell_init() -> None:
     """Cache shell integrations and completion scripts."""
     cache = user_cache_home()
@@ -236,7 +231,7 @@ def shell_init() -> None:
             _capture(command, completion_dir / f"{prefix}{name}")
 
 
-@app.command("terminal-profile")
+@app.command(name="terminal-profile")
 def terminal_profile() -> None:
     """Install the Catppuccin Frappé Pink profile in Terminal.app."""
     if sys.platform != "darwin":

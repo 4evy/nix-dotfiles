@@ -4,6 +4,10 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Annotated
+
+from cyclopts import App, Parameter
+from cyclopts.exceptions import CycloptsError, MissingArgumentError
 
 from workstation.errors import UsageError
 
@@ -43,34 +47,48 @@ def _parse_environment(value: str) -> tuple[str, str]:
     return key, setting
 
 
-def parse_invocation(argv: Sequence[str]) -> Invocation | None:
-    overrides: dict[str, str] = {}
-    index = 0
-    while index < len(argv):
-        argument = argv[index]
-        if argument == "--version":
-            return None
-        if argument == "--":
-            index += 1
-            break
-        if argument == "--env":
-            index += 1
-            if index == len(argv):
-                raise UsageError("--env requires KEY=VALUE")
-            key, value = _parse_environment(argv[index])
-            overrides[key] = value
-            index += 1
-            continue
-        if argument.startswith("--env="):
-            key, value = _parse_environment(argument.removeprefix("--env="))
-            overrides[key] = value
-            index += 1
-            continue
-        if argument.startswith("-"):
-            raise UsageError(f"unknown flag: {argument}")
-        break
+def _runner_arguments(
+    command: str | None = None,
+    *arguments: Annotated[str, Parameter(allow_leading_hyphen=True)],
+    version: Annotated[bool, Parameter(negative="")] = False,
+    env: Annotated[
+        list[str] | None,
+        Parameter(negative_iterable="", negative_none=""),
+    ] = None,
+) -> tuple[bool, dict[str, str], list[str]]:
+    argv = [command, *arguments] if command is not None else []
+    return version, dict(map(_parse_environment, env or [])), argv
 
-    command = tuple(argv[index:])
+
+_parser = App(
+    default_command=_runner_arguments,
+    exit_on_error=False,
+    help_flags=[],
+    print_error=False,
+    version_flags=[],
+    result_action="return_value",
+)
+
+
+def _parse_arguments(argv: Sequence[str]) -> tuple[bool, dict[str, str], list[str]]:
+    try:
+        command, bound, _ = _parser.parse_args(argv)
+    except MissingArgumentError as error:
+        if error.keyword == "--env":
+            raise UsageError("--env requires KEY=VALUE") from error
+        raise UsageError(str(error)) from error
+    except CycloptsError as error:
+        message = str(error)
+        if message.startswith("Unknown option:"):
+            message = message.replace("Unknown option:", "unknown flag:", 1)
+        raise UsageError(message) from error
+    return command(*bound.args, **bound.kwargs)
+
+
+def parse_invocation(argv: Sequence[str]) -> Invocation | None:
+    version, overrides, command = _parse_arguments(argv)
+    if version:
+        return None
     if not command:
         raise UsageError("expected COMMAND [ARG...]")
 

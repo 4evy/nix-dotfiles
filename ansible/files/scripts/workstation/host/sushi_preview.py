@@ -1,4 +1,3 @@
-import shutil
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
@@ -9,7 +8,7 @@ from workstation.automation_models import OperationResult
 from workstation.console import console
 from workstation.errors import DotfilesError
 from workstation.lib.commands import require_commands, run, which
-from workstation.lib.files import ensure_directory, write_if_changed
+from workstation.lib.files import ensure_directory, remove_path, write_if_changed
 from workstation.lib.host import user_cache_home, user_state_home
 
 
@@ -133,8 +132,7 @@ def install(settings: SushiSettings | None = None) -> OperationResult:
             "origin",
         ))
     else:
-        if source_dir.exists():
-            shutil.rmtree(source_dir)
+        remove_path(source_dir)
         run((
             "git",
             "clone",

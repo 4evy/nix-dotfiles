@@ -10,6 +10,7 @@ requires-python = ">=3.14"
 dependencies = [
   "astral>=3.2,<4",
   "boltons>=25,<27",
+  "cyclopts>=4.20,<5",
   "defusedxml>=0.7,<1",
   "filelock>=3.18,<4",
   "githubkit>=0.15,<1",
@@ -22,14 +23,12 @@ dependencies = [
   "platformdirs>=4.3,<5",
   "plumbum>=2,<3",
   "psutil>=7,<8",
-  "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'",
   "pydantic>=2.13,<3",
   "pydantic-settings>=2.14.2,<3",
   "questionary>=2.1,<3",
   "rich>=15,<16",
   "tenacity>=9.1,<10",
   "tomlkit>=0.13,<1",
-  "typer>=0.20,<1",
 ]
 
 [project.scripts]
@@ -47,6 +46,7 @@ install-yaml-language-server = "workstation.host.devtools:install_entrypoint"
 jj-get = "workstation.local.jj:jj_get_entrypoint"
 jj-git-fetch = "workstation.local.jj:jj_git_fetch_entrypoint"
 jj-redate = "workstation.local.jj:jj_redate_entrypoint"
+phone-mirror = "workstation.local.phone_mirror:entrypoint"
 raycast-beta-patch = "workstation.local.raycast:entrypoint"
 spectrum-build = "spectrum_build.cli:entrypoint"
 system-runner = "workstation.local.system_runner:entrypoint"
@@ -55,7 +55,14 @@ vscode-nixfmt = "workstation.local.user_commands:vscode_nixfmt_entrypoint"
 yaml-language-server = "workstation.host.devtools:yaml_language_server_entrypoint"
 
 [dependency-groups]
-dev = ["pytest>=9,<10", "ruff>=0.15.20,<0.16", "ty>=0.0.57,<0.1"]
+dev = [
+  "complexipy>=6,<7",
+  "deptry>=0.25.1,<0.26",
+  "pytest>=9,<10",
+  "ruff>=0.15.20,<0.16",
+  "ty>=0.0.57,<0.1",
+  "vulture>=2.14,<3",
+]
 
 [tool.uv]
 required-version = ">=0.11.26,<0.12"
@@ -138,7 +145,7 @@ ignore = [
   "EM101",
   "EM102",
   "TRY003",
-  # Typer callbacks are positional by framework contract.
+  # Boolean state and predicate helpers remain clearest at their call sites.
   "FBT",
   # These rewrites tend to reduce readability without improving correctness.
   "FLY002",
@@ -154,7 +161,7 @@ ignore = [
   "S606",
   # Standalone automation scripts and tests are not importable packages.
   "INP001",
-  # Package initializers intentionally register Typer commands and expose a version.
+  # Package initializers intentionally register Cyclopts command trees.
   "RUF067",
   # Runtime import placement is deliberate; ty checks the annotations themselves.
   "TC001",
@@ -172,7 +179,7 @@ combine-as-imports = true
 known-first-party = ["workstation", "spectrum_build"]
 
 [tool.ruff.lint.mccabe]
-max-complexity = 15
+max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "ansible/collections/ansible_collections/evy/dotfiles/plugins/modules/operation.py" = [
@@ -193,11 +200,11 @@ max-complexity = 15
 
 [tool.ruff.lint.pylint]
 max-args = 8
-max-branches = 20
-max-locals = 25
+max-branches = 15
+max-locals = 20
 max-positional-args = 8
 max-returns = 10
-max-statements = 80
+max-statements = 60
 max-statements-in-try = 10
 
 [tool.ruff.format]
@@ -220,3 +227,18 @@ all = "error"
 
 [tool.ty.terminal]
 error-on-warning = true
+
+[tool.vulture]
+min_confidence = 100
+sort_by_size = true
+
+[tool.deptry]
+extend_exclude = [".*tests/"]
+known_first_party = ["spectrum_build", "workstation"]
+
+[tool.deptry.per_rule_ignores]
+# Ansible injects its module runtime; Toshy injects xwaykeyz into its slices.
+DEP001 = ["ansible", "xwaykeyz"]
+
+[tool.complexipy]
+max-complexity-allowed = 15
