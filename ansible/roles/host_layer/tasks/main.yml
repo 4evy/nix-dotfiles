@@ -6,6 +6,22 @@
     - flatpak
     - sushi-preview
 
+- name: Configure NVIDIA Flatpak runtimes
+  ansible.builtin.import_tasks: flatpak-nvidia.yml
+  when: common_is_linux
+  tags:
+    - host
+    - flatpak
+    - flatpak-nvidia
+
+- name: Maintain host Flatpak installations
+  ansible.builtin.import_tasks: flatpak-maintenance.yml
+  when: common_is_linux
+  tags:
+    - host
+    - flatpak
+    - flatpak-maintenance
+
 - name: Configure KMSCON virtual terminals
   ansible.builtin.import_tasks: kmscon.yml
   when: common_is_linux
@@ -26,6 +42,45 @@
   when: common_is_linux
   tags:
     - host
+    - kanata
+
+- name: Configure Toshy GNOME context extensions
+  ansible.builtin.import_tasks: toshy-gnome-context.yml
+  when: common_is_linux
+  tags:
+    - host
+    - toshy
+    - toshy-gnome-context
+
+- name: Configure Hyper window tiling integrations
+  ansible.builtin.import_tasks: hyper-window-tiling.yml
+  when: common_is_linux
+  tags:
+    - host
+    - desktop
+    - hyper-window-tiling
+
+- name: Configure GNOME Sushi preview
+  ansible.builtin.import_tasks: sushi-preview.yml
+  when: common_is_linux
+  tags:
+    - host
+    - flatpak
+    - sushi-preview
+
+- name: Configure Toshy and Kanata device chain
+  ansible.builtin.import_tasks: toshy-kanata.yml
+  when: common_is_linux
+  tags:
+    - host
+    - toshy
+
+- name: Verify Toshy and Kanata device chain
+  ansible.builtin.import_tasks: toshy-verify.yml
+  when: common_is_linux
+  tags:
+    - host
+    - toshy
     - kanata
 
 - name: Configure host applications and desktop integration

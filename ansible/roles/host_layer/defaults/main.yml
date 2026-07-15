@@ -6,27 +6,6 @@ host_layer_scripts:
   - name: RustDesk Tailscale integration
     command: [host, apps, rustdesk-tailscale]
     tags: [host, scripts, rustdesk]
-  - name: hyper-window-tiling
-    command: [host, desktop, hyper-window-tiling]
-    tags: [host, scripts, hyper-window-tiling]
-  - name: Sushi preview
-    command: [host, desktop, sushi-preview]
-    tags: [host, scripts, sushi-preview]
-  - name: Flatpak NVIDIA GL runtime
-    command: [host, desktop, flatpak-nvidia]
-    tags: [host, scripts, flatpak-nvidia]
-  - name: Flatpak maintenance
-    command: [host, desktop, flatpak-maintenance]
-    tags: [host, scripts, flatpak-maintenance]
-  - name: Toshy GNOME context integration
-    command: [host, keyboard, toshy-gnome-context]
-    tags: [host, scripts, toshy-gnome-context]
-  - name: Toshy Kanata chain
-    command: [host, keyboard, toshy-kanata-chain]
-    tags: [host, scripts, toshy]
-  - name: Toshy Kanata chain verification
-    command: [host, keyboard, toshy-kanata-check]
-    tags: [host, scripts, toshy, kanata]
 
 host_layer_flatpak_remotes:
   - name: flathub
@@ -37,11 +16,14 @@ host_layer_flatpak_remotes:
 host_layer_flatpak_packages:
   - name: org.flatpak.Builder
     remote: flathub
-  - name: org.gnome.Platform//master
+  - name: org.gnome.Platform
+    branch: master
     remote: gnome-nightly
-  - name: org.gnome.Sdk//master
+  - name: org.gnome.Sdk
+    branch: master
     remote: gnome-nightly
-  - name: org.freedesktop.Sdk.Extension.rust-stable//25.08
+  - name: org.freedesktop.Sdk.Extension.rust-stable
+    branch: "25.08"
     remote: flathub
 
 host_layer_emoji_binding_path: >-
@@ -50,8 +32,99 @@ host_layer_emoji_command: "{{ dotfiles_bin_dir }}/carmenta-activate"
 
 host_layer_kanata_staged_binary: >-
   {{ dotfiles_data_dir }}/host/bin-staging/kanata/root/bin/kanata
+host_layer_kanata_source_dir: "{{ dotfiles_cache_dir }}/sources/kanata"
+host_layer_kanata_install_root: >-
+  {{ dotfiles_data_dir }}/host/bin-staging/kanata/root
 host_layer_keep_input_remapper: >-
   {{ lookup('env', 'DOTFILES_KEEP_INPUT_REMAPPER') == '1' }}
+
+host_layer_toshy_gnome_extension_origin: https://extensions.gnome.org
+host_layer_toshy_gnome_extension_cache: >-
+  {{ dotfiles_cache_home }}/dotfiles/gnome-extensions
+host_layer_toshy_gnome_extensions:
+  - uuid: focused-window-dbus@flexagoon.com
+    label: Focused Window D-Bus
+    window_context: true
+  - uuid: window-calls-extended@hseliger.eu
+    label: Window Calls Extended
+    window_context: true
+  - uuid: xremap@k0kubun.com
+    label: Xremap
+    window_context: true
+  - uuid: appindicatorsupport@rgcjonas.gmail.com
+    label: AppIndicator and KStatusNotifierItem Support
+    window_context: false
+
+host_layer_hyper_window_tiling_package: >-
+  {{ dotfiles_repo_root }}/packages/hyper-window-tiling
+host_layer_hyper_window_tiling_uuid: hyper-window-tiling@4evy.local
+host_layer_hyper_window_tiling_gnome_dir: >-
+  {{
+    dotfiles_data_home ~ '/gnome-shell/extensions/'
+    ~ host_layer_hyper_window_tiling_uuid
+  }}
+host_layer_hyper_window_tiling_gnome_keys:
+  - key: move-up
+    value: "['<Super><Control><Alt><Shift>w']"
+  - key: move-left
+    value: "['<Super><Control><Alt><Shift>a']"
+  - key: move-down
+    value: "['<Super><Control><Alt><Shift>s']"
+  - key: move-right
+    value: "['<Super><Control><Alt><Shift>d']"
+  - key: move-max-almost
+    value: "['<Super><Control><Alt><Shift>Return']"
+  - key: move-max
+    value: "['<Super><Control><Alt><Shift>backslash']"
+host_layer_hyper_window_tiling_kwin_dirs:
+  - "{{ dotfiles_data_home }}/kwin/scripts/hyper-window-tiling"
+  - "{{ dotfiles_data_home }}/kwin-wayland/scripts/hyper-window-tiling"
+
+host_layer_sushi_app_id: >-
+  {{
+    lookup('env', 'SUSHI_PREVIEW_APP_ID')
+    | default('org.gnome.NautilusPreviewer', true)
+  }}
+host_layer_sushi_profile: >-
+  {{ lookup('env', 'SUSHI_PREVIEW_PROFILE') | default('default', true) }}
+host_layer_sushi_revision: >-
+  {{
+    lookup('env', 'SUSHI_PREVIEW_REV')
+    | default('27886fee1c7f093dd7402f82e3ff3ff42fd1d606', true)
+  }}
+host_layer_sushi_repository: >-
+  {{
+    lookup('env', 'SUSHI_PREVIEW_REPO')
+    | default('https://github.com/GNOME/sushi.git', true)
+  }}
+host_layer_sushi_cache_root: >-
+  {{ dotfiles_cache_home }}/dotfiles/sushi-preview-flatpak
+host_layer_sushi_source_dir: "{{ host_layer_sushi_cache_root }}/source"
+host_layer_sushi_build_dir: "{{ host_layer_sushi_cache_root }}/build"
+host_layer_sushi_builder_state_dir: >-
+  {{ host_layer_sushi_cache_root }}/flatpak-builder-state
+host_layer_sushi_upstream_manifest: >-
+  {{ host_layer_sushi_source_dir }}/flatpak/org.gnome.NautilusPreviewer.json
+host_layer_sushi_manifest: >-
+  {{ host_layer_sushi_source_dir }}/flatpak/org.gnome.NautilusPreviewer.dotfiles.json
+
+host_layer_toshy_revision: >-
+  {{ lookup('env', 'TOSHY_REF') | default('Toshy_v26.06.0', true) }}
+host_layer_toshy_repository: https://github.com/RedBearAK/Toshy.git
+host_layer_toshy_root: "{{ dotfiles_state_home }}/dotfiles/toshy"
+host_layer_toshy_source_dir: "{{ host_layer_toshy_root }}/Toshy"
+host_layer_toshy_automation_dir: "{{ dotfiles_cache_dir }}/toshy-automation"
+host_layer_toshy_config: "{{ dotfiles_config_home }}/toshy/toshy_config.py"
+host_layer_toshy_slices: "{{ dotfiles_repo_root }}/packages/toshy/slices"
+host_layer_toshy_merged_config: >-
+  {{ host_layer_toshy_automation_dir }}/toshy_config.py
+host_layer_toshy_run_installer: >-
+  {{ lookup('env', 'TOSHY_RUN_INSTALLER') == '1' }}
+host_layer_toshy_distro_override: "{{ lookup('env', 'TOSHY_DISTRO_OVERRIDE') }}"
+host_layer_toshy_skip_native: >-
+  {{ lookup('env', 'TOSHY_SKIP_NATIVE') == '1' }}
+host_layer_toshy_no_dbus_python: >-
+  {{ lookup('env', 'TOSHY_NO_DBUS_PYTHON') == '1' }}
 
 host_layer_nerd_font_archive_url: >-
   https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip

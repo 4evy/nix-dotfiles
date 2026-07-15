@@ -1,15 +1,43 @@
 ---
+- name: Check out Kanata source # noqa: latest[git]
+  ansible.builtin.git:
+    repo: https://github.com/jtroo/kanata.git
+    dest: "{{ host_layer_kanata_source_dir }}"
+    version: HEAD
+    depth: 1
+    force: true
+  register: host_layer_kanata_source
+  tags:
+    - host
+    - kanata
+
+- name: Check existing staged Kanata binary
+  ansible.builtin.stat:
+    path: "{{ host_layer_kanata_staged_binary }}"
+  register: host_layer_kanata_staged_before_build
+  tags:
+    - host
+    - kanata
+
 - name: Build staged Kanata binary
-  evy.dotfiles.operation:
-    executable: "{{ dotfiles_bin_dir }}/dotfiles-scripts"
-    command:
-      - host
-      - keyboard
-      - kanata-build
-    context: "{{ dotfiles_automation_context }}"
-    chdir: "{{ dotfiles_repo_root }}"
-    environment:
-      PATH: "{{ dotfiles_home_dir }}/.cargo/bin:{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
+  ansible.builtin.command:
+    argv:
+      - cargo
+      - install
+      - --path
+      - "{{ host_layer_kanata_source_dir }}"
+      - --features
+      - cmd
+      - --root
+      - "{{ host_layer_kanata_install_root }}"
+      - --force
+      - --locked
+  environment:
+    PATH: "{{ dotfiles_home_dir }}/.cargo/bin:{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
+  changed_when: true
+  when: >-
+    host_layer_kanata_source is changed
+    or not host_layer_kanata_staged_before_build.stat.executable | default(false)
   tags:
     - host
     - kanata
@@ -29,6 +57,7 @@
     fail_msg: >-
       Kanata build did not produce the expected executable at
       {{ host_layer_kanata_staged_binary }}.
+  when: not ansible_check_mode
   tags:
     - host
     - kanata

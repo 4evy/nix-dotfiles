@@ -2,7 +2,7 @@
 
 from cyclopts import App
 
-from workstation.host import apps, desktop, keyboard
+from workstation.host import apps
 
 app = App(
     help="Configure the Linux host layer.",
@@ -10,5 +10,3 @@ app = App(
     result_action="return_none",
 )
 app.command(apps.app, name="apps")
-app.command(desktop.app, name="desktop")
-app.command(keyboard.app, name="keyboard")

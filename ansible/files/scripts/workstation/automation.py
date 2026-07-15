@@ -9,7 +9,6 @@ from cyclopts.exceptions import CycloptsError
 from pydantic import ValidationError
 
 from workstation.automation_models import (
-    AutomationContext,
     OperationRequest,
     OperationResponse,
     OperationResult,
@@ -26,14 +25,6 @@ _ALLOWED_COMMANDS = {
     ("apps", "install-helium-macos"),
     ("host", "apps", "rustdesk-tailscale"),
     ("host", "apps", "tailscale-bluefin"),
-    ("host", "desktop", "flatpak-maintenance"),
-    ("host", "desktop", "flatpak-nvidia"),
-    ("host", "desktop", "hyper-window-tiling"),
-    ("host", "desktop", "sushi-preview"),
-    ("host", "keyboard", "kanata-build"),
-    ("host", "keyboard", "toshy-gnome-context"),
-    ("host", "keyboard", "toshy-kanata-chain"),
-    ("host", "keyboard", "toshy-kanata-check"),
     ("macos", "kanata"),
     ("macos", "karabiner-vhid"),
 }
@@ -42,12 +33,6 @@ _ALLOWED_COMMANDS = {
 def current_request() -> OperationRequest | None:
     """Return the active machine request, if the function was called by Ansible."""
     return _REQUEST.get()
-
-
-def current_context() -> AutomationContext | None:
-    """Return the selected Ansible context for the active operation."""
-    request = current_request()
-    return request.context if request is not None else None
 
 
 def automation_check_mode() -> bool:

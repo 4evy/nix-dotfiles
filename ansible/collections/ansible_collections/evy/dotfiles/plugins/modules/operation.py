@@ -45,16 +45,16 @@ author:
 """
 
 EXAMPLES = r"""
-- name: Build a staged Kanata binary through the repository Python runtime
+- name: Configure Tailscale host policy through the repository Python runtime
   evy.dotfiles.operation:
     executable: "{{ dotfiles_bin_dir }}/dotfiles-scripts"
-    command: [host, keyboard, kanata-build]
+    command: [host, apps, tailscale-bluefin]
     context:
       repo_root: "{{ dotfiles_repo_root }}"
       home: "{{ dotfiles_home_dir }}"
       system: "{{ ansible_facts.system }}"
       architecture: "{{ ansible_facts.architecture }}"
-  register: kanata_build
+  register: tailscale_policy
 """
 
 RETURN = r"""

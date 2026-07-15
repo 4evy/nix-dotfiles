@@ -1,4 +1,30 @@
 ---
+- name: Stop old Sushi Flatpak process
+  ansible.builtin.command:
+    argv:
+      - flatpak
+      - kill
+      - "{{ host_layer_sushi_app_id }}"
+  changed_when: false
+  failed_when: false
+
+- name: Stop Nautilus after Sushi rebuild
+  ansible.builtin.command:
+    argv:
+      - nautilus
+      - -q
+  changed_when: false
+  failed_when: false
+
+- name: Restart Toshy services
+  ansible.builtin.command:
+    argv:
+      - sh
+      - -c
+      - command -v toshy-services-restart >/dev/null && exec toshy-services-restart
+  changed_when: true
+  failed_when: false
+
 - name: Refresh system font cache
   ansible.builtin.command:
     argv:

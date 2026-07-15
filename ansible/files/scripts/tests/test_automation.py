@@ -29,25 +29,20 @@ def _payload(tmp_path: Path, command: list[str], *, check: bool = True) -> str:
 
 def test_machine_protocol_uses_cli_parser_and_operation_result(tmp_path: Path) -> None:
     response = run_machine_protocol(
-        _payload(tmp_path, ["host", "keyboard", "kanata-build"])
+        _payload(
+            tmp_path,
+            [
+                "apps",
+                "install-ghostty-tip-linux",
+                str(tmp_path / "cache"),
+                str(tmp_path / "prefix"),
+            ],
+        )
     )
 
     assert not response.failed
     assert response.changed
-    assert response.msg == "Would build a staged Kanata binary"
-    assert response.data["executable"] == str(
-        tmp_path / "data/host/bin-staging/kanata/root/bin/kanata"
-    )
-
-
-def test_machine_protocol_skips_maintenance_in_check_mode(tmp_path: Path) -> None:
-    response = run_machine_protocol(
-        _payload(tmp_path, ["host", "desktop", "flatpak-maintenance"])
-    )
-
-    assert not response.failed
-    assert not response.changed
-    assert response.skipped
+    assert response.msg == "Would check and install the current Ghostty tip"
 
 
 def test_machine_protocol_rejects_commands_outside_allowlist(tmp_path: Path) -> None:
@@ -59,7 +54,17 @@ def test_machine_protocol_rejects_commands_outside_allowlist(tmp_path: Path) -> 
 
 
 def test_machine_protocol_rejects_unknown_context(tmp_path: Path) -> None:
-    payload = json.loads(_payload(tmp_path, ["host", "desktop", "flatpak-maintenance"]))
+    payload = json.loads(
+        _payload(
+            tmp_path,
+            [
+                "apps",
+                "install-ghostty-tip-linux",
+                str(tmp_path / "cache"),
+                str(tmp_path / "prefix"),
+            ],
+        )
+    )
     payload["context"]["hostvars"] = {"secret": "must not cross the boundary"}
 
     response = run_machine_protocol(json.dumps(payload))
