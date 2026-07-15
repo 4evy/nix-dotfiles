@@ -1,3 +1,5 @@
+import hashlib
+import string
 from collections.abc import Mapping
 from functools import cache
 from pathlib import Path
@@ -6,6 +8,7 @@ import httpx
 from boltons.fileutils import AtomicSaver
 from httpx_retries import Retry, RetryTransport
 
+from workstation.errors import DotfilesError
 from workstation.lib.validation import safe_path
 
 _TIMEOUT = httpx.Timeout(60.0, connect=20.0)
@@ -38,9 +41,28 @@ def get(
     return response
 
 
-def download(url: str, destination: str | Path, mode: int = 0o644) -> Path:
+def _expected_sha256(value: str | None) -> str | None:
+    if value is None:
+        return None
+    digest = value.removeprefix("sha256:").lower()
+    if len(digest) != 64 or any(
+        character not in string.hexdigits for character in digest
+    ):
+        raise DotfilesError(f"invalid SHA-256 digest: {value}")
+    return digest
+
+
+def download(
+    url: str,
+    destination: str | Path,
+    mode: int = 0o644,
+    *,
+    expected_sha256: str | None = None,
+) -> Path:
     destination_path = safe_path(destination)
+    expected = _expected_sha256(expected_sha256)
     destination_path.parent.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256() if expected is not None else None
     with client().stream("GET", url) as response:
         response.raise_for_status()
         with AtomicSaver(
@@ -51,5 +73,9 @@ def download(url: str, destination: str | Path, mode: int = 0o644) -> Path:
         ) as target:
             for chunk in response.iter_bytes():
                 target.write(chunk)
+                if digest is not None:
+                    digest.update(chunk)
+            if digest is not None and digest.hexdigest() != expected:
+                raise DotfilesError(f"SHA-256 mismatch for {destination_path.name}")
     destination_path.chmod(mode)
     return destination_path

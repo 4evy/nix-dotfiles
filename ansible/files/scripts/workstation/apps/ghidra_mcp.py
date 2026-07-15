@@ -1,12 +1,11 @@
 import os
 import re
-import shutil
 import sys
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Annotated
 
-import typer
+from cyclopts import App
 
 from workstation.console import console, error_console
 from workstation.errors import DotfilesError
@@ -14,6 +13,7 @@ from workstation.lib.commands import output, require_commands, run, which
 from workstation.lib.files import (
     ensure_directory,
     install_file_if_changed,
+    remove_path,
     require_directory,
     require_file,
     write_if_changed,
@@ -74,8 +74,7 @@ def _find_named_directories(root: Path, name: str, max_depth: int) -> list[Path]
         return []
     result: list[Path] = []
     base_depth = len(root.parts)
-    for current, directories, _files in os.walk(root):
-        path = Path(current)
+    for path, directories, _files in root.walk():
         depth = len(path.parts) - base_depth
         if depth >= max_depth:
             directories.clear()
@@ -85,20 +84,38 @@ def _find_named_directories(root: Path, name: str, max_depth: int) -> list[Path]
     return result
 
 
+def _first_ghidra_home(candidates: Iterable[Path]) -> Path | None:
+    return next(
+        (
+            home
+            for candidate in candidates
+            if (home := _normalize_ghidra_home(candidate)) is not None
+        ),
+        None,
+    )
+
+
 def detect_ghidra_home() -> Path:
-    for variable in ("GHIDRA_HOME", "GHIDRA_INSTALL_DIR", "GHIDRA_ROOT"):
-        if os.environ.get(variable):
-            result = _normalize_ghidra_home(Path(os.environ[variable]))
-            if result is not None:
-                return result
+    configured = (
+        Path(value)
+        for variable in ("GHIDRA_HOME", "GHIDRA_INSTALL_DIR", "GHIDRA_ROOT")
+        if (value := os.environ.get(variable))
+    )
+    if home := _first_ghidra_home(configured):
+        return home
     if which("brew") is not None:
         prefix = output(("brew", "--prefix", "ghidra"), check=False)
-        if prefix:
-            for suffix in ("libexec", "", "share/ghidra", "ghidra"):
-                result = _normalize_ghidra_home(Path(prefix) / suffix)
-                if result is not None:
-                    return result
-    for root in (
+        candidates = (
+            (
+                Path(prefix) / suffix
+                for suffix in ("libexec", "", "share/ghidra", "ghidra")
+            )
+            if prefix
+            else ()
+        )
+        if home := _first_ghidra_home(candidates):
+            return home
+    roots = (
         Path("/opt/homebrew"),
         Path("/usr/local"),
         Path("/home/linuxbrew/.linuxbrew"),
@@ -107,11 +124,14 @@ def detect_ghidra_home() -> Path:
         Path.home() / ".local/share",
         Path("/opt"),
         Path("/usr/share"),
-    ):
-        for directory in _find_named_directories(root, "Ghidra", 7):
-            result = _normalize_ghidra_home(directory)
-            if result is not None:
-                return result
+    )
+    discovered = (
+        directory
+        for root in roots
+        for directory in _find_named_directories(root, "Ghidra", 7)
+    )
+    if home := _first_ghidra_home(discovered):
+        return home
     raise DotfilesError(
         "could not find Ghidra; pass --ghidra-home PATH where PATH contains Ghidra/"
     )
@@ -166,8 +186,7 @@ def _checkout(source: Path) -> None:
     if (source / ".git").is_dir():
         run(("git", "-C", source, "fetch", "--depth", "1", "origin", UPSTREAM_REV))
     else:
-        if source.exists():
-            shutil.rmtree(source)
+        remove_path(source)
         run(("git", "clone", "--no-checkout", UPSTREAM_URL, source))
         run(("git", "-C", source, "fetch", "--depth", "1", "origin", UPSTREAM_REV))
     run(("git", "-C", source, "checkout", "--force", UPSTREAM_REV))
@@ -301,24 +320,15 @@ def _link_bins(install: Path, bin_dir: Path) -> None:
         link.symlink_to(install / "bin" / link.name)
 
 
-def version_callback(value: bool) -> None:
-    if value:
-        typer.echo(f"install-ghidra-mcp {PACKAGE_VERSION}")
-        raise typer.Exit()
-
-
 def install_ghidra_mcp(
-    cache_dir: Annotated[Path | None, typer.Argument()] = None,
-    install_prefix: Annotated[Path | None, typer.Argument()] = None,
-    bin_dir: Annotated[Path | None, typer.Argument()] = None,
-    force: Annotated[bool, typer.Option("--force")] = False,
-    ghidra_home: Annotated[Path | None, typer.Option("--ghidra-home")] = None,
-    version: Annotated[
-        bool, typer.Option("--version", callback=version_callback, is_eager=True)
-    ] = False,
+    cache_dir: Path | None = None,
+    install_prefix: Path | None = None,
+    bin_dir: Path | None = None,
+    *,
+    force: bool = False,
+    ghidra_home: Path | None = None,
 ) -> None:
     """Build the pinned Ghidra MCP server and Python bridge."""
-    del version
     require_commands("git", "java", "mvn", "patch", "uv")
     support = _support_dir()
     cache = safe_path(cache_dir or user_cache_home() / "dotfiles/ghidra-mcp")
@@ -389,8 +399,7 @@ def install_ghidra_mcp(
                 f"{error}\nGhidra MCP build log tail:\n{tail}"
             ) from error
         ensure_directory(install.parent)
-        if install.exists():
-            shutil.rmtree(install)
+        remove_path(install)
         stage.replace(install)
     _link_bins(install, links)
     console.print(
@@ -398,9 +407,16 @@ def install_ghidra_mcp(
     )
 
 
+app = App(
+    default_command=install_ghidra_mcp,
+    version=f"install-ghidra-mcp {PACKAGE_VERSION}",
+    result_action="return_none",
+)
+
+
 def entrypoint() -> None:
     try:
-        typer.run(install_ghidra_mcp)
+        app()
     except DotfilesError as error:
         error_console.print(f"[bold red]install-ghidra-mcp:[/bold red] {error}")
         raise SystemExit(1) from error

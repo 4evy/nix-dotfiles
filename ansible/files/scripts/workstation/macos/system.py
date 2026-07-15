@@ -1,11 +1,7 @@
-import hashlib
 import os
 import tempfile
 import time
 from pathlib import Path
-from typing import Annotated
-
-import typer
 
 from workstation.automation import automation_check_mode
 from workstation.automation_models import OperationResult
@@ -93,10 +89,7 @@ def configure_karabiner_vhid() -> OperationResult:
         )
         with tempfile.TemporaryDirectory(prefix="karabiner-vhid-") as temporary:
             package_path = Path(temporary) / package
-            download(url, package_path)
-            digest = hashlib.sha256(package_path.read_bytes()).hexdigest()
-            if digest != KARABINER_SHA256:
-                raise DotfilesError(f"karabiner-vhid: checksum mismatch for {package}")
+            download(url, package_path, expected_sha256=KARABINER_SHA256)
             run(("installer", "-pkg", package_path, "-target", "/"))
     require_executable(manager)
     require_executable(daemon)
@@ -236,9 +229,16 @@ def _stop_daemon(label: str) -> None:
 
 
 def configure_kanata(
-    config: Annotated[Path, typer.Argument(help="Kanata configuration file")],
+    config: Path,
 ) -> OperationResult:
-    """Install, sign, and launch Kanata with VirtualHID support."""
+    """Install, sign, and launch Kanata with VirtualHID support.
+
+    Parameters
+    ----------
+    config
+        Kanata configuration file.
+
+    """
     _require_root("kanata")
     config = require_file(config)
     require_commands("chown", "codesign", "launchctl", "openssl", "security")

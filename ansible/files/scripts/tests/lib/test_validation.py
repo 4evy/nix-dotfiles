@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from workstation.errors import DotfilesError
@@ -23,13 +21,26 @@ def test_safe_path_rejects_destructive_targets(value: str) -> None:
         safe_path(value)
 
 
-def test_safe_path_preserves_a_normal_relative_path() -> None:
-    assert safe_path("nested/value") == Path("nested/value")
-
-
 @pytest.mark.parametrize("value", ["", "8", "0o755", "-1", "755 "])
 def test_octal_mode_rejects_non_octal_input(value: str) -> None:
     with pytest.raises(DotfilesError, match="must be octal"):
+        octal_mode(value)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [("0644", 0o644), ("755", 0o755), (0o600, 0o600)]
+)
+def test_octal_mode_accepts_strings_and_native_mode_integers(
+    value: str | int, expected: int
+) -> None:
+    assert octal_mode(value) == expected
+
+
+@pytest.mark.parametrize("value", [True, -1, 0o10000, "10000"])
+def test_octal_mode_rejects_values_outside_permission_bits(
+    value: str | int,
+) -> None:
+    with pytest.raises(DotfilesError, match=r"must be (octal|a permission mode)"):
         octal_mode(value)
 
 

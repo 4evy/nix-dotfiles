@@ -43,12 +43,18 @@ def ensure_directory(path: str | Path, mode: int | str | None = None) -> Path:
     return result
 
 
+def remove_path(path: str | Path) -> None:
+    """Remove a file, symlink, or directory tree if it exists."""
+    target = safe_path(path)
+    if target.is_dir() and not target.is_symlink():
+        shutil.rmtree(target)
+    else:
+        target.unlink(missing_ok=True)
+
+
 def fresh_directory(path: str | Path, mode: int | str | None = None) -> Path:
     result = safe_path(path)
-    if result.is_symlink() or result.is_file():
-        result.unlink()
-    elif result.exists():
-        shutil.rmtree(result)
+    remove_path(result)
     return ensure_directory(result, mode)
 
 
@@ -99,8 +105,11 @@ def write_if_changed(
     parsed_mode = octal_mode(mode, label="file mode")
     if destination_path.is_file():
         current_mode = stat.S_IMODE(destination_path.stat().st_mode)
-        if destination_path.read_bytes() == data and current_mode == parsed_mode:
-            return False
+        if destination_path.read_bytes() == data:
+            if current_mode == parsed_mode:
+                return False
+            destination_path.chmod(parsed_mode)
+            return True
 
     destination_path.parent.mkdir(parents=True, exist_ok=True)
     with AtomicSaver(
@@ -118,18 +127,10 @@ def replace_directory(source: str | Path, destination: str | Path) -> None:
     source_path = require_directory(source)
     destination_path = safe_path(destination)
     destination_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = Path(
-        tempfile.mkdtemp(
-            prefix=f".{destination_path.name}-", dir=destination_path.parent
-        )
-    )
-    try:
-        shutil.copytree(source_path, temporary_path, dirs_exist_ok=True, symlinks=True)
-        if destination_path.is_symlink() or destination_path.is_file():
-            destination_path.unlink()
-        elif destination_path.exists():
-            shutil.rmtree(destination_path)
+    with tempfile.TemporaryDirectory(
+        prefix=f".{destination_path.name}-", dir=destination_path.parent
+    ) as temporary_root:
+        temporary_path = Path(temporary_root) / destination_path.name
+        source_path.copy(temporary_path, follow_symlinks=False, preserve_metadata=True)
+        remove_path(destination_path)
         temporary_path.replace(destination_path)
-    finally:
-        if temporary_path.exists():
-            shutil.rmtree(temporary_path)
