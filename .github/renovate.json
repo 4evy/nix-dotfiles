@@ -8,7 +8,7 @@
   "automergeType": "branch",
   "ignoreTests": true,
   "platformAutomerge": false,
-  "prCreation": "approval",
+  "prCreation": "status-success",
   "rebaseWhen": "auto",
   "branchConcurrentLimit": 1,
   "prConcurrentLimit": 0,
