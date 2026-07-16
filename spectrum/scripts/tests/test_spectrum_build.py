@@ -25,7 +25,9 @@ from spectrum_build.integrations.source_build import (
     clone_pinned_git_ref,
     pinned_git_project,
 )
+from spectrum_build.manifests.packages import VALIDATION_PACKAGES
 from spectrum_build.programs import copyous, ghostty
+from spectrum_build.programs.manifest import PROGRAMS
 from spectrum_build.programs.models import DnfProgram
 from spectrum_build.programs.operations import validate_program_manifest
 from spectrum_build.settings import BuildConfig, ImageConfig
@@ -88,6 +90,11 @@ def test_local_spectrum_builds_use_stable_layers_and_persistent_caches() -> None
     assert "--layers=true" in justfile
     assert "/var/cache/dnf/*" not in DNF_CLEANUP_PATTERNS
     assert "/var/cache/libdnf5/*" not in DNF_CLEANUP_PATTERNS
+
+
+def test_tailscale_is_inherited_from_bluefin_and_still_validated() -> None:
+    assert "tailscale" in VALIDATION_PACKAGES
+    assert "Tailscale" not in {program.name for program in PROGRAMS}
 
 
 def test_image_config_derives_defaults_and_honors_environment(

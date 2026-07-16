@@ -100,6 +100,7 @@ VALIDATION_PACKAGES: Sequence[str] = (
     "just",
     "podman",
     "systemd-oomd-defaults",
+    "tailscale",
     "uresourced",
 )
 
