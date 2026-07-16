@@ -10,7 +10,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/daku10/go-lz-string v0.0.7
 	github.com/go-resty/resty/v2 v2.17.2
-	github.com/google/go-github/v88 v88.0.0
+	github.com/google/go-github/v89 v89.0.0
 	github.com/google/go-querystring v1.2.0
 	github.com/google/renameio/v2 v2.0.2
 	github.com/hashicorp/go-retryablehttp v0.7.8
