@@ -10,7 +10,9 @@ diff-formatter = ":git"
 default-command = "log"
 
 [git]
-sign-on-push = true
+# jj-redate signs commits with their intended timestamps. Push-time signing can
+# rewrite signed descendants of unsigned commits and replace those timestamps.
+sign-on-push = false
 
 {{ if lookPath "watchman" -}}
 [fsmonitor]
