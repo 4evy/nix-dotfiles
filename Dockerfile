@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 
 ARG FEDORA_VERSION=44@sha256:b664a3226fca5915be74536f7c466bef6d69a2fc4830af9fd3e50e2855fbb4fc
-FROM ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa AS uv
+FROM ghcr.io/astral-sh/uv:0.11.29@sha256:eb2843a1e56fd9e30c7276ce1a52cba86e64c7b385f5e3279a0e08e02dd058fc AS uv
 
 FROM registry.fedoraproject.org/fedora:${FEDORA_VERSION} AS dotfiles-test
 
