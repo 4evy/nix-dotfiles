@@ -6,7 +6,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/buildkite/shellwords v1.0.1
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/charmbracelet/log v1.0.0
+	github.com/charmbracelet/log/v2 v2.0.0
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/daku10/go-lz-string v0.0.7
 	github.com/go-resty/resty/v2 v2.17.2
