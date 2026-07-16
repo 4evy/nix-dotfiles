@@ -331,21 +331,48 @@ _build target no_cache: (doctor 'build')
     esac
 
     github_token_file=
+    sudo_keepalive_pid=
+    cleanup() {
+      if [[ -n "$sudo_keepalive_pid" ]]; then
+        kill "$sudo_keepalive_pid" 2>/dev/null || true
+        wait "$sudo_keepalive_pid" 2>/dev/null || true
+      fi
+      if [[ -n "$github_token_file" ]]; then
+        rm -f "$github_token_file"
+      fi
+    }
+    trap cleanup EXIT
+
     if [[ -n "${GITHUB_TOKEN:-}" || -n "${GH_TOKEN:-}" ]]; then
       github_token_file=$(mktemp)
-      trap 'rm -f "$github_token_file"' EXIT
       printf '%s' "${GITHUB_TOKEN:-$GH_TOKEN}" >"$github_token_file"
       chmod 600 "$github_token_file"
       build_args=(--secret "id=github_token,src=$github_token_file" "${build_args[@]}")
     fi
 
-    sudo env \
+    # A Spectrum build can outlast sudo's credential timeout. Keep this
+    # terminal's timestamp fresh so a dependent switch/upgrade stays
+    # unattended after the single up-front authentication.
+    sudo -v
+    (
+      while sleep 60; do
+        sudo -n -v || exit
+      done
+    ) &
+    sudo_keepalive_pid=$!
+
+    sudo -n env \
       -u XDG_RUNTIME_DIR \
       -u DBUS_SESSION_BUS_ADDRESS \
       -u WAYLAND_DISPLAY \
       -u DISPLAY \
       -u SSH_AUTH_SOCK \
       "${podman_command[@]}" build "${build_args[@]}"
+
+    sudo -n -v || {
+      printf '%s\n' 'sudo credential keepalive expired during the Spectrum build' >&2
+      exit 1
+    }
 
 # Compatibility name for the cached local Spectrum build.
 [arg('target', help='Image reference to tag locally')]
@@ -436,7 +463,7 @@ switch target=local_ref: (doctor 'install') (build target)
     switch_log=$(mktemp)
     trap 'rm -f "$switch_log"' EXIT
 
-    if sudo bootc switch --transport containers-storage "$target" \
+    if sudo -n bootc switch --transport containers-storage "$target" \
       > >(tee "$switch_log") \
       2> >(tee -a "$switch_log" >&2); then
       switch_status=0
@@ -446,7 +473,7 @@ switch target=local_ref: (doctor 'install') (build target)
 
     if grep -Fxq 'Image specification is unchanged.' "$switch_log"; then
       printf 'Already tracking %s; staging the latest local image with `bootc upgrade`.\n' "$target"
-      sudo bootc upgrade
+      sudo -n bootc upgrade
       exit 0
     fi
 
@@ -463,7 +490,7 @@ switch target=local_ref: (_linux-only 'switch')
 [group('spectrum')]
 [linux]
 upgrade target=local_ref: (doctor 'install') (build target)
-    sudo bootc upgrade
+    sudo -n bootc upgrade
 
 [arg('target', help='Local image reference to rebuild before upgrade')]
 [group('spectrum')]
