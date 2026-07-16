@@ -29,16 +29,6 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Track the pinned Spectrum Bluefin base image in the Containerfile ARG",
-      "managerFilePatterns": ["/^spectrum/Containerfile$/"],
-      "matchStrings": [
-        "ARG BLUEFIN_BASE_IMAGE=(?<packageName>[^\\s:@]+(?:/[^\\s:@]+)+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
-      ],
-      "datasourceTemplate": "docker",
-      "versioningTemplate": "docker"
-    },
-    {
-      "customType": "regex",
       "description": "Track the pinned Spectrum Bluefin base image in defaults and workflows",
       "managerFilePatterns": [
         "/^Justfile$/",
