@@ -33,6 +33,7 @@ python314Packages.buildPythonApplication {
   dependencies = with python314Packages; [
     astral
     boltons
+    cyclopts
     defusedxml
     filelock
     githubkit
@@ -47,16 +48,17 @@ python314Packages.buildPythonApplication {
     psutil
     pydantic
     pydantic-settings
+    questionary
     rich
     tenacity
     tomlkit
     typer
   ];
 
-  # These names are supplied by dedicated Nix packages.  Keep this derivation
-  # focused on the repository automation commands and avoid buildEnv clashes.
+  # yaml-language-server is supplied by its dedicated Nix package. Keep
+  # system-runner here: it imports this application's modules and dependencies.
   postInstall = ''
-    rm -f "$out/bin/system-runner" "$out/bin/yaml-language-server"
+    rm -f "$out/bin/yaml-language-server"
   '';
 
   doCheck = false;

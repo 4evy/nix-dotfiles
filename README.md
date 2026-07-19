@@ -62,6 +62,12 @@ just setup
 NixOS, host and package state changes belong in `hosts/linux` or
 `modules/nixos`, followed by another `nixos-rebuild`.
 
+Spectrum's checked-in Bluetooth and systemd policy files are also the NixOS
+source of truth: the NixOS module links them into the system configuration
+without translating their contents into Nix. Cross-platform source builds use
+the shared pins in `spectrum/scripts/spectrum_build/programs/source-pins.json`;
+only the Fedora and Nix packaging recipes remain platform-specific.
+
 ### macOS
 
 ```bash

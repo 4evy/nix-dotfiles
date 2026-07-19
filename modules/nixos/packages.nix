@@ -11,8 +11,8 @@ let
     pkgs.unstable.zlib.dev
   ];
   codex = pkgs.eupkgs.codex;
-  ghosttyRevision = "c5a21edfcbc2d5b46540ad91b7980aca31f5f1f3";
-  ghosttyVersion = "1.3.2-dev.${builtins.substring 0 7 ghosttyRevision}";
+  ghosttyRevision = pkgs.spectrumSourcePins.ghostty.revision;
+  ghosttyVersion = pkgs.spectrumSourcePins.ghostty.version;
   ghosttySource = pkgs.fetchFromGitHub {
     owner = "ghostty-org";
     repo = "ghostty";
@@ -46,7 +46,6 @@ in
         ansible
         ansible-lint
         dotfiles-python
-        system-runner
         yamllint
         terminal-theme-tools
         ;
@@ -71,8 +70,10 @@ in
         cmake
         deadnix
         delta
+        delve
         diffutils
         direnv
+        dockerfmt
         duf
         dust
         fd
@@ -139,6 +140,7 @@ in
         rsync
         ruby
         ruby-lsp
+        rumdl
         rust-bindgen
         rust-analyzer
         rustc

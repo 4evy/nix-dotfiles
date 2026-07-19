@@ -4,85 +4,44 @@
   ...
 }:
 let
-  inherit (lib.attrsets) listToAttrs;
-  inherit (lib.filesystem) listFilesRecursive;
-  inherit (lib.path) hasPrefix;
-  inherit (lib.strings) removeSuffix;
-
-  rootfs = ../../spectrum/image/rootfs;
-  rootfsSystemdSystem = rootfs + "/usr/lib/systemd/system";
-  rootfsSystemdUser = rootfs + "/usr/lib/systemd/user";
-  rootfsSystemdSystemConf = rootfs + "/usr/lib/systemd/system.conf.d";
-  rootfsSystemdUserConf = rootfs + "/usr/lib/systemd/user.conf.d";
-
-  unitName = path: removeSuffix ".d" (baseNameOf (dirOf path));
-  serviceName = path: removeSuffix ".service" (unitName path);
-
-  dropinsFrom =
-    paths:
-    listToAttrs (
-      map (path: {
-        name = unitName path;
-        value = {
-          text = builtins.readFile path;
-          overrideStrategy = "asDropin";
-        };
-      }) paths
-    );
-
-  protection = memoryMin: memoryLow: cpuWeight: ioWeight: {
-    MemoryMin = memoryMin;
-    MemoryLow = memoryLow;
-    CPUWeight = cpuWeight;
-    IOWeight = ioWeight;
-    ManagedOOMPreference = "avoid";
+  # Import the rootfs once. Taking each local file as an independent Nix path
+  # would create another single-file store object for every shared policy.
+  rootfs = builtins.path {
+    path = ../../spectrum/image/rootfs;
+    name = "spectrum-rootfs";
   };
 
-  nativeSystemServices = {
-    NetworkManager = protection "64M" "128M" 800 800;
-    bluetooth = protection "64M" "128M" 1000 1000;
-    dbus-broker = protection "64M" "128M" 1000 1000;
-    gdm = protection "128M" "256M" 1000 1000;
-    kanata-main = protection "32M" "64M" 1000 1000;
-    polkit = protection "64M" "128M" 800 800;
-    rtkit-daemon = protection "32M" "64M" 1000 1000;
-    systemd-logind = protection "64M" "128M" 1000 1000;
-    systemd-udevd = protection "64M" "128M" 800 800;
-  };
-
-  nativeUserServices = {
-    dbus-broker = protection "128M" "256M" 1000 1000;
-    pipewire-pulse = protection "128M" "256M" 1000 1000;
-    pipewire = protection "128M" "256M" 1000 1000;
-    wireplumber = protection "128M" "256M" 1000 1000;
-  };
-
-  nativeUserSlices = [
-    "app.slice"
-    "background.slice"
-    "session.slice"
-  ];
-
-  systemUnitFiles = builtins.filter (path: !(hasPrefix rootfsSystemdSystemConf path)) (
-    listFilesRecursive rootfsSystemdSystem
-  );
-  userUnitFiles = builtins.filter (path: !(hasPrefix rootfsSystemdUserConf path)) (
-    listFilesRecursive rootfsSystemdUser
-  );
-  remainingSystemUnitFiles = builtins.filter (
-    path: !(builtins.hasAttr (serviceName path) nativeSystemServices) && unitName path != "system.slice"
-  ) systemUnitFiles;
-  remainingUserUnitFiles = builtins.filter (
-    path:
-    !(builtins.hasAttr (serviceName path) nativeUserServices)
-    && !(builtins.elem (unitName path) nativeUserSlices)
-  ) userUnitFiles;
+  # NixOS merges units from systemd.packages before adding its generated unit
+  # overrides. Keep Spectrum's checked-in drop-ins as real files so both
+  # operating systems consume the same policy rather than translating it into
+  # a second Nix representation.
+  spectrumSystemdUnits = pkgs.runCommandLocal "spectrum-systemd-units" { } ''
+    mkdir -p "$out/lib/systemd"
+    ln -s ${rootfs}/usr/lib/systemd/system "$out/lib/systemd/system"
+    ln -s ${rootfs}/usr/lib/systemd/user "$out/lib/systemd/user"
+  '';
 in
 {
-  environment.etc."uresourced.conf".source = rootfs + "/etc/uresourced.conf";
+  environment.etc = {
+    # BlueZ's NixOS module normally generates an empty input.conf. Spectrum's
+    # source file intentionally replaces that default.
+    "bluetooth/input.conf".source = lib.mkForce (rootfs + "/etc/bluetooth/input.conf");
+    "modprobe.d/60-spectrum-bluetooth.conf".source =
+      rootfs + "/usr/lib/modprobe.d/60-spectrum-bluetooth.conf";
+    "systemd/system.conf.d/60-spectrum-resource-accounting.conf".source =
+      rootfs + "/usr/lib/systemd/system.conf.d/60-spectrum-resource-accounting.conf";
+    "systemd/user.conf.d/60-spectrum-resource-accounting.conf".source =
+      rootfs + "/usr/lib/systemd/user.conf.d/60-spectrum-resource-accounting.conf";
+    "uresourced.conf".source = rootfs + "/etc/uresourced.conf";
+  };
+
   fonts.packages = [ pkgs.nerd-fonts.jetbrains-mono ];
 
   services = {
+    # The system daemon still supplies ancestor allocations to whichever user
+    # owns the active graphical session. Spectrum's shared user-unit drop-in
+    # keeps the separate --user app-management daemon disabled by default.
+    dbus.packages = [ pkgs.uresourced ];
     flatpak.enable = true;
 
     kmscon = {
@@ -104,59 +63,18 @@ in
     enableSSHSupport = false;
   };
 
-  systemd.oomd.enable = true;
+  systemd = {
+    oomd.enable = true;
+    packages = [
+      pkgs.uresourced
+      spectrumSystemdUnits
+    ];
+    services."user@".wants = [ "uresourced.service" ];
+  };
 
   virtualisation.podman = {
     enable = true;
     dockerCompat = true;
     defaultNetwork.settings.dns_enabled = true;
-  };
-
-  systemd = {
-    services = lib.mapAttrs (_: serviceConfig: { inherit serviceConfig; }) nativeSystemServices;
-    slices.system.sliceConfig = {
-      MemoryMin = "512M";
-      MemoryLow = "10%";
-      ManagedOOMMemoryPressure = "kill";
-      ManagedOOMMemoryPressureLimit = "80%";
-    };
-    units = dropinsFrom remainingSystemUnitFiles;
-    user = {
-      services = lib.mapAttrs (_: serviceConfig: { inherit serviceConfig; }) nativeUserServices;
-      settings.Manager = {
-        DefaultMemoryAccounting = true;
-        DefaultIOAccounting = true;
-        DefaultTasksAccounting = true;
-      };
-      slices = {
-        app.sliceConfig = {
-          CPUWeight = 100;
-          IOWeight = 100;
-          ManagedOOMSwap = "kill";
-          ManagedOOMMemoryPressure = "kill";
-          ManagedOOMMemoryPressureLimit = "60%";
-        };
-        background.sliceConfig = {
-          CPUWeight = 20;
-          IOWeight = 20;
-          ManagedOOMSwap = "kill";
-          ManagedOOMMemoryPressure = "kill";
-          ManagedOOMMemoryPressureLimit = "50%";
-        };
-        session.sliceConfig = {
-          MemoryMin = "768M";
-          MemoryLow = "20%";
-          CPUWeight = 1000;
-          IOWeight = 1000;
-          ManagedOOMMemoryPressure = "auto";
-        };
-      };
-      units = dropinsFrom remainingUserUnitFiles;
-    };
-    settings.Manager = {
-      DefaultMemoryAccounting = true;
-      DefaultIOAccounting = true;
-      DefaultTasksAccounting = true;
-    };
   };
 }
