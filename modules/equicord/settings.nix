@@ -13,7 +13,7 @@ let
 
   pluginToJson =
     plugin:
-    (builtins.removeAttrs plugin [ "enable" ])
+    (removeAttrs plugin [ "enable" ])
     // {
       enabled = plugin.enable or true;
     };
@@ -34,6 +34,7 @@ let
       crashHandler.enable = true;
       disableCallIdle.enable = true;
       dontRoundMyTimestamps.enable = true;
+      equicordHelper.enable = true;
       favoriteEmojiFirst.enable = true;
       fixCodeblockGap.enable = true;
       fixImagesQuality.enable = true;
@@ -45,21 +46,22 @@ let
       hideMedia.enable = true;
       ignoreActivities = {
         enable = true;
-        ignorePlaying = true;
-        ignoreListening = true;
-        ignoreWatching = true;
         ignoreCompeting = true;
+        ignoreListening = true;
+        ignorePlaying = true;
+        ignoreWatching = true;
       };
       implicitRelationships.enable = true;
       memberCount.enable = true;
       messageLogger = {
         enable = true;
         collapseDeleted = true;
-        ignoreSelf = true;
         ignoreBots = true;
+        ignoreSelf = true;
       };
       mutualGroupDms.enable = true;
       newGuildSettings.enable = true;
+      newPluginsManager.enable = true;
       noBlockedMessages.enable = true;
       noDevtoolsWarning.enable = true;
       noF1.enable = true;
@@ -74,7 +76,26 @@ let
       pictureInPicture.enable = true;
       platformIndicators.enable = true;
       previewMessage.enable = true;
-      questify.enable = true;
+      questify = {
+        enable = true;
+        disableMembersListPromo = true;
+        disableFriendsListPromo = true;
+        disableRelocationNotices = true;
+        disableAccountPanelPromo = true;
+        autoCompleteQuestTypes = {
+          PLAY_ON_DESKTOP = true;
+          PLAY_ON_XBOX = true;
+          PLAY_ON_PLAYSTATION = true;
+          PLAY_ACTIVITY = true;
+          WATCH_VIDEO = true;
+          WATCH_VIDEO_ON_MOBILE = true;
+          ACHIEVEMENT_IN_ACTIVITY = true;
+        };
+        makeMobileVideoQuestsDesktopCompatible = true;
+        allowChangingDangerousSettings = true;
+        completeVideoQuestsQuicker = true;
+        autoCompleteQuestsSimultaneously = true;
+      };
       readAllNotificationsButton.enable = true;
       relationshipNotifier.enable = true;
       replyTimestamp.enable = true;
