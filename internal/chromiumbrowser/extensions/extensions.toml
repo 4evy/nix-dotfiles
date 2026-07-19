@@ -13,6 +13,10 @@ id = "ponfpcnoihfmfllpaingbgckeeldkhle"
 name = "Enhancer for YouTube"
 
 [[chrome_store_extensions]]
+id = "kpmjjdhbcfebfjgdnpjagcndoelnidfj"
+name = "Control Panel for Twitter"
+
+[[chrome_store_extensions]]
 id = "pobhoodpcipjmedfenaigbeloiidbflp"
 name = "Minimal Theme for Twitter"
 
