@@ -1,0 +1,144 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    {{- if eq .chezmoi.os "linux" }}
+    "type": "file",
+    "source": "~/.config/fastfetch/coreos.txt",
+    "color": {
+      "1": "blue",
+      "2": "white",
+      "3": "red"
+    },
+    {{- else if eq .chezmoi.os "darwin" }}
+    "type": "file",
+    "source": "~/.config/fastfetch/apple.txt",
+    "color": {
+      "1": "green",
+      "2": "yellow",
+      "3": "light_red",
+      "4": "red",
+      "5": "magenta",
+      "6": "blue"
+    },
+    {{- else }}
+    "type": "small",
+    {{- end }}
+    "padding": {
+      "top": 1,
+      "right": 4
+    }
+  },
+  "display": {
+    "separator": "  ",
+    "color": {
+      "keys": "magenta",
+      "title": "magenta"
+    },
+    "key": {
+      "width": 15
+    },
+    "bar": {
+      "char": {
+        "elapsed": "━",
+        "total": "─"
+      },
+      "width": 10
+    },
+    "percent": {
+      "type": 3
+    }
+  },
+  "modules": [
+    "break",
+    {
+      "type": "title",
+      "format": "{#magenta}{user-name}{#}@{#blue}{host-name}{#}"
+    },
+    {
+      "type": "custom",
+      {{- if and (eq .chezmoi.os "linux") (eq .chezmoi.osRelease.id "bluefin") }}
+      "format": "{#blue}atomic workstation{#}  {#cyan}◆{#}  {#magenta}built to roam{#}"
+      {{- else if eq .chezmoi.os "darwin" }}
+      "format": "{#blue}darwin workstation{#}  {#cyan}◆{#}  {#magenta}built to create{#}"
+      {{- else }}
+      "format": "{#blue}declarative workstation{#}  {#cyan}◆{#}  {#magenta}built to roam{#}"
+      {{- end }}
+    },
+    {
+      "type": "custom",
+      "format": "{#bright_black}────────────────────────────{#}"
+    },
+    {
+      "type": "os",
+      {{- if eq .chezmoi.os "darwin" }}
+      "key": "  macOS",
+      {{- else }}
+      "key": "󰣛  os",
+      {{- end }}
+      "format": "{name}{?version-id} {version-id}{?}{?variant} · {variant}{?}"
+    },
+    {
+      "type": "host",
+      "key": "󰌢  host",
+      "format": "{vendor} {family}"
+    },
+    {
+      "type": "kernel",
+      "key": "  kernel",
+      "format": "{release}"
+    },
+    {
+      "type": "uptime",
+      "key": "󰅐  uptime",
+      "format": "{?days}{days}d {?}{hours}h {minutes}m"
+    },
+    {
+      "type": "packages",
+      "key": "󰏖  packages",
+      "format": "{all}{?rpm} · rpm {rpm}{?}{?brew-all} · brew {brew-all}{?}{?nix-all} · nix {nix-all}{?}{?flatpak-all} · flatpak {flatpak-all}{?}"
+    },
+    {{- if eq .chezmoi.os "darwin" }}
+    {
+      "type": "shell",
+      "key": "  shell",
+      "format": "{pretty-name}{?version} {version}{?}"
+    },
+    {{- else }}
+    {
+      "type": "de",
+      "key": "  desktop",
+      "format": "{pretty-name}{?version} {version}{?}"
+    },
+    {{- end }}
+    {
+      "type": "terminal",
+      "key": "  terminal",
+      "format": "{pretty-name}{?version} {version}{?}"
+    },
+    {
+      "type": "cpu",
+      "key": "󰍛  cpu",
+      "format": "{name} · {cores-logical} threads"
+    },
+    {
+      "type": "gpu",
+      "key": "󰢮  gpu",
+      "format": "{name}{?type} [{type}]{?}"
+    },
+    {
+      "type": "memory",
+      "key": "󰘚  memory",
+      "format": "{percentage-bar}  {used} / {total}"
+    },
+    {
+      "type": "battery",
+      "key": "󰁹  battery",
+      "format": "{capacity-bar}  {capacity} [{status}]"
+    },
+    {
+      "type": "custom",
+      "format": "{#blue}●{#}  {#cyan}●{#}  {#magenta}●{#}  {#bright_black}●{#}"
+    },
+    "break"
+  ]
+}

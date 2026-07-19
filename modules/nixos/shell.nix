@@ -44,9 +44,9 @@ in
       btop
       curl
       eza
+      fastfetch
       fzf
       nmap
-      pfetch
       starship
       yazi
       zoxide

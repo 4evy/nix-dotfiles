@@ -30,7 +30,7 @@ alias vi="hx"
 alias vim="hx"
 
 # A2 / file and system views
-# eza uses icons; btop uses the current terminal theme; neofetch maps to pfetch.
+# eza uses icons; btop uses the current terminal theme; fetch names share one theme.
 
 alias l="eza --icons"
 alias la="eza -la --icons"
@@ -40,7 +40,28 @@ alias lt="eza --tree --icons"
 alias btop="terminal-theme-run btop"
 alias htop="terminal-theme-run btop"
 alias top="terminal-theme-run btop"
-alias neofetch="pfetch"
+
+unalias pfetch neofetch 2>/dev/null || true
+
+pfetch() {
+	local terminal_width="${COLUMNS:-120}"
+	local -a fetch_options=()
+
+	if ! command -v fastfetch >/dev/null 2>&1; then
+		command pfetch "$@"
+		return
+	fi
+
+	if [[ ! -t 1 ]]; then
+		fetch_options+=(--pipe --logo none --key-width 0)
+	elif [[ "$terminal_width" =~ ^[0-9]+$ ]] && ((terminal_width < 100)); then
+		fetch_options+=(--logo none)
+	fi
+
+	command fastfetch "${fetch_options[@]}" "$@"
+}
+
+neofetch() { pfetch "$@"; }
 
 # A3 / media helpers
 #      m4a ─┐  mp3 ─┐  mp4 ─┐
