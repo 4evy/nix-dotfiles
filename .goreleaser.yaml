@@ -7,10 +7,7 @@ before:
     - go mod tidy
 
 builds:
-  - &build_defaults
-    id: chezmoi-support
-    main: ./cmd/chezmoi-support
-    binary: chezmoi-support
+  - main: ./cmd/...
     env:
       - CGO_ENABLED=0
     flags:
@@ -21,69 +18,14 @@ builds:
     goos:
       - darwin
       - linux
-      - windows
     goarch:
       - amd64
       - arm64
 
-  - <<: *build_defaults
-    id: helium-browser
-    main: ./cmd/helium-browser
-    binary: helium-browser
-
-  - <<: *build_defaults
-    id: http-fixture
-    main: ./cmd/http-fixture
-    binary: http-fixture
-
-  - <<: *build_defaults
-    id: immutable-activate
-    main: ./cmd/immutable-activate
-    binary: immutable-activate
-
-  - <<: *build_defaults
-    id: lenovo-con-mode
-    main: ./cmd/lenovo-con-mode
-    binary: lenovo-con-mode
-
-  - <<: *build_defaults
-    id: lsp-diagnostic-filter
-    main: ./cmd/lsp-diagnostic-filter
-    binary: lsp-diagnostic-filter
-
-  - <<: *build_defaults
-    id: system-run-mcp
-    main: ./cmd/system-run-mcp
-    binary: system-run-mcp
-
-  - <<: *build_defaults
-    id: system-runner
-    main: ./cmd/system-runner
-    binary: system-runner
-
-  - <<: *build_defaults
-    id: terminal-theme-run
-    main: ./cmd/terminal-theme-run
-    binary: terminal-theme-run
-
 archives:
   - id: platform-binaries
-    ids:
-      - chezmoi-support
-      - helium-browser
-      - http-fixture
-      - immutable-activate
-      - lenovo-con-mode
-      - lsp-diagnostic-filter
-      - system-run-mcp
-      - system-runner
-      - terminal-theme-run
     formats:
       - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -92,7 +34,7 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     wrap_in_directory: true
     files:
-      - LICENSE.txt
+      - LICENSE
 
 checksum:
   name_template: checksums.txt
