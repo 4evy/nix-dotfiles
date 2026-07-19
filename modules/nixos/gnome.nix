@@ -5,7 +5,6 @@
   ...
 }:
 let
-  inherit (builtins) map;
   inherit (lib.attrsets)
     attrValues
     genAttrs
@@ -40,6 +39,8 @@ let
     "systemd-hibernate.service"
   ];
 
+  copyousExtension = pkgs.gnomeExtensions.copyous;
+  copyousExtensionUuid = copyousExtension.extensionUuid;
   hyperWindowTilingExtension = pkgs.hyper-window-tiling-gnome;
   hyperWindowTilingExtensionUuid = hyperWindowTilingExtension.passthru.extensionUuid;
 
@@ -57,6 +58,7 @@ in
         desktopManager.gnome.enable = true;
       };
       environment.systemPackages = attrValues {
+        inherit copyousExtension;
         inherit (pkgs)
           apostrophe # Markdown Editor
           decibels # Audio Player
@@ -79,10 +81,6 @@ in
           evince # Docs
           totem # Videos
           ;
-      };
-      systemd.user.units."gnome-catppuccin-accent.service" = {
-        text = builtins.readFile ../../dotfiles/dot_config/systemd/user/gnome-catppuccin-accent.service;
-        wantedBy = [ "default.target" ];
       };
     })
     # Fix for GNOME suspend/resume issues with NVIDIA GPUs
@@ -147,9 +145,14 @@ in
 
             "org/gnome/desktop/wm/keybindings" = {
               switch-applications = mkEmptyArray type.string;
+              switch-applications-backward = mkEmptyArray type.string;
               switch-windows = mkArray [
                 "<Alt>Tab"
                 "<Super>Tab"
+              ];
+              switch-windows-backward = mkArray [
+                "<Shift><Alt>Tab"
+                "<Shift><Super>Tab"
               ];
             }
             // generateKeybindings "switch-to-workspace" "<Super>" [ ]
@@ -163,6 +166,7 @@ in
               enabled-extensions = mkArray [
                 "appindicatorsupport@rgcjonas.gmail.com"
                 "clipboard-indicator@tudmotu.com"
+                copyousExtensionUuid
                 hyperWindowTilingExtensionUuid
                 "pip-on-top@rafostar.github.com"
               ];

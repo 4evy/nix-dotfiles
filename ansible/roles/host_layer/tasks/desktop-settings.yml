@@ -12,6 +12,74 @@
     - host
     - desktop
     - emoji-shortcut
+    - workspace-shortcuts
+
+- name: Configure GNOME window switching shortcuts
+  community.general.dconf:
+    key: "/org/gnome/desktop/wm/keybindings/{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+  loop:
+    - key: switch-applications
+      value: "@as []"
+    - key: switch-applications-backward
+      value: "@as []"
+    - key: switch-windows
+      value: "['<Alt>Tab', '<Super>Tab']"
+    - key: switch-windows-backward
+      value: "['<Shift><Alt>Tab', '<Shift><Super>Tab']"
+  loop_control:
+    label: "{{ item.key }}"
+  when: host_layer_gsettings_command.rc == 0
+  tags:
+    - host
+    - desktop
+    - workspace-shortcuts
+
+- name: Free GNOME numbered application shortcuts
+  community.general.dconf:
+    key: >-
+      /org/gnome/shell/keybindings/switch-to-application-{{ item }}
+    value: "@as []"
+    state: present
+  loop: "{{ host_layer_gnome_workspace_numbers }}"
+  loop_control:
+    label: "Super+{{ item }}"
+  when: host_layer_gsettings_command.rc == 0
+  tags:
+    - host
+    - desktop
+    - workspace-shortcuts
+
+- name: Configure GNOME numbered workspace switching shortcuts
+  community.general.dconf:
+    key: >-
+      /org/gnome/desktop/wm/keybindings/switch-to-workspace-{{ item }}
+    value: "['<Super>{{ item }}']"
+    state: present
+  loop: "{{ host_layer_gnome_workspace_numbers }}"
+  loop_control:
+    label: "Super+{{ item }}"
+  when: host_layer_gsettings_command.rc == 0
+  tags:
+    - host
+    - desktop
+    - workspace-shortcuts
+
+- name: Configure GNOME numbered workspace move shortcuts
+  community.general.dconf:
+    key: >-
+      /org/gnome/desktop/wm/keybindings/move-to-workspace-{{ item }}
+    value: "['<Super><Shift>{{ item }}']"
+    state: present
+  loop: "{{ host_layer_gnome_workspace_numbers }}"
+  loop_control:
+    label: "Super+Shift+{{ item }}"
+  when: host_layer_gsettings_command.rc == 0
+  tags:
+    - host
+    - desktop
+    - workspace-shortcuts
 
 - name: Check emoji picker command
   ansible.builtin.stat:
