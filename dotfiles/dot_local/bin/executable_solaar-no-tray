@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+solaar_executable="$(command -v solaar)"
+solaar_python="$(head -n 1 "$solaar_executable")"
+solaar_python="${solaar_python#\#!}"
+
+exec "$solaar_python" -c '
+import sys
+
+from solaar import gtk
+
+original_window_init = gtk.ui.window.init
+
+
+def init_hidden_window(_show_window, hide_on_close):
+    original_window_init(False, hide_on_close)
+
+
+gtk.ui.window.init = init_hidden_window
+sys.argv = ["solaar", "--window=only"]
+gtk.main()
+'

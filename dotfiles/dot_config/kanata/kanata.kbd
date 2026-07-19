@@ -6,6 +6,7 @@
     "ITE Tech. Inc. ITE Device(8910) Keyboard"
     "LIFT Mouse"
     "Pebble K380s"
+    "solaar-keyboard"
   )
 )
 
@@ -20,10 +21,12 @@
 
 (defalias
   caps-hyper (tap-hold-press 200 200 esc (multi lmet lctl lalt lsft (layer-while-held hyper)))
+  volume-down-mute (tap-hold 200 1000 vold mute)
+  volume-up-mute (tap-hold 200 1000 volu mute)
 )
 
 (deflayer base
-  caps @caps-hyper vold volu w a s d ret \
+  caps @caps-hyper @volume-down-mute @volume-up-mute w a s d ret \
 )
 
 (deflayer hyper

@@ -82,6 +82,7 @@ REQUIRED_PACKAGES: PackageGroups = {
         "podman-compose",
         "pipewire-gstreamer",
         "selinux-policy-devel",
+        "solaar",
         "systemd-oomd-defaults",
         "uresourced",
         "vulkan-tools",
