@@ -7,6 +7,7 @@ fallback = "catppuccin_frappe_pink"
 auto-format = true
 auto-save = false
 idle-timeout = 100
+completion-timeout = 50
 color-modes = true
 cursorline = true
 line-number = "relative"
@@ -16,6 +17,7 @@ mouse = true
 bufferline = "always"
 completion-replace = true
 completion-trigger-len = 1
+text-width = 88
 end-of-line-diagnostics = "hint"
 popup-border = "all"
 rainbow-brackets = true
@@ -26,13 +28,25 @@ normal = "block"
 select = "underline"
 
 [editor.gutters]
-layout = ["diagnostics", "line-numbers", "spacer", "diff"]
+layout = ["diagnostics", "code-action-hint", "line-numbers", "spacer", "diff"]
 
 [editor.indent-guides]
 render = true
 
 [editor.statusline]
-center = ["position-percentage"]
+center = ["version-control"]
+right = [
+  "diagnostics",
+  "workspace-diagnostics",
+  "selections",
+  "register",
+  "position",
+  "position-percentage",
+  "file-indent-style",
+  "file-line-ending",
+  "file-encoding",
+  "file-type",
+]
 
 [editor.whitespace.characters]
 nbsp = "⍽"
@@ -46,6 +60,8 @@ trail = "•"
 display-messages = true
 display-inlay-hints = true
 display-progress-messages = true
+auto-document-highlight = true
+inlay-hints-length-limit = 50
 
 [editor.inline-diagnostics]
 cursor-line = "warning"
@@ -55,11 +71,27 @@ git-global = true
 git-ignore = true
 hidden = false
 
+[editor.file-explorer]
+hidden = false
+parents = true
+ignore = true
+git-ignore = true
+git-global = true
+git-exclude = true
+flatten-dirs = true
+
+[editor.buffer-picker]
+start-position = "previous"
+
 [editor.soft-wrap]
 enable = true
 
 [editor.smart-tab]
 enable = true
+
+[editor.word-completion]
+enable = true
+trigger-length = 4
 
 [editor.search]
 smart-case = true

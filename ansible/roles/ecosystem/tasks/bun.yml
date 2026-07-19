@@ -4,9 +4,9 @@
     argv:
       - >-
         {{
-          (prerequisites_homebrew_prefix | default('/opt/homebrew')) + '/bin/bun'
-          if common_is_macos
-          else dotfiles_home_dir + '/.cache/.bun/bin/bun'
+          prerequisites_homebrew_prefix + '/bin/bun'
+          if prerequisites_homebrew_prefix is defined
+          else 'bun'
         }}
       - add
       - --global
@@ -15,6 +15,7 @@
     creates: "{{ dotfiles_home_dir }}/.cache/.bun/bin/{{ item.bin }}"
   environment:
     BUN_INSTALL: "{{ dotfiles_home_dir }}/.cache/.bun"
+    PATH: "{{ prerequisites_homebrew_path | default(dotfiles_path) }}"
   loop: "{{ ecosystem_bun_global_packages }}"
   tags:
     - ecosystem

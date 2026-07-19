@@ -2,7 +2,7 @@
 applications_helix_revision: >-
   {{
     lookup('env', 'HELIX_TIP_REVISION')
-    | default('14d6bc0febed9c692048271a8ae2362ac969c6e0', true)
+    | default('f6f3eb1fe4a73933466f30175843059a4381a985', true)
   }}
 applications_helix_cache_dir: "{{ dotfiles_cache_dir }}/helix"
 applications_helix_source_dir: "{{ applications_helix_cache_dir }}/source"

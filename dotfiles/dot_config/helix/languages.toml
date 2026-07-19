@@ -2,6 +2,11 @@
 name = "python"
 auto-format = true
 language-servers = ["ruff"]
+code-actions-on-save = ["source.organizeImports", "source.fixAll"]
+
+[[language]]
+name = "go"
+language-servers = ["gopls"]
 
 [[language]]
 name = "bash"
@@ -35,6 +40,25 @@ auto-format = true
 language-servers = ["vscode-css-language-server"]
 
 [[language]]
+name = "html"
+language-servers = ["vscode-html-language-server"]
+
+[[language]]
+name = "markdown"
+auto-format = true
+formatter = { command = "prettier", args = [
+  "--parser",
+  "markdown",
+  "--stdin-filepath",
+  "%{buffer_name}",
+] }
+language-servers = ["rumdl"]
+
+[[language]]
+name = "dockerfile"
+language-servers = ["docker-langserver"]
+
+[[language]]
 name = "json"
 file-types = ["json", "jsonc", { glob = "*.json.tmpl" }]
 auto-format = true
@@ -45,6 +69,12 @@ language-servers = ["vscode-json-language-server"]
 name = "yaml"
 file-types = ["yaml", "yml", { glob = "*.yaml.tmpl" }, { glob = "*.yml.tmpl" }]
 auto-format = true
+formatter = { command = "prettier", args = [
+  "--parser",
+  "yaml",
+  "--stdin-filepath",
+  "%{buffer_name}",
+] }
 language-servers = ["yaml-language-server"]
 
 [[language]]
@@ -67,11 +97,12 @@ language-servers = ["nil"]
 command = "bash-language-server"
 args = ["start"]
 
+[language-server.rumdl]
+command = "helix-rumdl-lsp"
+
 [language-server.ruff]
 command = "ruff"
 args = ["server", "--preview"]
-[language-server.ruff.config]
-lineLength = 100
 [language-server.ruff.config.lint]
 extendSelect = ["I"]
 
@@ -96,6 +127,18 @@ args = [
   "vscode-css-language-server",
   "--stdio",
 ]
+config = { provideFormatter = true, css = { validate = { enable = true } } }
+
+[language-server.vscode-html-language-server]
+command = "bunx"
+args = [
+  "--bun",
+  "-p",
+  "vscode-langservers-extracted",
+  "vscode-html-language-server",
+  "--stdio",
+]
+config = { provideFormatter = true }
 
 [language-server.vscode-json-language-server]
 command = "bunx"
@@ -106,6 +149,7 @@ args = [
   "vscode-json-language-server",
   "--stdio",
 ]
+config = { provideFormatter = true, json = { validate = { enable = true } } }
 
 [language-server.yaml-language-server]
 command = "yaml-language-server"
@@ -113,7 +157,17 @@ args = ["--stdio"]
 [language-server.yaml-language-server.config.yaml]
 format = { enable = true }
 validation = true
-schemas = { https = true }
+schemaStore = { enable = true, url = "https://www.schemastore.org/api/json/catalog.json" }
+
+[language-server.docker-langserver]
+command = "bunx"
+args = [
+  "--bun",
+  "-p",
+  "dockerfile-language-server-nodejs",
+  "docker-langserver",
+  "--stdio",
+]
 
 [language-server.taplo]
 command = "taplo"
