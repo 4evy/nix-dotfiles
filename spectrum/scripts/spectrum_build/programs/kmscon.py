@@ -10,6 +10,7 @@ from spectrum_build.integrations.source_build import (
     pinned_git_project,
 )
 from spectrum_build.programs.models import CustomProgram
+from spectrum_build.programs.sources import SOURCE_PINS
 
 # Keep this independent of the system Python minor version so image upgrades do
 # not invalidate the KMSCON theme helper's import path.
@@ -48,6 +49,7 @@ KMSCON = MesonProject(
 
 def install(context: BuildContext) -> None:
     runner = context.runner
+    kmscon_pin = SOURCE_PINS["kmscon"]
     astral = pinned_git_project(
         "astral",
         repo="https://github.com/sffjunkie/astral.git",
@@ -63,8 +65,8 @@ def install(context: BuildContext) -> None:
     kmscon = pinned_git_project(
         "kmscon",
         repo="https://github.com/kmscon/kmscon.git",
-        tag="v10.0.1",
-        revision="c9d0e23336c6bb7645a1f5f48a4a82f1d5a589d9",
+        tag=f"v{kmscon_pin['version']}",
+        revision=kmscon_pin["revision"],
     )
     runner.require(*BUILD_COMMANDS)
 

@@ -91,6 +91,9 @@ packages = [
   "spectrum_build.programs",
 ]
 
+[tool.setuptools.package-data]
+"spectrum_build.programs" = ["source-pins.json"]
+
 [tool.pytest.ini_options]
 filterwarnings = ["error"]
 minversion = "9.0"

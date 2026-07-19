@@ -63,6 +63,17 @@
     - ghostty
     - homebrew
 
+- name: Sync shared source pins into local Homebrew tap
+  ansible.builtin.copy:
+    src: "{{ dotfiles_repo_root }}/spectrum/scripts/spectrum_build/programs/source-pins.json"
+    dest: "{{ prerequisites_homebrew_prefix }}/Library/Taps/4evy/homebrew-dotfiles/source-pins.json"
+    mode: "0644"
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - ghostty
+    - homebrew
+
 - name: Sync Ghostty patches into local Homebrew tap
   ansible.builtin.copy:
     src: "{{ dotfiles_repo_root }}/patches/ghostty/"

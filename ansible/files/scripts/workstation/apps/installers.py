@@ -14,6 +14,7 @@ from githubkit.exception import GitHubException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from spectrum_build.programs.sources import SOURCE_PINS
 from workstation.automation import automation_check_mode
 from workstation.automation_models import OperationResult
 from workstation.console import console, error_console
@@ -33,18 +34,15 @@ from workstation.lib.files import (
 from workstation.lib.http import download
 from workstation.lib.paths import find_repo_root
 
-GHOSTTY_REVISION = "c5a21edfcbc2d5b46540ad91b7980aca31f5f1f3"
-GHOSTTY_VERSION = "1.3.2-dev.c5a21ed"
+GHOSTTY_PIN = SOURCE_PINS["ghostty"]
+GHOSTTY_REVISION = GHOSTTY_PIN["revision"]
+GHOSTTY_VERSION = GHOSTTY_PIN["version"]
 GHOSTTY_SOURCE_URL = (
     f"https://github.com/ghostty-org/ghostty/archive/{GHOSTTY_REVISION}.tar.gz"
 )
-GHOSTTY_SOURCE_SHA256 = (
-    "84123887f93254387a333831cb544cbb23fb1f63eb9980db4ca94463f929c376"
-)
-GHOSTTY_ZIG_SHA256 = {
-    "x86_64-linux": "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239",
-    "aarch64-linux": "958ed7d1e00d0ea76590d27666efbf7a932281b3d7ba0c6b01b0ff26498f667f",
-}
+GHOSTTY_SOURCE_SHA256 = GHOSTTY_PIN["source_sha256"]
+GHOSTTY_ZIG_VERSION = GHOSTTY_PIN["zig_version"]
+GHOSTTY_ZIG_SHA256 = GHOSTTY_PIN["zig_sha256"]
 
 
 def _repo_root() -> Path:
@@ -300,7 +298,7 @@ def _build_ghostty(
                 "--env",
                 f"ZIG_ARCH={zig_architecture}",
                 "--env",
-                "ZIG_VERSION=0.15.2",
+                f"ZIG_VERSION={GHOSTTY_ZIG_VERSION}",
                 "--env",
                 f"ZIG_SHA256={GHOSTTY_ZIG_SHA256[zig_architecture]}",
                 "--env",

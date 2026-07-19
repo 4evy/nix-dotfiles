@@ -1,9 +1,19 @@
+require "json"
+require "pathname"
+
 class GhosttyPatched < Formula
+  tap_root = Pathname(__dir__).parent
+  source_pins = tap_root/"source-pins.json"
+  source_pins = tap_root/"spectrum/scripts/spectrum_build/programs/source-pins.json" unless source_pins.exist?
+  ghostty_pin = JSON.parse(
+    source_pins.read,
+  ).fetch("ghostty")
+
   desc "Fast, native terminal emulator with dotfiles scrollback patches"
   homepage "https://ghostty.org"
-  url "https://github.com/ghostty-org/ghostty/archive/c5a21edfcbc2d5b46540ad91b7980aca31f5f1f3.tar.gz"
-  version "1.3.2-dev.c5a21ed"
-  sha256 "84123887f93254387a333831cb544cbb23fb1f63eb9980db4ca94463f929c376"
+  url "https://github.com/ghostty-org/ghostty/archive/#{ghostty_pin.fetch("revision")}.tar.gz"
+  version ghostty_pin.fetch("version")
+  sha256 ghostty_pin.fetch("source_sha256")
   license "MIT"
 
   depends_on "zig@0.15" => :build

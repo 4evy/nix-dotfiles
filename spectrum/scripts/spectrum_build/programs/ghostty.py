@@ -9,18 +9,17 @@ from spectrum_build.core.common import fail, require_readable_file
 from spectrum_build.core.context import BuildContext
 from spectrum_build.integrations.http import download
 from spectrum_build.programs.models import CustomProgram
+from spectrum_build.programs.sources import SOURCE_PINS
 from workstation.lib.files import extract_tar_archive, write_if_changed
 
-REVISION = "c5a21edfcbc2d5b46540ad91b7980aca31f5f1f3"
-VERSION = "1.3.2-dev.c5a21ed"
+GHOSTTY_PIN = SOURCE_PINS["ghostty"]
+REVISION = GHOSTTY_PIN["revision"]
+VERSION = GHOSTTY_PIN["version"]
 SOURCE_URL = f"https://github.com/ghostty-org/ghostty/archive/{REVISION}.tar.gz"
-SOURCE_SHA256 = "84123887f93254387a333831cb544cbb23fb1f63eb9980db4ca94463f929c376"
-ZIG_VERSION = "0.15.2"
+SOURCE_SHA256 = GHOSTTY_PIN["source_sha256"]
+ZIG_VERSION = GHOSTTY_PIN["zig_version"]
 ZIG_BUILD_JOBS = 2
-ZIG_SHA256 = {
-    "x86_64-linux": "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239",
-    "aarch64-linux": "958ed7d1e00d0ea76590d27666efbf7a932281b3d7ba0c6b01b0ff26498f667f",
-}
+ZIG_SHA256 = GHOSTTY_PIN["zig_sha256"]
 
 
 def _verified_download(url: str, expected_sha256: str) -> bytes:
