@@ -44,7 +44,7 @@ def test_containerfile_owns_static_rootfs_and_nix_entrypoint_validation() -> Non
     wrappers = repository / "spectrum/image/rootfs/usr/bin"
     containerfile = (repository / "spectrum/Containerfile").read_text()
 
-    for tool in ("deadnix", "nil", "nixd", "nixfmt"):
+    for tool in ("deadnix", "nh", "nil", "nixd", "nixfmt"):
         launcher = wrappers / tool
         assert launcher.is_file()
         assert os.access(launcher, os.X_OK)
@@ -55,8 +55,10 @@ def test_containerfile_owns_static_rootfs_and_nix_entrypoint_validation() -> Non
     assert "COPY spectrum /image/spectrum" not in containerfile
     assert "COPY spectrum/image/repos /image/spectrum/image/repos" in containerfile
     assert "COPY spectrum/scripts /image/spectrum/scripts" in containerfile
-    assert "for command in deadnix nil nixd nixfmt" in containerfile
-    assert not {"deadnix", "nil", "nixd", "nixfmt"}.intersection(VALIDATION_COMMANDS)
+    assert "for command in deadnix nh nil nixd nixfmt" in containerfile
+    assert not {"deadnix", "nh", "nil", "nixd", "nixfmt"}.intersection(
+        VALIDATION_COMMANDS
+    )
 
 
 def test_local_spectrum_builds_use_stable_layers_and_persistent_caches() -> None:

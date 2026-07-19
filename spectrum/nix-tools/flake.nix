@@ -1,5 +1,5 @@
 {
-  description = "Self-contained Nix editor tools for the Spectrum image";
+  description = "Self-contained Nix tools for the Spectrum image";
 
   inputs = {
     bundlers = {
@@ -18,20 +18,21 @@
         name = "spectrum-nix-tools";
         runtimeInputs = with pkgs; [
           deadnix
+          nh
           nil
           nixd
           nixfmt
         ];
         text = ''
           if (( $# == 0 )); then
-            printf '%s\n' 'usage: spectrum-nix-tools (deadnix|nil|nixd|nixfmt) [arguments...]' >&2
+            printf '%s\n' 'usage: spectrum-nix-tools (deadnix|nh|nil|nixd|nixfmt) [arguments...]' >&2
             exit 2
           fi
 
           tool=$1
           shift
           case "$tool" in
-            deadnix | nil | nixd | nixfmt)
+            deadnix | nh | nil | nixd | nixfmt)
               exec "$tool" "$@"
               ;;
             *)

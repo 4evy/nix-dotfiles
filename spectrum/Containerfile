@@ -8,6 +8,8 @@ FROM ghcr.io/astral-sh/uv:0.11.29@sha256:eb2843a1e56fd9e30c7276ce1a52cba86e64c7b
 
 FROM docker.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818 AS nix-tools
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ARG DETERMINATE_NIX_INSTALLER_VERSION=v3.21.5
 ADD --chmod=0755 \
     https://install.determinate.systems/nix/tag/${DETERMINATE_NIX_INSTALLER_VERSION}/nix-installer-x86_64-linux \
@@ -101,7 +103,7 @@ CMD ["/sbin/init"]
 
 RUN test -x /usr/bin/open && \
     test -x /usr/libexec/spectrum-nix-tools && \
-    for command in deadnix nil nixd nixfmt; do \
+    for command in deadnix nh nil nixd nixfmt; do \
         command -v "${command}" >/dev/null; \
     done && \
     bootc container lint --fatal-warnings
