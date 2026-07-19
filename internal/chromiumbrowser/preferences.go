@@ -143,8 +143,7 @@ func readPreferenceFile(path string) (map[string]any, error) {
 
 func NestedObject(root map[string]any, dottedPath string) map[string]any {
 	current := root
-	parts := strings.Split(dottedPath, ".")
-	for _, part := range parts {
+	for part := range strings.SplitSeq(dottedPath, ".") {
 		next, ok := current[part].(map[string]any)
 		if !ok {
 			next = map[string]any{}

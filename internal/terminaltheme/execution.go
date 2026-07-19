@@ -51,10 +51,8 @@ func loadRuntimeDefaults(data []byte) (runtimeDefaultsFile, error) {
 			return runtimeDefaultsFile{}, fmt.Errorf("embedded terminal theme runtime defaults contain invalid runtime %q", name)
 		}
 	}
-	for _, path := range slices.Concat(defaults.JavaScriptRuntimePaths, defaults.JavaScriptRuntimeHomePath) {
-		if path == "" {
-			return runtimeDefaultsFile{}, fmt.Errorf("embedded terminal theme runtime defaults contain an empty path")
-		}
+	if slices.Contains(slices.Concat(defaults.JavaScriptRuntimePaths, defaults.JavaScriptRuntimeHomePath), "") {
+		return runtimeDefaultsFile{}, fmt.Errorf("embedded terminal theme runtime defaults contain an empty path")
 	}
 	return defaults, nil
 }

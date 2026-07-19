@@ -33,10 +33,7 @@ func detectTerminalTheme(timeout time.Duration) (TerminalThemeMode, bool) {
 	deadline := time.Now().Add(timeout)
 	var buffer []byte
 	for time.Now().Before(deadline) {
-		remaining := int(time.Until(deadline) / time.Millisecond)
-		if remaining < 1 {
-			remaining = 1
-		}
+		remaining := max(int(time.Until(deadline)/time.Millisecond), 1)
 		events := []unix.PollFd{{
 			Fd:     int32(tty.Fd()),
 			Events: unix.POLLIN,

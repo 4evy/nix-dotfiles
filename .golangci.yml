@@ -3,6 +3,8 @@ version: "2"
 run:
   timeout: 30m
   tests: true
+  relative-path-mode: gomod
+  modules-download-mode: readonly
 
 linters:
   default: standard
@@ -11,6 +13,7 @@ linters:
     - copyloopvar
     - durationcheck
     - errorlint
+    - modernize
     - nilerr
     - usestdlibvars
 

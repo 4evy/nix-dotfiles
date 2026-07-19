@@ -133,8 +133,8 @@ func ExecutableName(name string) string {
 func command(ctx context.Context, cwd string, argv []string, env []string) *exec.Cmd {
 	program := argv[0]
 	if !IsPathLike(program) {
-		for i := len(env) - 1; i >= 0; i-- {
-			key, value, ok := strings.Cut(env[i], "=")
+		for _, envVar := range slices.Backward(env) {
+			key, value, ok := strings.Cut(envVar, "=")
 			if ok && key == pathEnvKey {
 				if path, found := PathOfWithPath(program, value); found {
 					program = path

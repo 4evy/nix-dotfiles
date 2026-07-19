@@ -78,7 +78,7 @@ func resolveLaunchCwd(args []string) (string, bool, error) {
 }
 
 func cwdOverride(args []string) (string, bool) {
-	for index := 0; index < len(args); index++ {
+	for index := range len(args) {
 		arg := args[index]
 		if arg == "--" {
 			return "", false

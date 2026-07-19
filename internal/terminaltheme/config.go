@@ -15,7 +15,7 @@ import (
 
 func (c configSpec) args(extraArgs []string, theme Theme) ([]string, func(), error) {
 	basePath := ""
-	for index := 0; index < len(extraArgs); index++ {
+	for index := range len(extraArgs) {
 		arg := extraArgs[index]
 		for _, name := range c.ArgNames {
 			if arg == name {

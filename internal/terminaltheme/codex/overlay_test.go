@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -132,12 +133,7 @@ func TestCreateTrustRuntimeTrustsGitRootAndExplicitCwd(t *testing.T) {
 }
 
 func contains(items []string, want string) bool {
-	for _, item := range items {
-		if item == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(items, want)
 }
 
 func runGit(t *testing.T, dir string, args ...string) {
