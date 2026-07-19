@@ -1,7 +1,7 @@
 package chromiumbrowser
 
 import (
-	"github.com/charmbracelet/log"
+	"charm.land/log/v2"
 )
 
 type ApplyOptions struct {

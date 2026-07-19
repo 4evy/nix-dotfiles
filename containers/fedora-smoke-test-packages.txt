@@ -37,6 +37,7 @@ nss
 openssl-devel
 pango
 python3-ansible-lint
+python3-devel
 tar
 unzip
 xz

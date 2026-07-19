@@ -71,7 +71,13 @@ RUN --mount=type=cache,id=dotfiles-go-mod-${TARGETPLATFORM},target=/home/dotfile
     ansible-lint ansible; \
     yamllint .; \
     cd ansible/collections/ansible_collections/evy/dotfiles; \
-    ansible-test sanity --local --skip-test validate-modules; \
+    PYTHONWARNINGS=ignore::DeprecationWarning \
+      uv tool run --from pycodestyle pycodestyle \
+        --max-line-length 160 \
+        --config /dev/null \
+        --ignore E203,E402,E701,E704,E741,W503,W504 \
+        plugins/modules/operation.py; \
+    ansible-test sanity --local --skip-test pep8 --skip-test validate-modules; \
     ansible-test integration --local operation
 
 USER root

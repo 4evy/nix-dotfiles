@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/charmbracelet/log"
+	"charm.land/log/v2"
 	lzstring "github.com/daku10/go-lz-string"
 	"github.com/syndtr/goleveldb/leveldb"
 )

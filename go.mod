@@ -3,10 +3,10 @@ module github.com/4evy/dotfiles
 go 1.26.0
 
 require (
+	charm.land/log/v2 v2.0.0
 	github.com/adrg/xdg v0.5.3
 	github.com/buildkite/shellwords v1.0.1
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/charmbracelet/log/v2 v2.0.0
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/daku10/go-lz-string v0.0.7
 	github.com/go-resty/resty/v2 v2.17.2
@@ -29,16 +29,17 @@ require (
 )
 
 require (
+	charm.land/lipgloss/v2 v2.0.1 // indirect
 	github.com/STARRY-S/zip v0.2.3 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
-	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/sevenzip v1.6.1 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
-	github.com/charmbracelet/lipgloss v1.1.0 // indirect
-	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
+	github.com/charmbracelet/ultraviolet v0.0.0-20251205161215-1948445e3318 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
+	github.com/charmbracelet/x/termios v0.1.1 // indirect
+	github.com/charmbracelet/x/windows v0.2.2 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
@@ -54,7 +55,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.24 // indirect
 	github.com/mikelolasagasti/xz v1.0.1 // indirect
 	github.com/minio/minlz v1.0.1 // indirect
-	github.com/muesli/termenv v0.16.0 // indirect
+	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/nwaples/rardecode/v2 v2.2.0 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect

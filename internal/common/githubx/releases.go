@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/4evy/dotfiles/internal/common/httpx"
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v89/github"
 )
 
 func LatestReleaseTag(ctx context.Context, repository string) (string, error) {
