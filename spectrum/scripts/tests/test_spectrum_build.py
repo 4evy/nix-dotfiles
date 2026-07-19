@@ -90,6 +90,10 @@ def test_local_spectrum_builds_use_stable_layers_and_persistent_caches() -> None
     assert "switch target=local_ref: (doctor 'install') (build target)" in justfile
     assert "upgrade target=local_ref: (doctor 'install') (build target)" in justfile
     assert "--layers=true" in justfile
+    assert "sudo {{ podman }} system prune --force --build" in justfile
+    assert "-name 'buildah*'" in justfile
+    assert "uv cache prune --force" in justfile
+    assert "--output=source,used" in justfile
     assert "/var/cache/dnf/*" not in DNF_CLEANUP_PATTERNS
     assert "/var/cache/libdnf5/*" not in DNF_CLEANUP_PATTERNS
 

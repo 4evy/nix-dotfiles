@@ -226,14 +226,15 @@ clean:
     tracked_paths=(/var "$home_dir" /nix /run "$cache_dir")
 
     filesystem_usage_bytes() {
-      local path device used total=0
-      local -A seen_devices=()
+      local path filesystem used total=0
+      local -A seen_filesystems=()
       for path in "${tracked_paths[@]}"; do
         [[ -e $path ]] || continue
-        device=$(stat --format=%d -- "$path")
-        [[ -v seen_devices[$device] ]] && continue
-        seen_devices[$device]=1
-        used=$(df --block-size=1 --output=used -- "$path" | tail -n 1)
+        read -r filesystem used < <(
+          df --block-size=1 --output=source,used -- "$path" | tail -n 1
+        )
+        [[ -v seen_filesystems[$filesystem] ]] && continue
+        seen_filesystems[$filesystem]=1
         total=$((total + used))
       done
       printf '%s\n' "$total"
@@ -280,8 +281,20 @@ clean:
     }
 
     clean_podman_root() {
-      sudo {{ podman }} system prune --force |
+      # Rootful Podman performs Spectrum builds. Failed commits can leave
+      # Buildah working containers behind, and ordinary system prune does not
+      # remove them without --build.
+      sudo {{ podman }} system prune --force --build |
         sed 's/^Total reclaimed space:/Podman logical reclaimed total (not physical disk usage):/'
+    }
+
+    clean_buildah_caches() {
+    local buildah_tmp=/var/tmp
+    # Persistent cache mounts and interrupted layer commits live outside the
+    # containers-storage graph, so Podman's prune cannot account for them.
+    sudo find "$buildah_tmp" -mindepth 1 -maxdepth 1 -name 'buildah*' \
+      -exec rm -rf -- {} + ||
+      printf 'Some active Buildah temporary paths could not be removed.\n' >&2
     }
 
     clean_nix() {
@@ -290,7 +303,7 @@ clean:
 
     clean_tool_caches() {
     if command -v uv >/dev/null 2>&1; then
-      if ! uv cache prune; then
+      if ! uv cache prune --force; then
         printf 'uv cache prune failed; the full user-cache cleanup will retry it.\n' >&2
       fi
     fi
@@ -339,6 +352,7 @@ clean:
     total_before=$(filesystem_usage_bytes)
     measure_cleanup 'Rootless Podman' clean_podman
     measure_cleanup 'Rootful Podman' clean_podman_root
+    measure_cleanup 'Buildah temporary caches' clean_buildah_caches
     measure_cleanup 'Nix generations and store' clean_nix
     measure_cleanup 'Tool caches' clean_tool_caches
     measure_cleanup 'User cache' clean_user_cache
