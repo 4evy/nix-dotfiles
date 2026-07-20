@@ -8,7 +8,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.4",
     "@types/bun": "1.3.14",
-    "renovate": "43.265.2",
+    "renovate": "43.265.4",
     "typescript": "7.0.2"
   }
 }
