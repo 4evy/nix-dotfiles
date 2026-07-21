@@ -17,73 +17,59 @@ refreshPeriod = "168h"
 # ----- Oh-My-Zsh -----
 
 [".oh-my-zsh"]
-type = "git-repo"
-url = "https://github.com/ohmyzsh/ohmyzsh.git"
+type = "archive"
+url = "https://github.com/ohmyzsh/ohmyzsh/archive/master.tar.gz"
+exact = true
+stripComponents = 1
 refreshPeriod = "168h"
-[".oh-my-zsh".clone]
-args = ["--depth=1"]
-[".oh-my-zsh".pull]
-args = ["--ff-only"]
 
 [".oh-my-zsh/custom/plugins/zsh-autosuggestions"]
-type = "git-repo"
-url = "https://github.com/zsh-users/zsh-autosuggestions.git"
+type = "archive"
+url = "https://github.com/zsh-users/zsh-autosuggestions/archive/master.tar.gz"
+exact = true
+stripComponents = 1
 refreshPeriod = "168h"
-[".oh-my-zsh/custom/plugins/zsh-autosuggestions".clone]
-args = ["--depth=1"]
-[".oh-my-zsh/custom/plugins/zsh-autosuggestions".pull]
-args = ["--ff-only"]
 
 [".oh-my-zsh/custom/plugins/zsh-syntax-highlighting"]
-type = "git-repo"
-url = "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+type = "archive"
+url = "https://github.com/zsh-users/zsh-syntax-highlighting/archive/master.tar.gz"
+exact = true
+stripComponents = 1
 refreshPeriod = "168h"
-[".oh-my-zsh/custom/plugins/zsh-syntax-highlighting".clone]
-args = ["--depth=1"]
-[".oh-my-zsh/custom/plugins/zsh-syntax-highlighting".pull]
-args = ["--ff-only"]
 
 [".oh-my-zsh/custom/plugins/fzf-tab"]
-type = "git-repo"
-url = "https://github.com/Aloxaf/fzf-tab.git"
+type = "archive"
+url = "https://github.com/Aloxaf/fzf-tab/archive/master.tar.gz"
+exact = true
+stripComponents = 1
 refreshPeriod = "168h"
-[".oh-my-zsh/custom/plugins/fzf-tab".clone]
-args = ["--depth=1"]
-[".oh-my-zsh/custom/plugins/fzf-tab".pull]
-args = ["--ff-only"]
 
 # ----- Oh-My-Bash -----
 
 [".oh-my-bash"]
-type = "git-repo"
-url = "https://github.com/ohmybash/oh-my-bash.git"
+type = "archive"
+url = "https://github.com/ohmybash/oh-my-bash/archive/master.tar.gz"
+exact = true
+stripComponents = 1
 refreshPeriod = "168h"
-[".oh-my-bash".clone]
-args = ["--depth=1"]
-[".oh-my-bash".pull]
-args = ["--ff-only"]
 
 # ----- fzf-tab-completion (bash) -----
 
 [".fzf-tab-completion"]
-type = "git-repo"
-url = "https://github.com/lincheney/fzf-tab-completion.git"
+type = "archive"
+url = "https://github.com/lincheney/fzf-tab-completion/archive/master.tar.gz"
+exact = true
+stripComponents = 1
 refreshPeriod = "168h"
-[".fzf-tab-completion".clone]
-args = ["--depth=1"]
-[".fzf-tab-completion".pull]
-args = ["--ff-only"]
 
 # ----- Vim -----
 
 [".vim/pack/vendor/start/catppuccin"]
-type = "git-repo"
-url = "https://github.com/catppuccin/vim.git"
+type = "archive"
+url = "https://github.com/catppuccin/vim/archive/main.tar.gz"
+exact = true
+stripComponents = 1
 refreshPeriod = "168h"
-[".vim/pack/vendor/start/catppuccin".clone]
-args = ["--depth=1"]
-[".vim/pack/vendor/start/catppuccin".pull]
-args = ["--ff-only"]
 
 # ----- Yazi -----
 
