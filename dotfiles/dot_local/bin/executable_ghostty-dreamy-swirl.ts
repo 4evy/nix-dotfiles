@@ -5,7 +5,11 @@ import { chmodSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-const CANVAS = { height: 1080, width: 1920 } as const;
+// Keep the composition in its original 1080p design space while rendering a
+// smaller texture. Ghostty uploads one decoded copy per terminal surface.
+const DESIGN_CANVAS = { height: 1080, width: 1920 } as const;
+const CANVAS = { height: 810, width: 1440 } as const;
+const RENDER_SCALE = CANVAS.width / DESIGN_CANVAS.width;
 const DEFAULT_SEED = "25b38848";
 const OUTPUT =
   process.argv[2] ??
@@ -286,15 +290,16 @@ try {
   for (const [index, point] of points.entries()) {
     const sprite = join(work, `sprite-${index}.png`);
     const next = join(work, `canvas-${index}.png`);
-    const offsetX = Math.round(point.x - CANVAS.width / 2);
-    const offsetY = Math.round(point.y - CANVAS.height / 2);
+    const pointSize = Math.max(1, Math.round(point.pointSize * RENDER_SCALE));
+    const offsetX = Math.round(point.x * RENDER_SCALE - CANVAS.width / 2);
+    const offsetY = Math.round(point.y * RENDER_SCALE - CANVAS.height / 2);
 
     if (useNativeMacEmoji) {
       const unrotated = join(work, `unrotated-${index}.png`);
       runCommand("pango-view", [
         "--no-display",
         `--text=${point.emoji}`,
-        `--font=Noto Color Emoji ${point.pointSize}`,
+        `--font=Noto Color Emoji ${pointSize}`,
         "--background=transparent",
         // Prevent accents and rotated color glyphs from touching Pango's edge.
         "--margin=8",
@@ -314,7 +319,7 @@ try {
       runMagick([
         "-background",
         "none",
-        `pango:<span font_family="Noto Color Emoji" font_size="${point.pointSize}pt">${point.emoji}</span>`,
+        `pango:<span font_family="Noto Color Emoji" font_size="${pointSize}pt">${point.emoji}</span>`,
         "-background",
         "none",
         "-rotate",
