@@ -19,7 +19,6 @@ brew "rustup"
 
 # Shells and prompts
 brew "atuin", restart_service: true
-brew "direnv"
 brew "starship"
 brew "zoxide"
 brew "zsh"

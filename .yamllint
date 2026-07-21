@@ -5,7 +5,6 @@ ignore: |
   .ansible/
   .cache/
   .devenv/
-  .direnv/
   .venv/
   ansible.cfg
   build/

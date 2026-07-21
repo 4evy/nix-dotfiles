@@ -89,7 +89,7 @@ classify_file() {
     *.js | *.cjs | *.mjs | *.jsx | *.ts | *.tsx | *.css | *.html | *.mdx) prettier_files+=("$file"); prettier_parse_files+=("$file") ;;
     *.go) go_files+=("$file") ;;
     *.py) python_files+=("$file") ;;
-    *.sh | *.sh.in | *.bash | .envrc) shell_files+=("$file") ;;
+    *.sh | *.sh.in | *.bash) shell_files+=("$file") ;;
     *.toml) toml_files+=("$file") ;;
     *.plist | *.xml) xml_files+=("$file"); unformatted_files+=("$file") ;;
     *.lua) lua_files+=("$file") ;;

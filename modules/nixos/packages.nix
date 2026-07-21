@@ -72,7 +72,6 @@ in
         delta
         delve
         diffutils
-        direnv
         dockerfmt
         duf
         dust

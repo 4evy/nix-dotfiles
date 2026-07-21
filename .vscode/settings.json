@@ -1,6 +1,5 @@
 {
   "files.associations": {
-    ".envrc": "shellscript",
     "Brewfile": "ruby",
     "Containerfile": "dockerfile",
     "Justfile": "just",
@@ -35,7 +34,6 @@
     "**/.ansible": true,
     "**/.cache": true,
     "**/.devenv": true,
-    "**/.direnv": true,
     "**/.jj": true,
     "**/dist": true,
     "**/node_modules": true,
@@ -46,7 +44,6 @@
     "**/.ansible/**": true,
     "**/.cache/**": true,
     "**/.devenv/**": true,
-    "**/.direnv/**": true,
     "**/.jj/**": true,
     "**/dist/**": true,
     "**/node_modules/**": true,
