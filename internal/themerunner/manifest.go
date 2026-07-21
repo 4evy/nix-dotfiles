@@ -1,4 +1,4 @@
-package terminaltheme
+package themerunner
 
 import (
 	_ "embed"
@@ -11,6 +11,8 @@ import (
 	"github.com/4evy/dotfiles/internal/common/userdirs"
 	"github.com/pelletier/go-toml/v2"
 )
+
+const userRunnerConfigPath = "terminal-theme-run/runners.toml"
 
 //go:embed runners.toml
 var defaultRunnerConfig []byte
@@ -25,7 +27,6 @@ func ConfiguredProgramNames() []string {
 	if err == nil {
 		for _, runner := range manifest.Runners {
 			names = append(names, runner.Name)
-			names = append(names, runner.Aliases...)
 		}
 	}
 	slices.Sort(names)
@@ -35,7 +36,7 @@ func ConfiguredProgramNames() []string {
 func RunConfigured(program string, extraArgs []string) (int, bool, error) {
 	runner, ok, err := configuredRunner(program)
 	if err != nil || !ok {
-		return 1, ok, err
+		return failureExitCode, ok, err
 	}
 	code, err := runner.run(extraArgs)
 	return code, true, err
@@ -47,7 +48,7 @@ func configuredRunner(program string) (runnerSpec, bool, error) {
 		return runnerSpec{}, false, err
 	}
 	for _, runner := range manifest.Runners {
-		if runner.Name == program || slices.Contains(runner.Aliases, program) {
+		if runner.Name == program {
 			return runner, true, nil
 		}
 	}
@@ -63,9 +64,9 @@ func loadRunnerManifest() (runnerManifest, error) {
 	var configPaths []string
 	if environment.Config != "" {
 		configPaths = filepath.SplitList(environment.Config)
-	} else if home, err := HomeDir(); err == nil {
+	} else if home, err := homeDir(); err == nil {
 		configPaths = []string{
-			filepath.Join(userdirs.ConfigHome(home), "terminal-theme-run/runners.toml"),
+			filepath.Join(userdirs.ConfigHome(home), userRunnerConfigPath),
 		}
 	}
 	for _, path := range configPaths {

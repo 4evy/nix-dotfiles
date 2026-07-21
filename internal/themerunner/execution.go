@@ -1,4 +1,4 @@
-package terminaltheme
+package themerunner
 
 import (
 	_ "embed"
@@ -11,8 +11,14 @@ import (
 
 	"github.com/4evy/dotfiles/internal/common/envx"
 	commonprocess "github.com/4evy/dotfiles/internal/common/process"
-	"github.com/4evy/dotfiles/internal/terminaltheme/codex"
 	"github.com/pelletier/go-toml/v2"
+)
+
+const (
+	environmentVariablePrefix = "$"
+	shebangReadSize           = 64
+	envShebang                = "#!/usr/bin/env"
+	nodeRuntimeName           = "node"
 )
 
 //go:embed runtime_defaults.toml
@@ -74,7 +80,7 @@ func (r runnerSpec) run(extraArgs []string) (int, error) {
 	executable := ""
 	for _, rawName := range programs {
 		name := expandPath(rawName)
-		if envName, ok := strings.CutPrefix(rawName, "$"); ok {
+		if envName, ok := strings.CutPrefix(rawName, environmentVariablePrefix); ok {
 			value := os.Getenv(envName)
 			if value == "" {
 				continue
@@ -123,59 +129,26 @@ func (r runnerSpec) run(extraArgs []string) (int, error) {
 		}
 	}
 	if executable == "" {
-		return 1, fmt.Errorf("%s executable not found", r.Name)
+		return failureExitCode, fmt.Errorf("%s executable not found", r.Name)
 	}
-	theme := Theme{}
-	if r.EnvOverlay == "codex-trust" || len(r.ThemeArgs) > 0 || r.Config != nil {
-		theme = DetectSystemTheme()
+	integration, err := integrationFor(r.Integration)
+	if err != nil {
+		return failureExitCode, fmt.Errorf("%s: %w", r.Name, err)
 	}
-
-	runtimeEnv := []string(nil)
-	cleanup := func() {}
-	switch r.EnvOverlay {
-	case "":
-	case "codex-trust":
-		codexEnv, filteredArgs, overlayCleanup, err := codex.CreateTrustRuntimeForArgs(theme.Name, extraArgs)
-		if err != nil {
-			return 1, err
-		}
-		extraArgs = filteredArgs
-		runtimeEnv = codexEnv
-		cleanup = overlayCleanup
-	default:
-		return 1, fmt.Errorf("%s has unknown env overlay %q", r.Name, r.EnvOverlay)
+	extraArgs, cleanup, err := integration.prepareArgs(extraArgs)
+	if err != nil {
+		return failureExitCode, err
 	}
 	defer cleanup()
 
 	args := slices.Clone(r.DefaultArgs)
-	for _, arg := range r.ThemeArgs {
-		value := arg.Dark
-		if theme.Name == Latte.Name {
-			value = arg.Light
-		}
-		if value != "" {
-			args = append(args, value)
-		}
-	}
-	if r.Config != nil {
-		configArgs, cleanup, err := r.Config.args(extraArgs, theme)
-		if err != nil {
-			return 1, err
-		}
-		defer cleanup()
-		args = append(args, configArgs...)
-		extraArgs = stripArgs(extraArgs, r.Config.ArgNames)
-	}
 	args = append(args, extraArgs...)
-	if r.EnvOverlay == "codex-trust" {
-		var err error
-		executable, args, err = resolveNodeShebang(executable, args)
-		if err != nil {
-			return 1, err
-		}
+	executable, args, err = integration.prepareCommand(executable, args)
+	if err != nil {
+		return failureExitCode, err
 	}
 	var childEnv []string
-	if len(r.Env) > 0 || len(r.EnvUnset) > 0 || len(runtimeEnv) > 0 {
+	if len(r.Env) > 0 || len(r.EnvUnset) > 0 {
 		childEnv = os.Environ()
 		for _, name := range r.EnvUnset {
 			prefix := name + "="
@@ -183,32 +156,9 @@ func (r runnerSpec) run(extraArgs []string) (int, error) {
 				return strings.HasPrefix(item, prefix)
 			})
 		}
-		childEnv = slices.Concat(childEnv, r.Env, runtimeEnv)
+		childEnv = slices.Concat(childEnv, r.Env)
 	}
 	return RunInheritEnv(executable, args, childEnv)
-}
-
-func stripArgs(args, names []string) []string {
-	var out []string
-	for index := 0; index < len(args); index++ {
-		arg := args[index]
-		removed := false
-		for _, name := range names {
-			if arg == name {
-				index++
-				removed = true
-				break
-			}
-			if strings.HasPrefix(arg, name+"=") {
-				removed = true
-				break
-			}
-		}
-		if !removed {
-			out = append(out, arg)
-		}
-	}
-	return out
 }
 
 func resolveNodeShebang(executable string, args []string) (string, []string, error) {
@@ -218,14 +168,14 @@ func resolveNodeShebang(executable string, args []string) (string, []string, err
 	}
 	defer func() { _ = file.Close() }()
 
-	header := make([]byte, 64)
+	header := make([]byte, shebangReadSize)
 	n, err := file.Read(header)
 	if err != nil && n == 0 {
 		return executable, args, nil
 	}
 	firstLine, _, _ := strings.Cut(string(header[:n]), "\n")
 	fields := strings.Fields(firstLine)
-	if len(fields) < 2 || fields[0] != "#!/usr/bin/env" || fields[1] != "node" {
+	if len(fields) < 2 || fields[0] != envShebang || fields[1] != nodeRuntimeName {
 		return executable, args, nil
 	}
 

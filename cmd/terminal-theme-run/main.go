@@ -6,19 +6,23 @@ import (
 	"os"
 
 	"github.com/4evy/dotfiles/internal/common/cli"
-	"github.com/4evy/dotfiles/internal/terminaltheme"
+	"github.com/4evy/dotfiles/internal/themerunner"
 	"github.com/spf13/cobra"
 )
 
-var version = "dev"
+const (
+	version         = "dev"
+	successExitCode = 0
+	failureExitCode = 1
+)
 
 func main() {
-	code := 0
+	code := successExitCode
 	cmd := &cobra.Command{
 		Use:   "terminal-theme-run",
 		Short: "Run terminal theme helpers",
 	}
-	for _, name := range terminaltheme.ConfiguredProgramNames() {
+	for _, name := range themerunner.ConfiguredProgramNames() {
 		program := name
 		child := &cobra.Command{
 			Use:                program + " [ARG...]",
@@ -27,18 +31,18 @@ func main() {
 			RunE: func(_ *cobra.Command, args []string) error {
 				var err error
 				var ok bool
-				code, ok, err = terminaltheme.RunConfigured(program, args)
+				code, ok, err = themerunner.RunConfigured(program, args)
 				if err != nil || ok {
 					return err
 				}
-				code = 1
+				code = failureExitCode
 				return fmt.Errorf("unknown program %q", program)
 			},
 		}
 		cmd.AddCommand(child)
 	}
 	if err := cli.Execute(context.Background(), cmd, os.Args[1:], version); err != nil {
-		os.Exit(1)
+		os.Exit(failureExitCode)
 	}
 	os.Exit(code)
 }
