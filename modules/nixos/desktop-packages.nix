@@ -11,7 +11,6 @@ let
 
   desktopEnabled = config.local.gnome.enable || config.local.kde.enable;
   heliumProfileDir = "/home/4evy/.config/net.imput.helium/Default";
-  heliumPrivateSettingsFile = config.sops.secrets."helium-cookie-autodelete-settings".path;
 
   chromiumFeatures = [
     "ForceEnableWebGpuInterop"
@@ -39,7 +38,6 @@ let
     "--ignore-gpu-blocklist"
     "--enable-wayland-ime"
     "--wayland-text-input-version=3"
-    "--load-extension=${cookieAutoDeleteExtension}/share/helium/extensions/${cookieAutoDeleteId}"
   ];
 
   chromeStoreUpdateUrl = "https://clients2.google.com/service/update2/crx";
@@ -69,34 +67,6 @@ let
       name = "bolggfoncklhniejomgplkjcllmnonbh.crx";
       hash = "sha256-X4m1To1n/1zQGrzQPXPyR8KIA4JleyyAh5AjuS2BvYw=";
     };
-  };
-
-  cookieAutoDeleteId = "hebmefdjnehapihcomeennjpdjghcpdn";
-
-  cookieAutoDeleteExtension = pkgs.stdenvNoCC.mkDerivation {
-    pname = "helium-cookie-autodelete-extension";
-    version = "3.8.2";
-
-    src = pkgs.fetchurl {
-      url = "https://github.com/Cookie-AutoDelete/Cookie-AutoDelete/releases/download/v3.8.2/Cookie-AutoDelete_v3.8.2_Chrome.zip";
-      hash = "sha256-dzSNl4/W42sd8J+lJGOoFa/Znh6cdoxg8jZSkM6+dyM=";
-    };
-
-    nativeBuildInputs = [ pkgs.unzip ];
-
-    unpackPhase = ''
-      runHook preUnpack
-      unzip -q "$src" -d source
-      runHook postUnpack
-    '';
-
-    installPhase = ''
-      runHook preInstall
-      extension_dir="$out/share/helium/extensions/${cookieAutoDeleteId}"
-      mkdir -p "$extension_dir"
-      cp -R source/. "$extension_dir/"
-      runHook postInstall
-    '';
   };
 
   heliumBrowserTool = pkgs.callPackage ../../packages/go-workspace-package.nix { } {
@@ -149,16 +119,8 @@ in
       [ twpExternalExtensionFile ] ++ map chromeStoreExternalExtensionFile chromeStoreExtensionIds
     );
 
-    sops.secrets."helium-cookie-autodelete-settings" = {
-      owner = "4evy";
-      mode = "0400";
-    };
-
     system.activationScripts.heliumExtensionSettings = {
-      deps = [
-        "setupSecrets"
-        "users"
-      ];
+      deps = [ "users" ];
       text = ''
         mkdir -p '${heliumProfileDir}'
         chown 4evy:users '/home/4evy/.config' '/home/4evy/.config/net.imput.helium' '${heliumProfileDir}' 2>/dev/null || true
@@ -166,10 +128,9 @@ in
         if command -v runuser >/dev/null 2>&1; then
           runuser -u 4evy -- ${heliumBrowserTool}/bin/helium-browser apply-extension-settings \
             --profile-dir '${heliumProfileDir}' \
-            --settings '${heliumPrivateSettingsFile}' \
             --gh-token || true
         else
-          su -s /bin/sh 4evy -c '${heliumBrowserTool}/bin/helium-browser apply-extension-settings --profile-dir ${heliumProfileDir} --settings ${heliumPrivateSettingsFile} --gh-token' || true
+          su -s /bin/sh 4evy -c '${heliumBrowserTool}/bin/helium-browser apply-extension-settings --profile-dir ${heliumProfileDir} --gh-token' || true
         fi
       '';
     };
