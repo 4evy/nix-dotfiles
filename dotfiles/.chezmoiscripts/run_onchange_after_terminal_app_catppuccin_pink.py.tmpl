@@ -1,5 +1,8 @@
 {{- if eq .chezmoi.os "darwin" -}}
+{{- $repo := joinPath .chezmoi.sourceDir ".." -}}
 #!/usr/bin/env python3
+# dotfiles-scripts fingerprint: {{ template "executable_fingerprint" (joinPath .chezmoi.homeDir ".local/bin/dotfiles-scripts") }}
+# helper source hash: {{ output "cat" (joinPath $repo "ansible/files/scripts/workstation/chezmoi.py") | sha256sum }}
 from __future__ import annotations
 
 import os

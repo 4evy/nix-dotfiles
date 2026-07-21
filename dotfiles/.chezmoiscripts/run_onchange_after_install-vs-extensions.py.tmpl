@@ -1,5 +1,9 @@
+{{- $repo := joinPath .chezmoi.sourceDir ".." -}}
 #!/usr/bin/env python3
 # vscode-extensions.txt hash: {{ include "dot_config/Code/User/vscode-extensions.txt" | sha256sum }}
+# dotfiles-scripts fingerprint: {{ template "executable_fingerprint" (joinPath .chezmoi.homeDir ".local/bin/dotfiles-scripts") }}
+# helper source hash: {{ output "cat" (joinPath $repo "ansible/files/scripts/workstation/chezmoi.py") | sha256sum }}
+# code fingerprint: {{ template "executable_fingerprint" (lookPath "code") }}
 from __future__ import annotations
 
 import os

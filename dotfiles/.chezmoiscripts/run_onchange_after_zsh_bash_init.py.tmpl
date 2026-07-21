@@ -1,9 +1,10 @@
 {{- $repo := joinPath .chezmoi.sourceDir ".." -}}
 #!/usr/bin/env python3
-# yazi package.toml hash: {{ include "dot_config/yazi/package.toml" | sha256sum }}
 # dotfiles-scripts fingerprint: {{ template "executable_fingerprint" (joinPath .chezmoi.homeDir ".local/bin/dotfiles-scripts") }}
 # helper source hash: {{ output "cat" (joinPath $repo "ansible/files/scripts/workstation/chezmoi.py") | sha256sum }}
-# ya fingerprint: {{ template "executable_fingerprint" (lookPath "ya") }}
+{{- range $tool := list "atuin" "broot" "chezmoi" "delta" "deno" "fzf" "jj" "rustup" "starship" "zoxide" }}
+# {{ $tool }} fingerprint: {{ template "executable_fingerprint" (lookPath $tool) }}
+{{- end }}
 from __future__ import annotations
 
 import os
@@ -14,4 +15,4 @@ command = Path.home() / ".local/bin/dotfiles-scripts"
 if not command.is_file():
     command = Path(shutil.which("dotfiles-scripts") or command)
 if command.is_file() and os.access(command, os.X_OK):
-    os.execv(command, (command, "chezmoi", "yazi-init"))
+    os.execv(command, (command, "chezmoi", "shell-init"))
