@@ -87,7 +87,7 @@ def run_machine_protocol(payload: str) -> OperationResponse:
         return dispatch(request)
     except (CycloptsError, DotfilesError, ValidationError) as error:
         return _failure(str(error))
-    except Exception as error:  # noqa: BLE001 - wire boundary must stay valid JSON.
+    except Exception as error:  # ruff:ignore[blind-except] - preserve JSON protocol.
         return _failure(f"unexpected automation failure: {error}")
 
 
