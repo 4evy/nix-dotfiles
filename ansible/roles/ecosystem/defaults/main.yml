@@ -4,6 +4,8 @@ ecosystem_bun_global_packages:
     bin: codex
   - package: "@earendil-works/pi-coding-agent"
     bin: pi
+  - package: opencode-ai
+    bin: opencode
 
 ecosystem_determinate_nix_installer_url: https://install.determinate.systems/nix
 ecosystem_nixos_nix_installer_url: https://artifacts.nixos.org/nix-installer
