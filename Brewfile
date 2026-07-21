@@ -197,6 +197,8 @@ if OS.mac?
   cask "appcleaner"
   cask "brave-browser"
   cask "discord"
+  # Ansible installs Docker Desktop separately and excludes it from Bundle so
+  # an ordinary userland refresh never removes its root-owned helper tools.
   cask "docker-desktop", args: { "no-binaries": true }, no_upgrade: true
   cask "firefox"
   cask "google-chrome"

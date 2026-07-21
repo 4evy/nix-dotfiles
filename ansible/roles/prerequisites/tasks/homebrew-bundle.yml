@@ -275,6 +275,22 @@
     - discord
     - homebrew
 
+- name: Ensure Docker Desktop is installed without upgrading it
+  community.general.homebrew_cask:
+    name: docker-desktop
+    state: present
+    install_options:
+      - no-binaries
+    path: "{{ prerequisites_homebrew_prefix }}/bin"
+  environment:
+    HOMEBREW_NO_ASK: "1"
+    PATH: "{{ prerequisites_homebrew_path }}"
+  when: common_is_macos
+  tags:
+    - bootstrap
+    - docker
+    - homebrew
+
 - name: Remove Homebrew core Kanata before installing command-enabled formula
   community.general.homebrew:
     name: kanata
@@ -406,6 +422,7 @@
   args:
     chdir: "{{ dotfiles_repo_root }}"
   environment:
+    HOMEBREW_BUNDLE_CASK_SKIP: docker-desktop
     HOMEBREW_NO_ASK: "1"
     PATH: "{{ prerequisites_homebrew_path }}"
   register: prerequisites_homebrew_bundle_install
