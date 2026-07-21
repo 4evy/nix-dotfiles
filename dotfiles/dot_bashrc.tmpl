@@ -136,9 +136,10 @@ export OSH="$HOME/.oh-my-bash"
 # shellcheck disable=SC2034
 OSH_THEME=""
 
-# Keep the plugin list explicit.
+# Keep the plugin list explicit. Zoxide already provides directory jumping;
+# bashmarks also steals the Git plugin's `g` alias when it loads afterward.
 # shellcheck disable=SC2034
-plugins=(git bashmarks)
+plugins=(git)
 
 # Completion list; gh joins only when present.
 completions=(git ssh system)

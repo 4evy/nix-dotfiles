@@ -30,12 +30,16 @@ alias vi="hx"
 alias vim="hx"
 
 # A2 / file and system views
-# eza uses icons; btop uses the current terminal theme; fetch names share one theme.
+# Shared aliases load after the shell frameworks, so these definitions replace
+# their platform-specific `ls` wrappers in both Bash and Zsh.
 
-alias l="eza --icons"
-alias la="eza -la --icons"
-alias ll="eza -la --icons"
-alias lt="eza --tree --icons"
+unalias afind egrep fgrep grep 2>/dev/null || true
+
+alias ls="eza --icons=auto --group-directories-first"
+alias l="eza --icons=auto --group-directories-first"
+alias la="eza -a --icons=auto --group-directories-first"
+alias ll="eza -la --icons=auto --group-directories-first --git"
+alias lt="eza --tree --icons=auto --group-directories-first"
 
 alias btop="terminal-theme-run btop"
 alias htop="terminal-theme-run btop"
@@ -82,7 +86,17 @@ mp4-cut() { _dotfiles_ytdlp mp4-cut "$@"; }
 
 alias oo="opencode"
 alias cza="chezmoi apply --force"
-alias pmclean="podman system prune"
+
+pmclean() {
+	if command -v podman >/dev/null 2>&1; then
+		command podman system prune "$@"
+	elif command -v docker >/dev/null 2>&1; then
+		command docker system prune "$@"
+	else
+		printf '%s\n' "podman and docker are not installed" >&2
+		return 127
+	fi
+}
 
 jj() {
 	local shim_result
