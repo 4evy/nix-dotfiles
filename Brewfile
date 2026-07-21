@@ -1,6 +1,6 @@
 if OS.mac?
   cask_args appdir: "/Applications"
-  tap "4evy/dotfiles", __dir__
+  tap "4evy/dotfiles", __dir__, trusted: true
 end
 
 # Bootstrap shell and provisioning tools
