@@ -93,7 +93,9 @@ def configure_karabiner_vhid() -> OperationResult:
             run(("installer", "-pkg", package_path, "-target", "/"))
     require_executable(manager)
     require_executable(daemon)
-    run((manager, "forceActivate"))
+    # The manager prints activation progress to stdout. Keep the automation
+    # protocol's stdout reserved for its single JSON response.
+    run((manager, "forceActivate"), output_mode="stderr")
 
     ensure_directory("/var/log/karabiner", "0755")
     _bootout(plist)
