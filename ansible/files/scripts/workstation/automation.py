@@ -21,6 +21,7 @@ _REQUEST: ContextVar[OperationRequest | None] = ContextVar(
 
 _ALLOWED_COMMANDS = {
     ("apps", "install-ghostty-tip-linux"),
+    ("apps", "install-ghostty-tip-macos"),
     ("apps", "install-helium-linux"),
     ("apps", "install-helium-macos"),
     ("host", "apps", "rustdesk-tailscale"),

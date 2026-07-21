@@ -11,5 +11,6 @@ app = App(
 )
 app.command(ghidra_mcp.install_ghidra_mcp, name="install-ghidra-mcp")
 app.command(installers.install_ghostty_tip_linux, name="install-ghostty-tip-linux")
+app.command(installers.install_ghostty_tip_macos, name="install-ghostty-tip-macos")
 app.command(installers.install_helium_linux, name="install-helium-linux")
 app.command(installers.install_helium_macos, name="install-helium-macos")

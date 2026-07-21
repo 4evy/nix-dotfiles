@@ -116,6 +116,30 @@ def test_ghostty_check_mode_does_not_create_directories(tmp_path: Path) -> None:
     assert not (tmp_path / "prefix").exists()
 
 
+def test_ghostty_macos_check_mode_does_not_create_directories(
+    tmp_path: Path,
+) -> None:
+    cache = tmp_path / "cache"
+    app_root = tmp_path / "apps/ghostty-patched"
+    response = run_machine_protocol(
+        _payload(
+            tmp_path,
+            [
+                "apps",
+                "install-ghostty-tip-macos",
+                str(cache),
+                str(app_root),
+                str(tmp_path / "zig"),
+            ],
+        )
+    )
+
+    assert not response.failed
+    assert response.changed
+    assert not cache.exists()
+    assert not app_root.exists()
+
+
 def test_ghostty_staged_prefix_merge_replaces_links_without_rewriting_dirs(
     tmp_path: Path,
 ) -> None:
@@ -168,6 +192,43 @@ def test_ghostty_current_state_is_idempotent(
     assert not response.failed
     assert not response.changed
     assert response.msg == "Ghostty tip was checked recently"
+
+
+def test_ghostty_macos_current_state_is_idempotent(tmp_path: Path) -> None:
+    app_root = tmp_path / "apps/ghostty-patched"
+    executable = app_root / "Ghostty.app/Contents/MacOS/ghostty"
+    executable.parent.mkdir(parents=True)
+    executable.write_text(
+        f"#!/bin/sh\necho 'Ghostty {installers.GHOSTTY_VERSION}'\n"
+        "echo 'scrollback-editor ='\n"
+    )
+    executable.chmod(0o755)
+    patches = installers._ghostty_patches()
+    installers.BuildState.write(
+        app_root / ".ghostty-tip-state.json",
+        installers.GHOSTTY_REVISION,
+        inputs={
+            "patches": installers._ghostty_patch_key(patches),
+            "target": "native-macos",
+        },
+    )
+    response = run_machine_protocol(
+        _payload(
+            tmp_path,
+            [
+                "apps",
+                "install-ghostty-tip-macos",
+                str(tmp_path / "cache"),
+                str(app_root),
+                str(tmp_path / "zig"),
+            ],
+            check=False,
+        )
+    )
+
+    assert not response.failed
+    assert not response.changed
+    assert response.msg == "Ghostty macOS tip is current"
 
 
 def test_build_state_round_trips_and_rejects_corruption(

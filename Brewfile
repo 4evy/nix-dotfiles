@@ -170,9 +170,11 @@ brew "ghidra"
 # macOS uses a local Ansible-installed Homebrew formula matching the former
 # nix-darwin kanata-with-cmd package.
 if OS.mac?
+  brew "gettext"
   brew "hidapi"
+  brew "mas"
+  brew "zig@0.15"
   brew "4evy/dotfiles/kanata-with-cmd"
-  brew "4evy/dotfiles/ghostty-patched"
 end
 brew "lsof"
 brew "ncdu"

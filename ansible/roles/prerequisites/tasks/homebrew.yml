@@ -36,6 +36,7 @@
       - gnu-which
       - grep
       - make
+      - mas
     prerequisites_homebrew_enabled: true
   vars:
     prerequisites_macos_homebrew_prefix: "{{ '/opt/homebrew' if common_architecture == 'arm64' else '/usr/local' }}"
@@ -43,6 +44,7 @@
   tags:
     - bootstrap
     - bash
+    - ghostty
     - homebrew
 
 - name: Set Homebrew paths on Linux

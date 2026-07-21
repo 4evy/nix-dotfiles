@@ -82,6 +82,49 @@
     - apps
     - ghostty
 
+- name: Install Ghostty's JetBrains Mono Nerd Font on macOS
+  community.general.homebrew_cask:
+    name: font-jetbrains-mono-nerd-font
+    state: present
+    path: "{{ prerequisites_homebrew_prefix }}/bin"
+  environment:
+    HOMEBREW_NO_ASK: "1"
+    PATH: "{{ prerequisites_homebrew_path }}"
+  when: common_is_macos
+  tags:
+    - apps
+    - fonts
+    - ghostty
+
+- name: Install patched native Ghostty tip build on macOS
+  evy.dotfiles.operation:
+    executable: "{{ dotfiles_bin_dir }}/dotfiles-scripts"
+    command:
+      - apps
+      - install-ghostty-tip-macos
+      - "{{ dotfiles_cache_dir }}/ghostty-macos"
+      - "{{ dotfiles_data_home }}/ghostty-patched"
+      - "{{ prerequisites_homebrew_prefix }}/opt/zig@0.15/bin/zig"
+    context: "{{ dotfiles_automation_context }}"
+    chdir: "{{ dotfiles_repo_root }}"
+    environment:
+      PATH: "{{ dotfiles_bin_dir }}:{{ dotfiles_path }}"
+  when: common_is_macos
+  tags:
+    - apps
+    - ghostty
+
+- name: Link patched Ghostty application bundle on macOS
+  ansible.builtin.file:
+    src: "{{ dotfiles_data_home }}/ghostty-patched/Ghostty.app"
+    dest: /Applications/Ghostty.app
+    state: link
+    force: true
+  when: common_is_macos
+  tags:
+    - apps
+    - ghostty
+
 - name: Install native Helix tip build
   ansible.builtin.import_tasks: helix.yml
   when: common_is_linux or common_is_macos
