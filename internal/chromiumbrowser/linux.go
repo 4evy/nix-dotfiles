@@ -10,99 +10,105 @@ import (
 	"strings"
 
 	"github.com/4evy/dotfiles/internal/common/fileutil"
+	"github.com/4evy/dotfiles/internal/common/process"
 	"github.com/4evy/dotfiles/internal/common/userdirs"
+	"gopkg.in/ini.v1"
+)
+
+const (
+	linuxAppDirName               = "app"
+	linuxApplicationsDir          = "applications"
+	linuxApplicationIconsDir      = "icons/hicolor/256x256/apps"
+	linuxQtShimFilename           = "libqt5_shim.so"
+	linuxClassFlagPrefix          = "--class="
+	desktopEntryExecKey           = "Exec"
+	desktopEntrySection           = "Desktop Entry"
+	desktopEntryStartupNotifyKey  = "StartupNotify"
+	desktopEntryStartupWMClassKey = "StartupWMClass"
+	desktopDatabaseCommand        = "update-desktop-database"
 )
 
 func (browser Browser) installLinux(options *InstallOptions) error {
-	appDir := browser.defaultAppDir(options.Root)
+	appDir := filepath.Join(options.Root, linuxAppDirName)
 	if options.AppDir != "" {
 		appDir = options.AppDir
 	}
 	dataHome := userdirs.DataHome(homeDir())
 
 	for _, dir := range []string{
-		options.Root,
-		options.BinDir,
-		filepath.Join(dataHome, "applications"),
-		filepath.Join(dataHome, "icons/hicolor/256x256/apps"),
+		filepath.Join(dataHome, linuxApplicationsDir),
+		filepath.Join(dataHome, linuxApplicationIconsDir),
 	} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, fileutil.DefaultDirPerm); err != nil {
 			return err
 		}
 	}
-	if stat, err := os.Stat(appDir); err != nil {
-		return fmt.Errorf("find %s app directory %s: %w", browser.Name, appDir, err)
-	} else if !stat.IsDir() {
-		return fmt.Errorf("%s app path is not a directory: %s", browser.Name, appDir)
+	if err := browser.prepareInstall(options, appDir); err != nil {
+		return err
 	}
 	if err := os.Remove(
-		filepath.Join(appDir, "libqt5_shim.so"),
+		filepath.Join(appDir, linuxQtShimFilename),
 	); err != nil &&
 		!errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
-	if err := browser.installExtensions(options); err != nil {
-		return err
-	}
-	if err := browser.applyInstallSettings(options); err != nil {
-		return err
-	}
-	linuxWrapperFlags := slices.Clone(browser.LinuxWrapperFlags)
-	if browser.LinuxDesktopID != "" {
-		linuxWrapperFlags = append(linuxWrapperFlags, "--class="+browser.LinuxDesktopID)
+	linuxWrapperFlags := slices.Clone(browser.Config.Linux.WrapperFlags)
+	if browser.Config.Linux.DesktopID != "" {
+		linuxWrapperFlags = append(
+			linuxWrapperFlags,
+			linuxClassFlagPrefix+browser.Config.Linux.DesktopID,
+		)
 	}
 	options.extraWrapperFlags = slices.Insert(
 		options.extraWrapperFlags,
 		0,
 		linuxWrapperFlags...,
 	)
-	if err := writeWrapper(
-		filepath.Join(options.BinDir, browser.ExecutableName),
-		filepath.Join(appDir, browser.LinuxLauncherName),
+	if err := browser.configureApp(
 		options,
+		filepath.Join(appDir, browser.Config.Linux.LauncherName),
 	); err != nil {
 		return err
 	}
-	if browser.AliasName != "" {
-		if err := replaceSymlink(
-			browser.ExecutableName,
-			filepath.Join(options.BinDir, browser.AliasName),
-		); err != nil {
-			return err
-		}
-	}
 
-	desktopData, err := os.ReadFile(filepath.Join(appDir, browser.LinuxDesktopName))
+	desktopData, err := os.ReadFile(filepath.Join(appDir, browser.Config.Linux.DesktopName))
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	if err == nil {
-		executable := filepath.Join(options.BinDir, browser.ExecutableName)
-		text := LinuxDesktopEntry(
+		executable := filepath.Join(options.BinDir, browser.Config.ExecutableName)
+		text, err := LinuxDesktopEntry(
 			string(desktopData),
 			executable,
-			browser.LinuxDesktopExec,
-			browser.LinuxDesktopID,
+			browser.Config.Linux.DesktopExec,
+			browser.Config.Linux.DesktopID,
 		)
+		if err != nil {
+			return err
+		}
 		if _, err := fileutil.WriteTextIfChanged(
-			filepath.Join(dataHome, "applications", browser.ExecutableName+".desktop"),
+			filepath.Join(
+				dataHome,
+				linuxApplicationsDir,
+				browser.Config.ExecutableName+desktopEntryFileSuffix,
+			),
 			text,
 		); err != nil {
 			return err
 		}
-		if err := updateDesktopDatabase(filepath.Join(dataHome, "applications")); err != nil {
+		if err := updateDesktopDatabase(filepath.Join(dataHome, linuxApplicationsDir)); err != nil {
 			return err
 		}
 	}
 
-	iconSource := filepath.Join(appDir, browser.LinuxIconSource)
+	iconSource := filepath.Join(appDir, browser.Config.Linux.IconSource)
 	if _, err := os.Stat(iconSource); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	} else if err == nil {
 		if err := fileutil.CopyPath(
 			iconSource,
-			filepath.Join(dataHome, "icons/hicolor/256x256/apps", browser.LinuxIconName),
+			filepath.Join(dataHome, linuxApplicationIconsDir, browser.Config.Linux.IconName),
 		); err != nil {
 			return err
 		}
@@ -110,58 +116,53 @@ func (browser Browser) installLinux(options *InstallOptions) error {
 	return nil
 }
 
-func LinuxDesktopEntry(text, executable, sourceExec, startupWMClass string) string {
-	text = strings.ReplaceAll(text, "Exec="+sourceExec+" %U", "Exec="+executable+" %U")
-	text = strings.ReplaceAll(
-		text,
-		"Exec="+sourceExec+" --incognito",
-		"Exec="+executable+" --incognito",
-	)
-	text = strings.ReplaceAll(text, "Exec="+sourceExec+"\n", "Exec="+executable+"\n")
-	text = setDesktopEntryKey(text, "StartupNotify", "false")
-	if startupWMClass == "" {
-		return text
+func LinuxDesktopEntry(text, executable, sourceExec, startupWMClass string) (string, error) {
+	cfg, err := ini.LoadSources(ini.LoadOptions{
+		Insensitive:         false,
+		InsensitiveSections: false,
+		InsensitiveKeys:     false,
+		IgnoreInlineComment: true,
+	}, []byte(text))
+	if err != nil {
+		return "", fmt.Errorf("parse desktop entry: %w", err)
 	}
-	return setDesktopEntryKey(text, "StartupWMClass", startupWMClass)
-}
-
-func setDesktopEntryKey(text, key, value string) string {
-	lines := strings.Split(text, "\n")
-	if len(lines) == 0 || lines[0] != "[Desktop Entry]" {
-		return text
-	}
-
-	keyPrefix := key + "="
-	insertAt := len(lines)
-	for i := 1; i < len(lines); i++ {
-		line := lines[i]
-		if strings.HasPrefix(line, keyPrefix) {
-			lines[i] = keyPrefix + value
-			return strings.Join(lines, "\n")
+	for _, section := range cfg.Sections() {
+		key, err := section.GetKey(desktopEntryExecKey)
+		if err != nil {
+			continue
 		}
-		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
-			insertAt = i
-			break
+		command, args, _ := strings.Cut(key.String(), " ")
+		if command == sourceExec {
+			replacement := executable
+			if args != "" {
+				replacement += " " + args
+			}
+			key.SetValue(replacement)
 		}
 	}
-
-	lines = slices.Insert(lines, insertAt, keyPrefix+value)
-	return strings.Join(lines, "\n")
+	desktop := cfg.Section(desktopEntrySection)
+	desktop.Key(desktopEntryStartupNotifyKey).SetValue("false")
+	if startupWMClass != "" {
+		desktop.Key(desktopEntryStartupWMClassKey).SetValue(startupWMClass)
+	}
+	var output strings.Builder
+	if _, err := cfg.WriteTo(&output); err != nil {
+		return "", fmt.Errorf("render desktop entry: %w", err)
+	}
+	return output.String(), nil
 }
 
 func updateDesktopDatabase(applicationsDir string) error {
-	if _, err := exec.LookPath("update-desktop-database"); err != nil {
+	if _, err := exec.LookPath(desktopDatabaseCommand); err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
 			return nil
 		}
 		return err
 	}
-	return run("update-desktop-database", applicationsDir)
-}
-
-func run(name string, args ...string) error {
-	command := exec.Command(name, args...)
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	return command.Run()
+	return process.RunInWithEnvAndStdin(
+		"",
+		[]string{desktopDatabaseCommand, applicationsDir},
+		nil,
+		nil,
+	)
 }

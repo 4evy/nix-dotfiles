@@ -4,204 +4,113 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
-	lzstring "github.com/daku10/go-lz-string"
+	"github.com/4evy/dotfiles/internal/chromiumbrowser"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-func TestApplyWritesLocalAndSyncSettings(t *testing.T) {
-	root := t.TempDir()
-	settingsPath := filepath.Join(root, "settings.json")
-	profileDir := filepath.Join(root, "profile")
-	settingsJSON := `{
-		"local": [
-			{
-				"id": "local-extension",
-				"values": {
-					"enabled": true,
-					"count": 2,
-					"nested": {"mode": "quiet"}
-				}
-			}
-		],
-		"sync": [
-			{
-				"id": "sync-extension",
-				"values": {
-					"name": "Helium"
-				}
-			}
-		]
-	}`
-	if err := os.WriteFile(settingsPath, []byte(settingsJSON), 0o600); err != nil {
-		t.Fatal(err)
+func TestDefaultSettingsContainHeliumUBlockComponentFilters(t *testing.T) {
+	sources := DefaultBrowser().DefaultSettings
+	if len(sources) != 1 {
+		t.Fatalf("Helium default settings sources = %d, want 1", len(sources))
 	}
+	var settings struct {
+		LocalAppend []struct {
+			ID     string `json:"id"`
+			Values struct {
+				SelectedFilterLists []string `json:"selectedFilterLists"`
+			} `json:"values"`
+		} `json:"local_append"`
+	}
+	if err := json.Unmarshal(sources[0].Data, &settings); err != nil {
+		t.Fatalf("%s: %v", sources[0].Name, err)
+	}
+	if len(settings.LocalAppend) != 1 {
+		t.Fatalf("Helium local append settings = %d, want 1", len(settings.LocalAppend))
+	}
+	if got := settings.LocalAppend[0].ID; got != "cjpalhdlnbpafiamejdnhcphjbkeiagm" {
+		t.Fatalf("Helium uBlock base ID = %q", got)
+	}
+	want := []string{"helium-annoyances", "helium-unbreak"}
+	if !slices.Equal(settings.LocalAppend[0].Values.SelectedFilterLists, want) {
+		t.Fatalf("Helium uBlock additions = %q, want %q", settings.LocalAppend[0].Values.SelectedFilterLists, want)
+	}
+}
 
-	if err := ApplyExtensionSettings(
-		ApplyOptions{ProfileDir: profileDir, Settings: []string{settingsPath}},
+func TestDefaultBrowserExtendsChromiumUBlockSettings(t *testing.T) {
+	profileDir := filepath.Join(t.TempDir(), "Default")
+	if err := DefaultBrowser().ApplyExtensionSettings(
+		chromiumbrowser.ApplyOptions{ProfileDir: profileDir},
 	); err != nil {
 		t.Fatal(err)
 	}
 
-	assertStoredValue(
-		t,
-		profileDir,
-		"Local Extension Settings",
-		"local-extension",
-		"enabled",
-		"true",
-	)
-	assertStoredValue(t, profileDir, "Local Extension Settings", "local-extension", "count", "2")
-	assertStoredValue(
-		t,
-		profileDir,
-		"Local Extension Settings",
-		"local-extension",
-		"nested",
-		`{"mode":"quiet"}`,
-	)
-	assertStoredValue(
-		t,
-		profileDir,
-		"Sync Extension Settings",
-		"sync-extension",
-		"name",
-		`"Helium"`,
-	)
-}
-
-func TestApplyMergesRefinedGitHubToken(t *testing.T) {
-	root := t.TempDir()
-	profileDir := filepath.Join(root, "profile")
-	refinedGitHubID := defaultConfig.Browser.ExtensionIDs.RefinedGitHub
-	dbPath := filepath.Join(profileDir, "Sync Extension Settings", refinedGitHubID)
-	if err := os.MkdirAll(dbPath, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	db, err := leveldb.OpenFile(dbPath, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	encoded, err := json.Marshal(map[string]any{
-		"theme":         "dark",
-		"personalToken": "old-token",
-	})
-	if err != nil {
-		_ = db.Close()
-		t.Fatal(err)
-	}
-	compressed, err := lzstring.CompressToEncodedURIComponent(string(encoded))
-	if err != nil {
-		_ = db.Close()
-		t.Fatal(err)
-	}
-	stored, err := json.Marshal(compressed)
-	if err != nil {
-		_ = db.Close()
-		t.Fatal(err)
-	}
-	if err := db.Put([]byte("options"), stored, nil); err != nil {
-		_ = db.Close()
-		t.Fatal(err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	err = ApplyExtensionSettings(ApplyOptions{
-		ProfileDir:  profileDir,
-		GitHubToken: true,
-		TokenFunc: func() string {
-			return "new-token"
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	db, err = leveldb.OpenFile(
-		filepath.Join(profileDir, "Sync Extension Settings", refinedGitHubID),
+	const componentID = "blockjmkbacgjkknlgpkjjiijinjdanf"
+	db, err := leveldb.OpenFile(
+		filepath.Join(profileDir, "Local Extension Settings", componentID),
 		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		if err := db.Close(); err != nil {
-			t.Errorf("close extension settings: %v", err)
+	raw, err := db.Get([]byte("selectedFilterLists"), nil)
+	if closeErr := db.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var filters []string
+	if err := json.Unmarshal(raw, &filters); err != nil {
+		t.Fatal(err)
+	}
+	for _, filter := range []string{"ublock-filters", "helium-annoyances", "helium-unbreak"} {
+		if !slices.Contains(filters, filter) {
+			t.Errorf("composed Helium uBlock settings are missing %q", filter)
 		}
-	})
-
-	raw, err := db.Get([]byte("options"), nil)
-	if err != nil {
-		t.Fatal(err)
 	}
-	var compressedOptions string
-	if err := json.Unmarshal(raw, &compressedOptions); err != nil {
-		t.Fatal(err)
-	}
-	decompressed, err := lzstring.DecompressFromEncodedURIComponent(compressedOptions)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var options map[string]any
-	if err := json.Unmarshal([]byte(decompressed), &options); err != nil {
-		t.Fatal(err)
-	}
-	if got := options["theme"]; got != "dark" {
-		t.Fatalf("theme = %v, want dark", got)
-	}
-	if got := options["personalToken"]; got != "new-token" {
-		t.Fatalf("personalToken = %v, want new-token", got)
+	const webstoreID = "cjpalhdlnbpafiamejdnhcphjbkeiagm"
+	if _, err := os.Stat(filepath.Join(profileDir, "Local Extension Settings", webstoreID)); !os.IsNotExist(err) {
+		t.Fatalf("web-store uBlock storage exists after Helium ID remap: %v", err)
 	}
 }
 
-func TestDefaultSettingsSourcesAreValid(t *testing.T) {
-	sources, err := DefaultSettingsSources()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, source := range sources {
-		var settings any
-		if err := json.Unmarshal(source.Data, &settings); err != nil {
-			t.Fatalf("%s: %v", source.Name, err)
-		}
-	}
-}
-
-func TestUserColorFromFlagsParsesQuotedShellFields(t *testing.T) {
-	want, ok := userColorFromFlags("--set-user-color=12,34,56")
+func TestUserColorFromFlagsFindsColorAmongParsedFlags(t *testing.T) {
+	got, ok := userColorFromFlags([]string{"--some-flag", "--set-user-color=12,34,56"})
 	if !ok {
-		t.Fatal("plain user color flag was not parsed")
+		t.Fatal("user color flag was not parsed")
 	}
-
-	got, ok := userColorFromFlags(`--some-flag "--set-user-color=12,34,56"`)
-	if !ok {
-		t.Fatal("quoted user color flag was not parsed")
-	}
+	want := int64(0xff0c2238) - 1<<32
 	if got != want {
-		t.Fatalf("quoted user color = %d, want %d", got, want)
+		t.Fatalf("user color = %d, want %d", got, want)
 	}
 }
 
-func assertStoredValue(t *testing.T, profileDir, area, extensionID, key, want string) {
-	t.Helper()
-	db, err := leveldb.OpenFile(filepath.Join(profileDir, area, extensionID), nil)
-	if err != nil {
-		t.Fatal(err)
+func TestUserColorFromFlagsUsesLastValue(t *testing.T) {
+	got, ok := userColorFromFlags([]string{
+		"--set-user-color=1,2,3",
+		"--set-user-color=12,34,56",
+	})
+	if !ok {
+		t.Fatal("user color flag was not parsed")
 	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Errorf("close extension settings: %v", err)
-		}
-	}()
+	want := int64(0xff0c2238) - 1<<32
+	if got != want {
+		t.Fatalf("user color = %d, want %d", got, want)
+	}
+}
 
-	got, err := db.Get([]byte(key), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != want {
-		t.Fatalf("%s/%s/%s = %s, want %s", area, extensionID, key, got, want)
+func TestUserColorFromFlagsRejectsInvalidLastValue(t *testing.T) {
+	for _, flags := range [][]string{
+		{"--set-user-color=12,34"},
+		{"--set-user-color=12,34,256"},
+		{"--set-user-color=12,34,pink"},
+		{"--set-user-color=1,2,3", "--set-user-color=invalid"},
+	} {
+		if color, ok := userColorFromFlags(flags); ok {
+			t.Fatalf("user color %d parsed from invalid flags %q", color, flags)
+		}
 	}
 }

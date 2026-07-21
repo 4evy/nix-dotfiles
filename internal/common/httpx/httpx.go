@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/4evy/dotfiles/internal/common/fileutil"
 	"github.com/go-resty/resty/v2"
 	"github.com/google/renameio/v2"
 	"github.com/hashicorp/go-retryablehttp"
@@ -31,6 +32,8 @@ type TextResponse struct {
 }
 
 const defaultTimeout = 30 * time.Second
+
+const retryCount = 3
 
 func (c *Client) GetBearerText(url, token string) (TextResponse, error) {
 	resp, err := c.request().SetAuthToken(token).Get(url)
@@ -91,10 +94,13 @@ func (c *Client) DownloadFile(url, path string) (err error) {
 	}
 	body := resp.RawBody()
 	defer func() { err = errors.Join(err, body.Close()) }()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), fileutil.DefaultDirPerm); err != nil {
 		return err
 	}
-	file, err := renameio.NewPendingFile(path, renameio.WithPermissions(0o644))
+	file, err := renameio.NewPendingFile(
+		path,
+		renameio.WithPermissions(fileutil.DefaultFilePerm),
+	)
 	if err != nil {
 		return err
 	}
@@ -141,7 +147,7 @@ func textResponse(resp *resty.Response, err error) (TextResponse, error) {
 func RetryableClient(timeout time.Duration) *http.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.Logger = nil
-	retryClient.RetryMax = 3
+	retryClient.RetryMax = retryCount
 	client := retryClient.StandardClient()
 	client.Timeout = timeout
 	return client
@@ -164,7 +170,7 @@ func (c *Client) resty() *resty.Client {
 
 func configureResty(client *resty.Client) *resty.Client {
 	return client.
-		SetRetryCount(3).
+		SetRetryCount(retryCount).
 		AddRetryCondition(func(resp *resty.Response, err error) bool {
 			return err != nil || resp.StatusCode() >= http.StatusInternalServerError
 		})

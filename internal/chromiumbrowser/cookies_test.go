@@ -7,24 +7,40 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+const (
+	profilePreferenceKey          = "profile"
+	contentSettingsPreferenceKey  = "content_settings"
+	exceptionsPreferenceKey       = "exceptions"
+	cookiesPreferenceKey          = "cookies"
+	lastModifiedKey               = "last_modified"
+	testLastModified              = "13300000000000000"
+	testKeepCookiePattern         = "[*.]keep.example"
+	testKeepCookieCanonical       = testKeepCookiePattern + ",*"
+	testOldCookiePattern          = "[*.]old.example"
+	testBlockedCookiePattern      = "[*.]blocked.example"
+	testContentSettingBlock       = 2
+	testContentSettingSessionOnly = 4
+	testContentSettingAllowJSON   = "1"
+)
+
 func TestSetCookieAllowlistReconcilesAllowExceptions(t *testing.T) {
 	preferences := map[string]any{
-		"profile": map[string]any{
-			"content_settings": map[string]any{
-				"exceptions": map[string]any{
-					"cookies": map[string]any{
-						"[*.]keep.example,*": map[string]any{
-							"last_modified": "13300000000000000",
-							"setting":       json.Number("1"),
+		profilePreferenceKey: map[string]any{
+			contentSettingsPreferenceKey: map[string]any{
+				exceptionsPreferenceKey: map[string]any{
+					cookiesPreferenceKey: map[string]any{
+						testKeepCookieCanonical: map[string]any{
+							lastModifiedKey:           testLastModified,
+							chromiumContentSettingKey: json.Number(testContentSettingAllowJSON),
 						},
-						"[*.]old.example": map[string]any{
-							"setting": 1,
+						testOldCookiePattern: map[string]any{
+							chromiumContentSettingKey: chromiumContentSettingAllow,
 						},
-						"[*.]blocked.example": map[string]any{
-							"setting": 2,
+						testBlockedCookiePattern: map[string]any{
+							chromiumContentSettingKey: testContentSettingBlock,
 						},
 						"[*.]session.example": map[string]any{
-							"setting": 4,
+							chromiumContentSettingKey: testContentSettingSessionOnly,
 						},
 					},
 				},
@@ -32,38 +48,38 @@ func TestSetCookieAllowlistReconcilesAllowExceptions(t *testing.T) {
 		},
 	}
 
-	SetCookieAllowlist(preferences, []string{"[*.]keep.example", "[*.]new.example"})
+	SetCookieAllowlist(preferences, []string{testKeepCookiePattern, "[*.]new.example"})
 
-	exceptions := preferences["profile"].(map[string]any)["content_settings"].(map[string]any)["exceptions"].(map[string]any)["cookies"].(map[string]any)
+	exceptions := preferences[profilePreferenceKey].(map[string]any)[contentSettingsPreferenceKey].(map[string]any)[exceptionsPreferenceKey].(map[string]any)[cookiesPreferenceKey].(map[string]any)
 	assert.DeepEqual(t, exceptions, map[string]any{
-		"[*.]keep.example,*": map[string]any{
-			"last_modified": "13300000000000000",
-			"setting":       1,
+		testKeepCookieCanonical: map[string]any{
+			lastModifiedKey:           testLastModified,
+			chromiumContentSettingKey: chromiumContentSettingAllow,
 		},
 		"[*.]new.example,*": map[string]any{
-			"setting": 1,
+			chromiumContentSettingKey: chromiumContentSettingAllow,
 		},
-		"[*.]blocked.example": map[string]any{
-			"setting": 2,
+		testBlockedCookiePattern: map[string]any{
+			chromiumContentSettingKey: testContentSettingBlock,
 		},
 		"[*.]session.example": map[string]any{
-			"setting": 4,
+			chromiumContentSettingKey: testContentSettingSessionOnly,
 		},
 	})
 }
 
 func TestSetCookieAllowlistRemovesNonCanonicalAllowExceptions(t *testing.T) {
 	preferences := map[string]any{
-		"profile": map[string]any{
-			"content_settings": map[string]any{
-				"exceptions": map[string]any{
-					"cookies": map[string]any{
-						"[*.]keep.example": map[string]any{
-							"last_modified": "13300000000000000",
-							"setting":       1,
+		profilePreferenceKey: map[string]any{
+			contentSettingsPreferenceKey: map[string]any{
+				exceptionsPreferenceKey: map[string]any{
+					cookiesPreferenceKey: map[string]any{
+						testKeepCookiePattern: map[string]any{
+							lastModifiedKey:           testLastModified,
+							chromiumContentSettingKey: chromiumContentSettingAllow,
 						},
-						"[*.]old.example": map[string]any{
-							"setting": 1,
+						testOldCookiePattern: map[string]any{
+							chromiumContentSettingKey: chromiumContentSettingAllow,
 						},
 					},
 				},
@@ -71,27 +87,27 @@ func TestSetCookieAllowlistRemovesNonCanonicalAllowExceptions(t *testing.T) {
 		},
 	}
 
-	SetCookieAllowlist(preferences, []string{"[*.]keep.example"})
+	SetCookieAllowlist(preferences, []string{testKeepCookiePattern})
 
-	exceptions := preferences["profile"].(map[string]any)["content_settings"].(map[string]any)["exceptions"].(map[string]any)["cookies"].(map[string]any)
+	exceptions := preferences[profilePreferenceKey].(map[string]any)[contentSettingsPreferenceKey].(map[string]any)[exceptionsPreferenceKey].(map[string]any)[cookiesPreferenceKey].(map[string]any)
 	assert.DeepEqual(t, exceptions, map[string]any{
-		"[*.]keep.example,*": map[string]any{
-			"setting": 1,
+		testKeepCookieCanonical: map[string]any{
+			chromiumContentSettingKey: chromiumContentSettingAllow,
 		},
 	})
 }
 
 func TestSetCookieAllowlistRemovesAllAllowExceptionsWhenConfiguredEmpty(t *testing.T) {
 	preferences := map[string]any{
-		"profile": map[string]any{
-			"content_settings": map[string]any{
-				"exceptions": map[string]any{
-					"cookies": map[string]any{
-						"[*.]old.example": map[string]any{
-							"setting": 1,
+		profilePreferenceKey: map[string]any{
+			contentSettingsPreferenceKey: map[string]any{
+				exceptionsPreferenceKey: map[string]any{
+					cookiesPreferenceKey: map[string]any{
+						testOldCookiePattern: map[string]any{
+							chromiumContentSettingKey: chromiumContentSettingAllow,
 						},
-						"[*.]blocked.example": map[string]any{
-							"setting": 2,
+						testBlockedCookiePattern: map[string]any{
+							chromiumContentSettingKey: testContentSettingBlock,
 						},
 					},
 				},
@@ -101,10 +117,10 @@ func TestSetCookieAllowlistRemovesAllAllowExceptionsWhenConfiguredEmpty(t *testi
 
 	SetCookieAllowlist(preferences, []string{})
 
-	exceptions := preferences["profile"].(map[string]any)["content_settings"].(map[string]any)["exceptions"].(map[string]any)["cookies"].(map[string]any)
+	exceptions := preferences[profilePreferenceKey].(map[string]any)[contentSettingsPreferenceKey].(map[string]any)[exceptionsPreferenceKey].(map[string]any)[cookiesPreferenceKey].(map[string]any)
 	assert.DeepEqual(t, exceptions, map[string]any{
-		"[*.]blocked.example": map[string]any{
-			"setting": 2,
+		testBlockedCookiePattern: map[string]any{
+			chromiumContentSettingKey: testContentSettingBlock,
 		},
 	})
 }

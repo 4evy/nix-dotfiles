@@ -2,7 +2,6 @@ package chromiumbrowser
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -17,107 +16,115 @@ const (
 	PreferencesFilename = "Preferences"
 	LocalStateFilename  = "Local State"
 	VariationsFilename  = "Variations"
+
+	acceleratorAddedKey = "added"
 )
 
 type PreferencePatch func(map[string]any)
 
+type browserDataFile struct {
+	filename    string
+	description string
+	profileDir  bool
+}
+
+var (
+	preferencesFile = browserDataFile{
+		filename: PreferencesFilename, description: "Chromium Preferences", profileDir: true,
+	}
+	localStateFile = browserDataFile{
+		filename: LocalStateFilename, description: "Chromium Local State",
+	}
+	variationsFile = browserDataFile{
+		filename: VariationsFilename, description: "Chromium Variations",
+	}
+)
+
 func (browser Browser) ApplyBrowserPreferenceSettings(profileDir string) error {
-	preferences, err := ReadPreferences(profileDir)
-	if err != nil {
-		return err
-	}
-
-	for _, patch := range browser.PreferencePatches {
-		patch(preferences)
-	}
-
-	return WritePreferences(profileDir, preferences)
+	return applyBrowserDataSettings(profileDir, preferencesFile, browser.PreferencePatches)
 }
 
 func (browser Browser) ApplyBrowserLocalStateSettings(profileDir string) error {
 	if len(browser.LocalStatePatches) == 0 {
 		return nil
 	}
-	localState, err := ReadLocalState(profileDir)
-	if err != nil {
-		return err
-	}
-	for _, patch := range browser.LocalStatePatches {
-		patch(localState)
-	}
-	return WriteLocalState(profileDir, localState)
+	return applyBrowserDataSettings(profileDir, localStateFile, browser.LocalStatePatches)
 }
 
 func (browser Browser) ApplyBrowserVariationSettings(profileDir string) error {
 	if len(browser.VariationPatches) == 0 {
 		return nil
 	}
-	variations, err := ReadVariations(profileDir)
-	if err != nil {
-		return err
-	}
-	for _, patch := range browser.VariationPatches {
-		patch(variations)
-	}
-	return WriteVariations(profileDir, variations)
+	return applyBrowserDataSettings(profileDir, variationsFile, browser.VariationPatches)
 }
 
 func ReadPreferences(profileDir string) (map[string]any, error) {
-	path := filepath.Join(profileDir, PreferencesFilename)
-	preferences, err := readPreferenceFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read Chromium Preferences: %w", err)
-	}
-	return preferences, nil
+	return readBrowserDataFile(profileDir, preferencesFile)
 }
 
 func WritePreferences(profileDir string, preferences map[string]any) error {
-	if _, err := fileutil.WriteJSONIfChanged(
-		filepath.Join(profileDir, PreferencesFilename),
-		preferences,
-		0o600,
-	); err != nil {
-		return fmt.Errorf("write Chromium Preferences: %w", err)
-	}
-	return nil
+	return writeBrowserDataFile(profileDir, preferencesFile, preferences)
 }
 
 func ReadLocalState(profileDir string) (map[string]any, error) {
-	localState, err := readPreferenceFile(localStatePath(profileDir))
-	if err != nil {
-		return nil, fmt.Errorf("read Chromium Local State: %w", err)
-	}
-	return localState, nil
+	return readBrowserDataFile(profileDir, localStateFile)
 }
 
 func WriteLocalState(profileDir string, localState map[string]any) error {
-	if _, err := fileutil.WriteJSONIfChanged(localStatePath(profileDir), localState, 0o600); err != nil {
-		return fmt.Errorf("write Chromium Local State: %w", err)
-	}
-	return nil
+	return writeBrowserDataFile(profileDir, localStateFile, localState)
 }
 
 func ReadVariations(profileDir string) (map[string]any, error) {
-	variations, err := readPreferenceFile(variationsPath(profileDir))
-	if err != nil {
-		return nil, fmt.Errorf("read Chromium Variations: %w", err)
-	}
-	return variations, nil
+	return readBrowserDataFile(profileDir, variationsFile)
 }
 
 func WriteVariations(profileDir string, variations map[string]any) error {
-	if _, err := fileutil.WriteJSONIfChanged(variationsPath(profileDir), variations, 0o600); err != nil {
-		return fmt.Errorf("write Chromium Variations: %w", err)
+	return writeBrowserDataFile(profileDir, variationsFile, variations)
+}
+
+func applyBrowserDataSettings(
+	profileDir string,
+	file browserDataFile,
+	patches []PreferencePatch,
+) error {
+	values, err := readBrowserDataFile(profileDir, file)
+	if err != nil {
+		return err
+	}
+	for _, patch := range patches {
+		patch(values)
+	}
+	return writeBrowserDataFile(profileDir, file, values)
+}
+
+func readBrowserDataFile(profileDir string, file browserDataFile) (map[string]any, error) {
+	values, err := readPreferenceFile(file.path(profileDir))
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", file.description, err)
+	}
+	return values, nil
+}
+
+func writeBrowserDataFile(
+	profileDir string,
+	file browserDataFile,
+	values map[string]any,
+) error {
+	if _, err := fileutil.WriteJSONIfChanged(
+		file.path(profileDir),
+		values,
+		fileutil.PrivateFilePerm,
+	); err != nil {
+		return fmt.Errorf("write %s: %w", file.description, err)
 	}
 	return nil
 }
 
-func localStatePath(profileDir string) string {
-	return filepath.Join(filepath.Dir(profileDir), LocalStateFilename)
-}
-
-func variationsPath(profileDir string) string {
-	return filepath.Join(filepath.Dir(profileDir), VariationsFilename)
+func (file browserDataFile) path(profileDir string) string {
+	if file.profileDir {
+		return filepath.Join(profileDir, file.filename)
+	}
+	return filepath.Join(filepath.Dir(profileDir), file.filename)
 }
 
 func readPreferenceFile(path string) (map[string]any, error) {
@@ -133,9 +140,7 @@ func readPreferenceFile(path string) (map[string]any, error) {
 	}
 
 	preferences := map[string]any{}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	if err := decoder.Decode(&preferences); err != nil {
+	if err := decodeJSON(bytes.NewReader(data), &preferences); err != nil {
 		return nil, err
 	}
 	return preferences, nil
@@ -172,15 +177,15 @@ func EnsureAcceleratorAdded(customAccelerators map[string]any, commandID, accele
 		customAccelerators[commandID] = command
 	}
 
-	added, ok := command["added"].([]any)
+	added, ok := command[acceleratorAddedKey].([]any)
 	if !ok {
 		added = []any{}
 	}
 	if slices.ContainsFunc(added, func(existing any) bool {
 		return existing == accelerator
 	}) {
-		command["added"] = added
+		command[acceleratorAddedKey] = added
 		return
 	}
-	command["added"] = append(added, accelerator)
+	command[acceleratorAddedKey] = append(added, accelerator)
 }

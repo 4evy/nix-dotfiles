@@ -3,95 +3,93 @@ package helium
 import (
 	"embed"
 	"fmt"
-	"io/fs"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/4evy/dotfiles/internal/chromiumbrowser"
-	"github.com/buildkite/shellwords"
 )
 
-type (
-	ApplyOptions   = chromiumbrowser.ApplyOptions
-	SettingsSource = chromiumbrowser.SettingsSource
+const (
+	heliumDefaultSettingsPattern       = "settings/default/*.json"
+	browserThemePath                   = "browser.theme"
+	extensionThemePath                 = "extensions.theme"
+	colorVariantKey                    = "color_variant2"
+	defaultColorVariant                = 1
+	grayscaleKey                       = "is_grayscale2"
+	userColorKey                       = "user_color2"
+	extensionThemeIDKey                = "id"
+	userColorThemeID                   = "user_color_theme_id"
+	setUserColorFlagPrefix             = "--set-user-color="
+	rgbComponentSeparator              = ","
+	rgbComponentCount                  = 3
+	redComponentIndex                  = 0
+	greenComponentIndex                = 1
+	blueComponentIndex                 = 2
+	rgbComponentMax                    = 255
+	decimalRadix                       = 10
+	int64BitSize                       = 64
+	redShift                           = 16
+	greenShift                         = 8
+	opaqueAlphaMask              int64 = 0xff000000
+	signedColorBoundary          int64 = 1 << 31
+	argbModulus                  int64 = 1 << 32
 )
-
-const defaultSettingsDir = "settings/default"
 
 //go:embed settings/default/*.json
 var defaultSettingsFS embed.FS
 
-func DefaultSettingsSources() ([]SettingsSource, error) {
-	entries, err := fs.ReadDir(defaultSettingsFS, defaultSettingsDir)
+var heliumDefaultSettings = mustDefaultSettingsSources()
+
+func mustDefaultSettingsSources() []chromiumbrowser.SettingsSource {
+	sources, err := chromiumbrowser.SettingsSourcesFromFS(
+		defaultSettingsFS,
+		heliumDefaultSettingsPattern,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("read embedded default Helium extension settings: %w", err)
+		panic(fmt.Errorf("load embedded Helium extension settings: %w", err))
 	}
-	sources := make([]SettingsSource, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-		path := defaultSettingsDir + "/" + entry.Name()
-		data, err := defaultSettingsFS.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"read embedded default Helium extension settings file %s: %w",
-				path,
-				err,
-			)
-		}
-		sources = append(sources, SettingsSource{Name: "embedded " + path, Data: data})
-	}
-	if len(sources) == 0 {
-		return nil, fmt.Errorf("embedded default Helium extension settings are empty")
-	}
-	return sources, nil
+	return sources
 }
 
-func ApplyExtensionSettings(options ApplyOptions) error {
-	options.ExtensionIDs = options.ExtensionIDs.WithFallback(defaultConfig.Browser.ExtensionIDs)
-	return chromiumbrowser.ApplyExtensionSettings(options)
-}
-
-func applyThemePreferencesFromFlags(preferences map[string]any, flags string) {
+func applyThemePreferencesFromFlags(preferences map[string]any, flags []string) {
 	userColor, ok := userColorFromFlags(flags)
 	if !ok {
 		return
 	}
-	theme := chromiumbrowser.NestedObject(preferences, "browser.theme")
-	theme["color_variant2"] = 1
-	theme["is_grayscale2"] = false
-	theme["user_color2"] = userColor
+	theme := chromiumbrowser.NestedObject(preferences, browserThemePath)
+	theme[colorVariantKey] = defaultColorVariant
+	theme[grayscaleKey] = false
+	theme[userColorKey] = userColor
 
-	extensionTheme := chromiumbrowser.NestedObject(preferences, "extensions.theme")
-	extensionTheme["id"] = "user_color_theme_id"
+	extensionTheme := chromiumbrowser.NestedObject(preferences, extensionThemePath)
+	extensionTheme[extensionThemeIDKey] = userColorThemeID
 }
 
-func userColorFromFlags(flags string) (int64, bool) {
-	fields, err := shellwords.Split(flags)
-	if err != nil {
-		return 0, false
-	}
-	for _, field := range fields {
-		value, ok := strings.CutPrefix(field, "--set-user-color=")
+func userColorFromFlags(flags []string) (int64, bool) {
+	for _, field := range slices.Backward(flags) {
+		value, ok := strings.CutPrefix(field, setUserColorFlagPrefix)
 		if !ok {
 			continue
 		}
-		parts := strings.Split(value, ",")
-		if len(parts) != 3 {
+		parts := strings.Split(value, rgbComponentSeparator)
+		if len(parts) != rgbComponentCount {
 			return 0, false
 		}
-		var rgb [3]int64
+		var rgb [rgbComponentCount]int64
 		for i, part := range parts {
-			parsed, err := strconv.ParseInt(part, 10, 64)
-			if err != nil || parsed < 0 || parsed > 255 {
+			parsed, err := strconv.ParseInt(part, decimalRadix, int64BitSize)
+			if err != nil || parsed < 0 || parsed > rgbComponentMax {
 				return 0, false
 			}
 			rgb[i] = parsed
 		}
-		argb := int64(0xff000000 | rgb[0]<<16 | rgb[1]<<8 | rgb[2])
-		if argb >= 1<<31 {
-			argb -= 1 << 32
+		argb := opaqueAlphaMask |
+			rgb[redComponentIndex]<<redShift |
+			rgb[greenComponentIndex]<<greenShift |
+			rgb[blueComponentIndex]
+		if argb >= signedColorBoundary {
+			argb -= argbModulus
 		}
 		return argb, true
 	}

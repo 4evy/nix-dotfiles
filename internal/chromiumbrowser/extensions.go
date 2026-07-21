@@ -2,52 +2,71 @@ package chromiumbrowser
 
 import (
 	"context"
-	"path/filepath"
+	"strings"
 
 	"github.com/4evy/dotfiles/internal/chromiumbrowser/extensions"
-	"github.com/4evy/dotfiles/internal/common/archiveutil"
+	"github.com/4evy/dotfiles/internal/common/chromiumext"
+	"github.com/4evy/dotfiles/internal/common/githubx"
 	"github.com/4evy/dotfiles/internal/common/httpx"
+)
+
+const (
+	loadExtensionFlagPrefix = "--load-extension="
+	releaseTagPlaceholder   = "{tag}"
+	releaseTagPrefix        = "v"
 )
 
 func (browser Browser) installExtensions(options *InstallOptions) error {
 	result, err := extensions.Install(extensions.Options{
-		Root:          options.Root,
-		ExternalDirs:  browser.ExternalDirs(options.Mode),
-		Download:      downloadFile,
-		Resolve:       resolveDownloadURL,
-		BundlePatches: options.BundlePatches,
-		Unzip: func(zipPath, dst string) error {
-			return archiveutil.ExtractZipFile(context.Background(), zipPath, dst)
-		},
+		Root:                 options.Root,
+		ExternalDirs:         browser.Config.ExternalExtensionDirs(options.Mode),
+		Download:             downloadFile,
+		Resolve:              resolveDownloadURL,
+		ResolveLatestRelease: resolveLatestGitHubRelease,
+		ExcludedIDs:          browser.extensionInstallExclusions(),
 	})
 	if err != nil {
 		return err
 	}
 	for _, path := range result.LoadExtensionPaths {
-		options.extraWrapperFlags = append(options.extraWrapperFlags, "--load-extension="+path)
+		options.extraWrapperFlags = append(options.extraWrapperFlags, loadExtensionFlagPrefix+path)
 	}
-	aliases, err := unpackedExtensionIDAliases(options.Root)
-	if err != nil {
-		return err
-	}
-	options.extensionIDAliases = aliases
+	options.extensionIDAliases = result.ExtensionIDAliases
 	return nil
 }
 
-func unpackedExtensionIDAliases(root string) (map[string]string, error) {
-	catalog, err := extensions.LoadCatalog()
+func resolveLatestGitHubRelease(
+	repository,
+	assetTemplate string,
+) (chromiumext.ReleaseArtifact, error) {
+	tag, err := githubx.LatestReleaseTag(context.Background(), repository)
 	if err != nil {
-		return nil, err
+		return chromiumext.ReleaseArtifact{}, err
 	}
-	aliases := map[string]string{}
-	for _, extension := range catalog.ZIP {
-		if !extension.LoadUnpacked {
-			continue
+	assetName := strings.ReplaceAll(assetTemplate, releaseTagPlaceholder, tag)
+	asset, err := githubx.ReleaseAsset(context.Background(), repository, tag, assetName)
+	if err != nil {
+		return chromiumext.ReleaseArtifact{}, err
+	}
+	checksum, err := chromiumext.NormalizeSHA256(asset.Digest)
+	if err != nil {
+		return chromiumext.ReleaseArtifact{}, err
+	}
+	return chromiumext.ReleaseArtifact{
+		Version: strings.TrimPrefix(tag, releaseTagPrefix),
+		URL:     asset.DownloadURL,
+		SHA256:  checksum,
+	}, nil
+}
+
+func (browser Browser) extensionInstallExclusions() map[string]bool {
+	excludedIDs := map[string]bool{}
+	for sourceID, installedID := range browser.Config.ExtensionIDAliases {
+		if sourceID != installedID {
+			excludedIDs[sourceID] = true
 		}
-		path := filepath.Join(root, "extensions/unpacked", extension.ID)
-		aliases[extension.ID] = extensions.UnpackedExtensionID(path)
 	}
-	return aliases, nil
+	return excludedIDs
 }
 
 func downloadFile(path, url string) error {

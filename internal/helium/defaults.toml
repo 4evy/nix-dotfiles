@@ -3,6 +3,7 @@ name = "Helium"
 log_prefix = "helium-browser"
 executable_name = "helium-browser"
 alias_name = "helium"
+flags_file = "helium-flags.conf"
 
 [browser.linux]
 desktop_id = "helium-browser"
@@ -29,8 +30,8 @@ external_extension_dirs = [
   "${config_home}/net.imput.helium/External Extensions",
 ]
 
-[browser.extensions]
-refined_github_id = "hlepfoohegkhhmjieoechaddaejaokhf"
+[browser.extension_id_aliases]
+cjpalhdlnbpafiamejdnhcphjbkeiagm = "blockjmkbacgjkknlgpkjjiijinjdanf"
 
 [[browser.preferences.values]]
 path = "helium.completed_onboarding"
@@ -68,30 +69,11 @@ value = true
 path = "helium.services.ublock_assets"
 value = true
 
-[[browser.preferences.values]]
-path = "profile.default_content_setting_values.cookies"
-value = 4
-
 [[browser.preferences.local_state_values]]
 path = "helium.browser.default_browser_infobar_rejected"
 value = true
 
+# Helium's CrashReportingMode::kDisabled value.
 [[browser.preferences.local_state_values]]
-path = "hardware_acceleration_mode_previous"
-value = true
-
-[[browser.preferences.local_state_values]]
-path = "variations_crash_streak"
-value = 0
-
-[[browser.preferences.local_state_values]]
-path = "user_experience_metrics.stability.exited_cleanly"
-value = true
-
-[[browser.preferences.variation_values]]
-path = "user_experience_metrics.stability.exited_cleanly"
-value = true
-
-[[browser.preferences.variation_values]]
-path = "variations_crash_streak"
-value = 0
+path = "helium.crash_reporting.mode"
+value = -1

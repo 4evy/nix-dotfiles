@@ -5,9 +5,10 @@ import (
 	"fmt"
 
 	"github.com/4evy/dotfiles/internal/chromiumbrowser"
-	"github.com/4evy/dotfiles/internal/common/chromiumext"
 	"github.com/pelletier/go-toml/v2"
 )
+
+const embeddedHeliumDefaultsName = "embedded Helium defaults"
 
 //go:embed defaults.toml
 var defaultConfigData []byte
@@ -19,7 +20,7 @@ type Config struct {
 }
 
 func mustLoadConfig(data []byte) Config {
-	config, err := loadConfig(data, "embedded Helium defaults")
+	config, err := loadConfig(data, embeddedHeliumDefaultsName)
 	if err != nil {
 		panic(err)
 	}
@@ -47,10 +48,7 @@ func (config Config) validate(name string) error {
 	if config.Browser.MacOS.LauncherPath == "" {
 		return fmt.Errorf("%s is missing browser.macos.launcher_path", name)
 	}
-	if !chromiumext.ValidExtensionID(config.Browser.ExtensionIDs.RefinedGitHub) {
-		return fmt.Errorf("%s has invalid browser.extensions.refined_github_id", name)
-	}
-	for _, mode := range []string{"macos", "linux"} {
+	for _, mode := range []string{chromiumbrowser.ModeMacOS, chromiumbrowser.ModeLinux} {
 		paths, ok := config.Browser.Paths[mode]
 		if !ok {
 			return fmt.Errorf("%s is missing browser.paths.%s", name, mode)
@@ -60,4 +58,10 @@ func (config Config) validate(name string) error {
 		}
 	}
 	return nil
+}
+
+func DefaultBrowser() chromiumbrowser.Browser {
+	browser := defaultConfig.Browser.Browser()
+	browser.DefaultSettings = append(browser.DefaultSettings, heliumDefaultSettings...)
+	return browser
 }

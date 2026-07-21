@@ -1,0 +1,21 @@
+{
+  "local": [
+    {
+      "id": "hlepfoohegkhhmjieoechaddaejaokhf",
+      "values": {
+        "welcomed": true
+      }
+    }
+  ],
+  "sync": [],
+  "inputs": [
+    {
+      "name": "refined-github-personal-token",
+      "area": "sync",
+      "id": "hlepfoohegkhhmjieoechaddaejaokhf",
+      "key": "options",
+      "path": "personalToken",
+      "encoding": "json-lz-string-uri"
+    }
+  ]
+}

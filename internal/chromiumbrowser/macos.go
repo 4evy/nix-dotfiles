@@ -1,44 +1,18 @@
 package chromiumbrowser
 
-import (
-	"fmt"
-	"os"
-	"path/filepath"
-)
+import "path/filepath"
 
 func (browser Browser) installMacOS(options *InstallOptions) error {
 	appDir := options.AppDir
 	if appDir == "" {
-		appDir = browser.MacOSAppDir
+		appDir = expandPathTemplate(browser.Config.MacOS.AppDir)
 	}
 
-	if err := os.MkdirAll(options.Root, 0o755); err != nil {
+	if err := browser.prepareInstall(options, appDir); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(options.BinDir, 0o755); err != nil {
-		return err
-	}
-	if stat, err := os.Stat(appDir); err != nil {
-		return fmt.Errorf("find %s app directory %s: %w", browser.Name, appDir, err)
-	} else if !stat.IsDir() {
-		return fmt.Errorf("%s app path is not a directory: %s", browser.Name, appDir)
-	}
-
-	if err := browser.installExtensions(options); err != nil {
-		return err
-	}
-	if err := browser.applyInstallSettings(options); err != nil {
-		return err
-	}
-	if err := writeWrapper(
-		filepath.Join(options.BinDir, browser.ExecutableName),
-		filepath.Join(appDir, browser.MacOSLauncherPath),
+	return browser.configureApp(
 		options,
-	); err != nil {
-		return err
-	}
-	if browser.AliasName == "" {
-		return nil
-	}
-	return replaceSymlink(browser.ExecutableName, filepath.Join(options.BinDir, browser.AliasName))
+		filepath.Join(appDir, filepath.FromSlash(browser.Config.MacOS.LauncherPath)),
+	)
 }

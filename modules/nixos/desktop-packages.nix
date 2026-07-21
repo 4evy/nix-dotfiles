@@ -40,34 +40,9 @@ let
     "--wayland-text-input-version=3"
   ];
 
-  chromeStoreUpdateUrl = "https://clients2.google.com/service/update2/crx";
-
-  chromeStoreExtensionIds = [
-    # 1Password - Password Manager
-    "aeblfdkhhhdcdjpifhhbdiojplfjncoa"
-    # Catppuccin for Web File Explorer Icons
-    "lnjaiaapbakfhlbjenjkhffcdpoompki"
-    # Enhancer for YouTube
-    "ponfpcnoihfmfllpaingbgckeeldkhle"
-    # Minimal Theme for Twitter
-    "pobhoodpcipjmedfenaigbeloiidbflp"
-    # All-in-one bookmark manager
-    "ldgfbffkinooeloadekpmfoklnobpien"
-    # SponsorBlock for YouTube - Skip Sponsorships
-    "mnjggcdmjocbbbhaepdhchncahnbgone"
-    # Refined GitHub
-    "hlepfoohegkhhmjieoechaddaejaokhf"
-  ];
-
-  twpExtension = {
-    id = "bolggfoncklhniejomgplkjcllmnonbh";
-    version = "10.1.1.0";
-    crxPath = pkgs.fetchurl {
-      url = "https://github.com/FilipePS/Traduzir-paginas-web/releases/download/v10.1.1.0/TWP_10.1.1.0_Chromium.crx";
-      name = "bolggfoncklhniejomgplkjcllmnonbh.crx";
-      hash = "sha256-X4m1To1n/1zQGrzQPXPyR8KIA4JleyyAh5AjuS2BvYw=";
-    };
-  };
+  extensionCatalog = builtins.fromTOML (
+    builtins.readFile ../../internal/chromiumbrowser/extensions/extensions.toml
+  );
 
   heliumBrowserTool = pkgs.callPackage ../../packages/go-workspace-package.nix { } {
     pname = "helium-browser";
@@ -85,15 +60,27 @@ let
   };
 
   chromeStoreExternalExtensionFile =
-    id:
-    externalExtensionFile id {
-      external_update_url = chromeStoreUpdateUrl;
+    extension:
+    externalExtensionFile extension.id {
+      external_update_url = extensionCatalog.chrome_store_update_url;
     };
 
-  twpExternalExtensionFile = externalExtensionFile twpExtension.id {
-    external_crx = twpExtension.crxPath;
-    external_version = twpExtension.version;
-  };
+  updateUrlExternalExtensionFile =
+    extension:
+    externalExtensionFile extension.id {
+      external_update_url = extension.update_url;
+    };
+
+  crxExternalExtensionFile =
+    extension:
+    externalExtensionFile extension.id {
+      external_crx = pkgs.fetchurl {
+        inherit (extension) url;
+        name = "${extension.id}.crx";
+        hash = extension.sha256;
+      };
+      external_version = extension.version;
+    };
 
   heliumBrowser = pkgs.eupkgs.helium-browser.override {
     commandLineArgs = concatStringsSep " " commandLineArgs;
@@ -116,21 +103,30 @@ in
     };
 
     environment.etc = builtins.listToAttrs (
-      [ twpExternalExtensionFile ] ++ map chromeStoreExternalExtensionFile chromeStoreExtensionIds
+      map chromeStoreExternalExtensionFile extensionCatalog.chrome_store_extensions
+      ++ map updateUrlExternalExtensionFile extensionCatalog.update_url_extensions
+      ++ map crxExternalExtensionFile extensionCatalog.crx_extensions
     );
 
-    system.activationScripts.heliumExtensionSettings = {
+    system.activationScripts.heliumProfileSettings = {
       deps = [ "users" ];
       text = ''
         mkdir -p '${heliumProfileDir}'
         chown 4evy:users '/home/4evy/.config' '/home/4evy/.config/net.imput.helium' '${heliumProfileDir}' 2>/dev/null || true
 
         if command -v runuser >/dev/null 2>&1; then
-          runuser -u 4evy -- ${heliumBrowserTool}/bin/helium-browser apply-extension-settings \
+          token="$(runuser -u 4evy -- ${pkgs.gh}/bin/gh auth token 2>/dev/null || true)"
+          input="$(${pkgs.jq}/bin/jq -nc --arg token "$token" \
+            '{extension_values: (if $token == "" then {} else {"refined-github-personal-token": $token} end)}')"
+          printf '%s' "$input" | runuser -u 4evy -- ${heliumBrowserTool}/bin/helium-browser apply-profile-settings \
             --profile-dir '${heliumProfileDir}' \
-            --gh-token || true
+            --input - || true
         else
-          su -s /bin/sh 4evy -c '${heliumBrowserTool}/bin/helium-browser apply-extension-settings --profile-dir ${heliumProfileDir} --gh-token' || true
+          token="$(su -s /bin/sh 4evy -c '${pkgs.gh}/bin/gh auth token' 2>/dev/null || true)"
+          input="$(${pkgs.jq}/bin/jq -nc --arg token "$token" \
+            '{extension_values: (if $token == "" then {} else {"refined-github-personal-token": $token} end)}')"
+          printf '%s' "$input" | su -s /bin/sh 4evy -c \
+            '${heliumBrowserTool}/bin/helium-browser apply-profile-settings --profile-dir ${heliumProfileDir} --input -' || true
         fi
       '';
     };

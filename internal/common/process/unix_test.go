@@ -1,7 +1,11 @@
 package process
 
-import "os"
+import (
+	"os"
+
+	"github.com/4evy/dotfiles/internal/common/fileutil"
+)
 
 func osWriteFileExecutable(path string, data []byte) error {
-	return os.WriteFile(path, data, 0o755)
+	return os.WriteFile(path, data, fileutil.DefaultFilePerm|fileutil.ExecutablePerm)
 }

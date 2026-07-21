@@ -1,0 +1,38 @@
+{
+  "local": [
+    {
+      "id": "cjpalhdlnbpafiamejdnhcphjbkeiagm",
+      "values": {
+        "netWhitelist": [
+          "chrome-extension-scheme",
+          "moz-extension-scheme",
+          "www.mail.com"
+        ],
+        "selectedFilterLists": [
+          "user-filters",
+          "ublock-filters",
+          "ublock-badware",
+          "ublock-privacy",
+          "ublock-quick-fixes",
+          "ublock-unbreak",
+          "easylist",
+          "adguard-generic",
+          "easyprivacy",
+          "adguard-spyware-url",
+          "urlhaus-1",
+          "plowe-0",
+          "fanboy-cookiemonster",
+          "ublock-cookies-easylist",
+          "adguard-cookies",
+          "easylist-newsletters",
+          "easylist-notifications",
+          "ublock-annoyances",
+          "BGR-0",
+          "RUS-0",
+          "RUS-1"
+        ]
+      }
+    }
+  ],
+  "sync": []
+}

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/4evy/dotfiles/internal/common/chromiumext"
+	"github.com/4evy/dotfiles/internal/common/fileutil"
 )
 
 func TestValidExtensionIDMatchesChromiumIDShape(t *testing.T) {
@@ -47,17 +48,6 @@ func TestValidExternalVersionMatchesChromiumExternalVersionShape(t *testing.T) {
 	}
 }
 
-func TestUnpackedExtensionIDMatchesChromiumPathID(t *testing.T) {
-	path := "/var/home/4evy/.cache/dotfiles/ansible/helium-browser/extensions/unpacked/aeblfdkhhhdcdjpifhhbdiojplfjncoa"
-	want := "eemjflinlmihebpkelplffenpkclceef"
-	if got := chromiumext.UnpackedExtensionID(path); got != want {
-		t.Fatalf("UnpackedExtensionID(%q) = %q, want %q", path, got, want)
-	}
-	if got := chromiumext.UnpackedExtensionID(path + "/../aeblfdkhhhdcdjpifhhbdiojplfjncoa"); got != want {
-		t.Fatalf("UnpackedExtensionID with redundant path segments = %q, want %q", got, want)
-	}
-}
-
 func TestChromeStoreCRXDownloadURL(t *testing.T) {
 	got, err := chromiumext.ChromeStoreCRXDownloadURL(
 		"https://clients2.google.com/service/update2/crx",
@@ -71,7 +61,7 @@ func TestChromeStoreCRXDownloadURL(t *testing.T) {
 	}
 	for _, want := range []string{
 		"response=redirect",
-		"prodversion=140.0.0.0",
+		"prodversion=150.0.0.0",
 		"acceptformat=crx2%2Ccrx3",
 		"x=id%3Daeblfdkhhhdcdjpifhhbdiojplfjncoa%26uc",
 	} {
@@ -87,14 +77,17 @@ func TestInstallPinsChromeStoreExtensionsToCRXFiles(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 
-	result, err := Install(Options{
+	_, err := Install(Options{
 		Root:         filepath.Join(root, "cache"),
 		ExternalDirs: []string{filepath.Join(home, ".config/net.imput.helium/External Extensions")},
+		ExcludedIDs: map[string]bool{
+			"cjpalhdlnbpafiamejdnhcphjbkeiagm": true,
+		},
 		Download: func(path, url string) error {
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(path), fileutil.DefaultDirPerm); err != nil {
 				return err
 			}
-			return os.WriteFile(path, []byte(url), 0o644)
+			return os.WriteFile(path, []byte(url), fileutil.DefaultFilePerm)
 		},
 		Resolve: func(rawURL string) (string, error) {
 			parsed, err := url.Parse(rawURL)
@@ -109,25 +102,12 @@ func TestInstallPinsChromeStoreExtensionsToCRXFiles(t *testing.T) {
 			return "https://clients2.googleusercontent.com/crx/blobs/example/" +
 				strings.ToUpper(id) + "_8_12_24_34.crx", nil
 		},
-		Unzip: func(zipPath, dst string) error {
-			bundles := filepath.Join(dst, "bundles")
-			if err := os.MkdirAll(bundles, 0o755); err != nil {
-				return err
-			}
-			return os.WriteFile(
-				filepath.Join(bundles, "common-background.bundle.js"),
-				[]byte(`case"install":yield browser.runtime.openOptionsPage();break;case"update":`),
-				0o644,
-			)
-		},
+		Verify:    func(string, string) error { return nil },
+		VerifyCRX: func(string, string) error { return nil },
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.LoadExtensionPaths) != 0 {
-		t.Fatalf("load extension paths = %#v, want none", result.LoadExtensionPaths)
-	}
-
 	externalDir := filepath.Join(home, ".config/net.imput.helium/External Extensions")
 	store := readExternalJSONTest(
 		t,
@@ -163,36 +143,27 @@ func TestInstallPinsChromeStoreExtensionsToCRXFiles(t *testing.T) {
 	}
 }
 
-func TestPatchUnpackedExtensionSuppressesInstallOptionsPage(t *testing.T) {
-	root := t.TempDir()
-	bundles := filepath.Join(root, "bundles")
-	if err := os.MkdirAll(bundles, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	bundle := filepath.Join(bundles, "common-background.bundle.js")
-	input := `case"install":yield browser.runtime.openOptionsPage();break;case"update":`
-	if err := os.WriteFile(bundle, []byte(input), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := chromiumext.PatchUnpackedExtension(
-		root,
-		[]chromiumext.BundlePatch{SuppressInstallOptionsPagePatch},
-	); err != nil {
-		t.Fatal(err)
-	}
-
-	data, err := os.ReadFile(bundle)
+func TestCatalogGetsLatestUBlockOriginFromGitHub(t *testing.T) {
+	catalog, err := LoadCatalog()
 	if err != nil {
 		t.Fatal(err)
 	}
-	text := string(data)
-	if strings.Contains(text, "openOptionsPage") {
-		t.Fatalf("patched bundle still opens options page: %q", text)
+	for _, extension := range catalog.ZIP {
+		if extension.ID != "cjpalhdlnbpafiamejdnhcphjbkeiagm" {
+			continue
+		}
+		if extension.Repository != "gorhill/uBlock" {
+			t.Fatalf("uBlock Origin repository = %q", extension.Repository)
+		}
+		if extension.AssetTemplate != "uBlock0_{tag}.chromium.zip" {
+			t.Fatalf("uBlock Origin asset template = %q", extension.AssetTemplate)
+		}
+		if !extension.LoadUnpacked || extension.ArchiveRoot != "uBlock0.chromium" {
+			t.Fatalf("uBlock Origin unpacked metadata = %#v", extension)
+		}
+		return
 	}
-	if want := `case"install":break;case"update":`; !strings.Contains(text, want) {
-		t.Fatalf("patched bundle = %q, want %q", text, want)
-	}
+	t.Fatal("latest uBlock Origin GitHub release is missing from the Chromium catalog")
 }
 
 func readExternalJSONTest(t *testing.T, path string) map[string]string {

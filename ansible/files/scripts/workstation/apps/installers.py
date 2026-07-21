@@ -584,6 +584,49 @@ def _verified_download(path: Path, url: str, digest: str | None) -> None:
     download(url, path, expected_sha256=expected)
 
 
+def _helium_apply_input(secrets: Path) -> str:
+    apply_input: dict[str, object] = {}
+    decrypted = run(
+        (
+            "sops",
+            "--decrypt",
+            "--output-type",
+            "json",
+            "--extract",
+            '["chromium-cookie-allowed-for-urls"]',
+            secrets,
+        ),
+        check=False,
+        capture=True,
+    )
+    if decrypted.returncode == 0:
+        try:
+            cookie_allowlist = json.loads(decrypted.stdout)
+        except json.JSONDecodeError as error:
+            raise DotfilesError(
+                "Chromium cookie allowlist is not valid JSON"
+            ) from error
+        if not isinstance(cookie_allowlist, list) or not all(
+            isinstance(pattern, str) for pattern in cookie_allowlist
+        ):
+            raise DotfilesError("Chromium cookie allowlist must be an array of strings")
+        apply_input["cookie_allowlist"] = cookie_allowlist
+    else:
+        error_console.print(
+            "helium-browser: private cookie settings could not be decrypted; "
+            "continuing with public settings"
+        )
+
+    if which("gh") is not None:
+        token = run(("gh", "auth", "token"), check=False, capture=True)
+        value = token.stdout.strip()
+        if token.returncode == 0 and value:
+            apply_input["extension_values"] = {
+                "refined-github-personal-token": value,
+            }
+    return json.dumps(apply_input)
+
+
 def _run_helium_configurer(
     *,
     platform_name: str,
@@ -610,8 +653,8 @@ def _run_helium_configurer(
         (
             installer_bin / "helium-browser",
             "configure",
-            "--secrets",
-            secrets,
+            "--input",
+            "-",
             "--",
             platform_name,
             root,
@@ -620,6 +663,7 @@ def _run_helium_configurer(
             flags,
         ),
         cwd=_repo_root(),
+        input_text=_helium_apply_input(secrets),
     )
 
 

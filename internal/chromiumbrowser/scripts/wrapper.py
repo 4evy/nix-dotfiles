@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 COMMAND: list[str] = __COMMAND_JSON__  # noqa: F821  # ty: ignore[unresolved-reference]
+FLAGS_FILE: str = __FLAGS_FILE_JSON__  # noqa: F821  # ty: ignore[unresolved-reference]
 
 for variable in (
     "DESKTOP_STARTUP_ID",
@@ -25,9 +26,11 @@ if "/usr/share" not in data_dirs and "/usr/share/" not in data_dirs:
     )
 
 flags: list[str] = []
-config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-flags_file = config_home / "helium-flags.conf"
-if flags_file.is_file():
+flags_file = Path(FLAGS_FILE) if FLAGS_FILE else None
+if flags_file is not None and not flags_file.is_absolute():
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    flags_file = config_home / flags_file
+if flags_file is not None and flags_file.is_file():
     for line in flags_file.read_text().splitlines():
         value = line.strip()
         if value and not value.startswith("#"):

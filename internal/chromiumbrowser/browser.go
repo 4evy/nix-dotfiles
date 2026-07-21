@@ -1,10 +1,22 @@
 package chromiumbrowser
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
 
+	"github.com/4evy/dotfiles/internal/common/chromiumext"
 	"github.com/4evy/dotfiles/internal/common/envx"
+)
+
+const (
+	defaultBrowserName      = "Chromium"
+	defaultBrowserLogPrefix = "chromium"
+	defaultLinuxIconSource  = "product_logo_256.png"
+	defaultMacOSContentsDir = "Contents"
+	defaultMacOSLauncherDir = "MacOS"
+	desktopEntryFileSuffix  = ".desktop"
+	pngFileExtension        = ".png"
 )
 
 type environment struct {
@@ -12,66 +24,48 @@ type environment struct {
 }
 
 type Browser struct {
-	Name              string
-	LogPrefix         string
-	ExecutableName    string
-	AliasName         string
-	LinuxDesktopID    string
-	LinuxWrapperFlags []string
-	LinuxLauncherName string
-	LinuxDesktopName  string
-	LinuxDesktopExec  string
-	LinuxIconName     string
-	LinuxIconSource   string
-	MacOSAppDir       string
-	MacOSLauncherPath string
-	ExternalDirs      func(mode string) []string
-	DefaultProfileDir func(mode string) string
+	Config            Config
+	DefaultSettings   []SettingsSource
 	PreferencePatches []PreferencePatch
 	LocalStatePatches []PreferencePatch
 	VariationPatches  []PreferencePatch
-	ExtensionIDs      ExtensionIDs
 }
 
 func (browser Browser) normalized() (Browser, error) {
-	if browser.Name == "" {
-		browser.Name = "Chromium"
+	config := &browser.Config
+	for sourceID, installedID := range config.ExtensionIDAliases {
+		if !chromiumext.ValidExtensionID(sourceID) {
+			return Browser{}, fmt.Errorf("invalid extension ID alias source %q", sourceID)
+		}
+		if !chromiumext.ValidExtensionID(installedID) {
+			return Browser{}, fmt.Errorf(
+				"invalid installed extension ID %q for alias %q",
+				installedID,
+				sourceID,
+			)
+		}
 	}
-	if browser.LogPrefix == "" {
-		browser.LogPrefix = "chromium"
+	config.Name = cmp.Or(config.Name, defaultBrowserName)
+	config.LogPrefix = cmp.Or(config.LogPrefix, defaultBrowserLogPrefix)
+	if config.ExecutableName == "" {
+		return Browser{}, fmt.Errorf("%s browser config is missing executable_name", config.Name)
 	}
-	if browser.ExecutableName == "" {
-		return Browser{}, fmt.Errorf("%s browser config is missing ExecutableName", browser.Name)
-	}
-	if browser.LinuxLauncherName == "" {
-		browser.LinuxLauncherName = browser.ExecutableName
-	}
-	if browser.LinuxDesktopExec == "" {
-		browser.LinuxDesktopExec = browser.ExecutableName
-	}
-	if browser.LinuxDesktopName == "" {
-		browser.LinuxDesktopName = browser.ExecutableName + ".desktop"
-	}
-	if browser.LinuxIconName == "" {
-		browser.LinuxIconName = browser.ExecutableName + ".png"
-	}
-	if browser.LinuxIconSource == "" {
-		browser.LinuxIconSource = "product_logo_256.png"
-	}
-	if browser.MacOSLauncherPath == "" {
-		browser.MacOSLauncherPath = filepath.Join("Contents", "MacOS", browser.Name)
-	}
-	if browser.ExternalDirs == nil {
-		browser.ExternalDirs = func(string) []string { return nil }
-	}
-	if browser.DefaultProfileDir == nil {
-		browser.DefaultProfileDir = func(string) string { return "" }
-	}
+	config.Linux.LauncherName = cmp.Or(config.Linux.LauncherName, config.ExecutableName)
+	config.Linux.DesktopExec = cmp.Or(config.Linux.DesktopExec, config.ExecutableName)
+	config.Linux.DesktopName = cmp.Or(
+		config.Linux.DesktopName,
+		config.ExecutableName+desktopEntryFileSuffix,
+	)
+	config.Linux.IconName = cmp.Or(
+		config.Linux.IconName,
+		config.ExecutableName+pngFileExtension,
+	)
+	config.Linux.IconSource = cmp.Or(config.Linux.IconSource, defaultLinuxIconSource)
+	config.MacOS.LauncherPath = cmp.Or(
+		config.MacOS.LauncherPath,
+		filepath.Join(defaultMacOSContentsDir, defaultMacOSLauncherDir, config.Name),
+	)
 	return browser, nil
-}
-
-func (browser Browser) defaultAppDir(root string) string {
-	return filepath.Join(root, "app")
 }
 
 func homeDir() string {

@@ -10,12 +10,19 @@ import (
 	"github.com/google/go-github/v89/github"
 )
 
+const (
+	githubRequestTimeout = 30 * time.Second
+	releaseAssetsPerPage = 100
+)
+
 func LatestReleaseTag(ctx context.Context, repository string) (string, error) {
 	owner, name, err := SplitRepository(repository)
 	if err != nil {
 		return "", err
 	}
-	client, err := github.NewClient(github.WithHTTPClient(httpx.RetryableClient(30 * time.Second)))
+	client, err := github.NewClient(
+		github.WithHTTPClient(httpx.RetryableClient(githubRequestTimeout)),
+	)
 	if err != nil {
 		return "", err
 	}
@@ -50,7 +57,9 @@ func ReleaseAsset(ctx context.Context, repository, tag, assetName string) (Relea
 	if err != nil {
 		return ReleaseAssetInfo{}, err
 	}
-	client, err := github.NewClient(github.WithHTTPClient(httpx.RetryableClient(30 * time.Second)))
+	client, err := github.NewClient(
+		github.WithHTTPClient(httpx.RetryableClient(githubRequestTimeout)),
+	)
 	if err != nil {
 		return ReleaseAssetInfo{}, err
 	}
@@ -63,7 +72,7 @@ func ReleaseAsset(ctx context.Context, repository, tag, assetName string) (Relea
 		return ReleaseAssetInfo{}, fmt.Errorf("release %s for %s has no release ID", tag, repository)
 	}
 
-	opt := &github.ListOptions{PerPage: 100}
+	opt := &github.ListOptions{PerPage: releaseAssetsPerPage}
 	for {
 		assets, resp, err := client.Repositories.ListReleaseAssets(ctx, owner, name, releaseID, opt)
 		if err != nil {

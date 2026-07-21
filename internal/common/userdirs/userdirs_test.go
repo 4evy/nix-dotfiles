@@ -5,26 +5,39 @@ import (
 	"testing"
 )
 
+const (
+	configDirectory = "config"
+	dataDirectory   = "data"
+	stateDirectory  = "state"
+	cacheDirectory  = "cache"
+	binDirectory    = "bin"
+	configHomeEnv   = "XDG_CONFIG_HOME"
+	dataHomeEnv     = "XDG_DATA_HOME"
+	stateHomeEnv    = "XDG_STATE_HOME"
+	cacheHomeEnv    = "XDG_CACHE_HOME"
+	binHomeEnv      = "XDG_BIN_HOME"
+)
+
 func TestDirectoriesPreferExplicitXDGEnvironment(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", "/xdg/config")
-	t.Setenv("XDG_DATA_HOME", "/xdg/data")
-	t.Setenv("XDG_STATE_HOME", "/xdg/state")
-	t.Setenv("XDG_CACHE_HOME", "/xdg/cache")
-	t.Setenv("XDG_BIN_HOME", "/xdg/bin")
+	t.Setenv(configHomeEnv, "/xdg/config")
+	t.Setenv(dataHomeEnv, "/xdg/data")
+	t.Setenv(stateHomeEnv, "/xdg/state")
+	t.Setenv(cacheHomeEnv, "/xdg/cache")
+	t.Setenv(binHomeEnv, "/xdg/bin")
 
 	tests := map[string]string{
-		"config": ConfigHome("/ignored"),
-		"data":   DataHome("/ignored"),
-		"state":  StateHome("/ignored"),
-		"cache":  CacheHome("/ignored"),
-		"bin":    BinHome("/ignored"),
+		configDirectory: ConfigHome("/ignored"),
+		dataDirectory:   DataHome("/ignored"),
+		stateDirectory:  StateHome("/ignored"),
+		cacheDirectory:  CacheHome("/ignored"),
+		binDirectory:    BinHome("/ignored"),
 	}
 	wants := map[string]string{
-		"config": "/xdg/config",
-		"data":   "/xdg/data",
-		"state":  "/xdg/state",
-		"cache":  "/xdg/cache",
-		"bin":    "/xdg/bin",
+		configDirectory: "/xdg/config",
+		dataDirectory:   "/xdg/data",
+		stateDirectory:  "/xdg/state",
+		cacheDirectory:  "/xdg/cache",
+		binDirectory:    "/xdg/bin",
 	}
 	for name, got := range tests {
 		if got != wants[name] {
@@ -35,29 +48,29 @@ func TestDirectoriesPreferExplicitXDGEnvironment(t *testing.T) {
 
 func TestDirectoriesFallBackUnderRequestedHome(t *testing.T) {
 	for _, name := range []string{
-		"XDG_CONFIG_HOME",
-		"XDG_DATA_HOME",
-		"XDG_STATE_HOME",
-		"XDG_CACHE_HOME",
-		"XDG_BIN_HOME",
+		configHomeEnv,
+		dataHomeEnv,
+		stateHomeEnv,
+		cacheHomeEnv,
+		binHomeEnv,
 	} {
 		t.Setenv(name, "")
 	}
 
 	home := filepath.Join(string(filepath.Separator), "users", "test")
 	tests := map[string]string{
-		"config": ConfigHome(home),
-		"data":   DataHome(home),
-		"state":  StateHome(home),
-		"cache":  CacheHome(home),
-		"bin":    BinHome(home),
+		configDirectory: ConfigHome(home),
+		dataDirectory:   DataHome(home),
+		stateDirectory:  StateHome(home),
+		cacheDirectory:  CacheHome(home),
+		binDirectory:    BinHome(home),
 	}
 	wants := map[string]string{
-		"config": filepath.Join(home, ".config"),
-		"data":   filepath.Join(home, ".local/share"),
-		"state":  filepath.Join(home, ".local/state"),
-		"cache":  filepath.Join(home, ".cache"),
-		"bin":    filepath.Join(home, ".local/bin"),
+		configDirectory: filepath.Join(home, defaultConfigHome),
+		dataDirectory:   filepath.Join(home, defaultDataHome),
+		stateDirectory:  filepath.Join(home, defaultStateHome),
+		cacheDirectory:  filepath.Join(home, defaultCacheHome),
+		binDirectory:    filepath.Join(home, defaultBinHome),
 	}
 	for name, got := range tests {
 		if got != wants[name] {

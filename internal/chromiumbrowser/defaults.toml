@@ -1,0 +1,23 @@
+[[preferences.values]]
+path = "profile.default_content_setting_values.cookies"
+value = 4
+
+[[preferences.local_state_values]]
+path = "hardware_acceleration_mode_previous"
+value = true
+
+[[preferences.local_state_values]]
+path = "variations_crash_streak"
+value = 0
+
+[[preferences.local_state_values]]
+path = "user_experience_metrics.stability.exited_cleanly"
+value = true
+
+[[preferences.variation_values]]
+path = "user_experience_metrics.stability.exited_cleanly"
+value = true
+
+[[preferences.variation_values]]
+path = "variations_crash_streak"
+value = 0

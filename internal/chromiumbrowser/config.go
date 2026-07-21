@@ -1,23 +1,29 @@
 package chromiumbrowser
 
 import (
+	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 
 	"github.com/4evy/dotfiles/internal/common/userdirs"
 )
 
+const (
+	homeTemplateVariable       = "home"
+	configHomeTemplateVariable = "config_home"
+	dataHomeTemplateVariable   = "data_home"
+)
+
 type Config struct {
-	Name           string                   `toml:"name"`
-	LogPrefix      string                   `toml:"log_prefix"`
-	ExecutableName string                   `toml:"executable_name"`
-	AliasName      string                   `toml:"alias_name"`
-	Linux          LinuxConfig              `toml:"linux"`
-	MacOS          MacOSConfig              `toml:"macos"`
-	Paths          map[string]ModePaths     `toml:"paths"`
-	Preferences    PreferenceDefaultsConfig `toml:"preferences"`
-	ExtensionIDs   ExtensionIDs             `toml:"extensions"`
+	Name               string                   `toml:"name"`
+	LogPrefix          string                   `toml:"log_prefix"`
+	ExecutableName     string                   `toml:"executable_name"`
+	AliasName          string                   `toml:"alias_name"`
+	FlagsFile          string                   `toml:"flags_file"`
+	Linux              LinuxConfig              `toml:"linux"`
+	MacOS              MacOSConfig              `toml:"macos"`
+	Paths              map[string]ModePaths     `toml:"paths"`
+	Preferences        PreferenceDefaultsConfig `toml:"preferences"`
+	ExtensionIDAliases map[string]string        `toml:"extension_id_aliases"`
 }
 
 type LinuxConfig struct {
@@ -64,32 +70,39 @@ type PreferenceAcceleratorConfig struct {
 }
 
 func (config Config) Browser() Browser {
-	browser := Browser{
-		Name:              config.Name,
-		LogPrefix:         config.LogPrefix,
-		ExecutableName:    config.ExecutableName,
-		AliasName:         config.AliasName,
-		LinuxDesktopID:    config.Linux.DesktopID,
-		LinuxWrapperFlags: slices.Clone(config.Linux.WrapperFlags),
-		LinuxLauncherName: config.Linux.LauncherName,
-		LinuxDesktopName:  config.Linux.DesktopName,
-		LinuxDesktopExec:  config.Linux.DesktopExec,
-		LinuxIconName:     config.Linux.IconName,
-		LinuxIconSource:   config.Linux.IconSource,
-		MacOSAppDir:       expandPathTemplate(config.MacOS.AppDir),
-		MacOSLauncherPath: filepath.FromSlash(config.MacOS.LauncherPath),
-		ExternalDirs:      config.ExternalExtensionDirs,
-		DefaultProfileDir: config.DefaultProfileDir,
-		ExtensionIDs:      config.ExtensionIDs,
+	browser := Browser{Config: config}
+	if defaultConfig.Preferences.HasDefaults() {
+		browser.PreferencePatches = append(
+			browser.PreferencePatches,
+			defaultConfig.Preferences.Patch,
+		)
 	}
 	if config.Preferences.HasDefaults() {
-		browser.PreferencePatches = []PreferencePatch{config.Preferences.Patch}
+		browser.PreferencePatches = append(browser.PreferencePatches, config.Preferences.Patch)
+	}
+	if defaultConfig.Preferences.HasLocalStateDefaults() {
+		browser.LocalStatePatches = append(
+			browser.LocalStatePatches,
+			defaultConfig.Preferences.PatchLocalState,
+		)
 	}
 	if config.Preferences.HasLocalStateDefaults() {
-		browser.LocalStatePatches = []PreferencePatch{config.Preferences.PatchLocalState}
+		browser.LocalStatePatches = append(
+			browser.LocalStatePatches,
+			config.Preferences.PatchLocalState,
+		)
+	}
+	if defaultConfig.Preferences.HasVariationDefaults() {
+		browser.VariationPatches = append(
+			browser.VariationPatches,
+			defaultConfig.Preferences.PatchVariations,
+		)
 	}
 	if config.Preferences.HasVariationDefaults() {
-		browser.VariationPatches = []PreferencePatch{config.Preferences.PatchVariations}
+		browser.VariationPatches = append(
+			browser.VariationPatches,
+			config.Preferences.PatchVariations,
+		)
 	}
 	return browser
 }
@@ -152,9 +165,15 @@ func expandPathTemplate(path string) string {
 		return ""
 	}
 	home := homeDir()
-	return filepath.FromSlash(strings.NewReplacer(
-		"${home}", home,
-		"${config_home}", userdirs.ConfigHome(home),
-		"${data_home}", userdirs.DataHome(home),
-	).Replace(path))
+	variables := map[string]string{
+		homeTemplateVariable:       home,
+		configHomeTemplateVariable: userdirs.ConfigHome(home),
+		dataHomeTemplateVariable:   userdirs.DataHome(home),
+	}
+	return filepath.FromSlash(os.Expand(path, func(name string) string {
+		if value, ok := variables[name]; ok {
+			return value
+		}
+		return "${" + name + "}"
+	}))
 }

@@ -10,6 +10,7 @@ const (
 	chromiumContentSettingAllow  = 1
 	chromiumPatternSeparator     = ","
 	chromiumWildcardPattern      = "*"
+	chromiumContentSettingKey    = "setting"
 )
 
 func SetCookieAllowlist(preferences map[string]any, patterns []string) {
@@ -38,7 +39,7 @@ func SetCookieAllowlist(preferences map[string]any, patterns []string) {
 			entry = map[string]any{}
 			exceptions[pattern] = entry
 		}
-		entry["setting"] = chromiumContentSettingAllow
+		entry[chromiumContentSettingKey] = chromiumContentSettingAllow
 	}
 }
 
@@ -55,7 +56,7 @@ func isCookieAllowException(entry any) bool {
 	if !ok {
 		return false
 	}
-	return contentSettingInt(values["setting"]) == chromiumContentSettingAllow
+	return contentSettingInt(values[chromiumContentSettingKey]) == chromiumContentSettingAllow
 }
 
 func contentSettingInt(value any) int {

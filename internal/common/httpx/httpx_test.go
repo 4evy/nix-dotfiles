@@ -19,7 +19,7 @@ func TestDefaultRestyClientHasTimeout(t *testing.T) {
 func TestRestyClientRetriesServerErrors(t *testing.T) {
 	var attempts atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if attempts.Add(1) < 3 {
+		if attempts.Add(1) < retryCount {
 			http.Error(w, "try again", http.StatusInternalServerError)
 			return
 		}
@@ -30,5 +30,5 @@ func TestRestyClientRetriesServerErrors(t *testing.T) {
 	resp, err := configureResty(resty.New().SetRetryWaitTime(time.Millisecond)).R().Get(server.URL)
 	assert.NilError(t, err)
 	assert.Equal(t, resp.String(), "ok")
-	assert.Equal(t, attempts.Load(), int32(3))
+	assert.Equal(t, attempts.Load(), int32(retryCount))
 }

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/4evy/dotfiles/internal/common/envx"
+	"github.com/4evy/dotfiles/internal/common/fileutil"
 )
 
 const (
@@ -23,6 +24,10 @@ const (
 	runTimeoutEnv         = "DOTFILES_PROCESS_RUN_TIMEOUT_SECS"
 	captureTimeoutEnv     = "DOTFILES_PROCESS_CAPTURE_TIMEOUT_SECS"
 	pathEnvKey            = "PATH"
+	decimalRadix          = 10
+	uint64BitSize         = 64
+	unknownStatusCode     = -1
+	successStatusCode     = 0
 )
 
 type Output struct {
@@ -92,10 +97,10 @@ func CaptureWithEnvAndStdin(argv []string, env []string, stdin []byte) (Output, 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
-	statusCode := -1
+	statusCode := unknownStatusCode
 	success := false
 	if err == nil {
-		statusCode = 0
+		statusCode = successStatusCode
 		success = true
 	} else {
 		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
@@ -159,7 +164,7 @@ func IsPathLike(name string) bool {
 }
 
 func IsExecutableFile(info os.FileInfo) bool {
-	return !info.IsDir() && info.Mode()&0o111 != 0
+	return !info.IsDir() && info.Mode()&fileutil.ExecutablePerm != 0
 }
 
 func timeoutFromEnv(name string, fallback time.Duration) time.Duration {
@@ -168,7 +173,7 @@ func timeoutFromEnv(name string, fallback time.Duration) time.Duration {
 	if name == captureTimeoutEnv {
 		raw = environment.CaptureTimeoutSecs
 	}
-	value, err := strconv.ParseUint(raw, 10, 64)
+	value, err := strconv.ParseUint(raw, decimalRadix, uint64BitSize)
 	if err != nil || value == 0 {
 		return fallback
 	}

@@ -12,15 +12,26 @@ import (
 	cp "github.com/otiai10/copy"
 )
 
+const (
+	// DefaultDirPerm is the default permission mode for generated directories.
+	DefaultDirPerm fs.FileMode = 0o755
+	// DefaultFilePerm is the default permission mode for generated files.
+	DefaultFilePerm fs.FileMode = 0o644
+	// PrivateFilePerm is the permission mode for generated user-private files.
+	PrivateFilePerm fs.FileMode = 0o600
+	// ExecutablePerm contains the executable permission bits for all users.
+	ExecutablePerm fs.FileMode = 0o111
+)
+
 func WriteExecutable(path string, data []byte) error {
-	if err := WriteFile(path, data, 0o644); err != nil {
+	if err := WriteFile(path, data, DefaultFilePerm); err != nil {
 		return err
 	}
 	return MakeExecutable(path)
 }
 
 func WriteFile(path string, data []byte, perm fs.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), DefaultDirPerm); err != nil {
 		return err
 	}
 	return maybe.WriteFile(path, data, perm)
@@ -31,7 +42,7 @@ func WriteTextIfChanged(path, text string) (bool, error) {
 	if err == nil && bytes.Equal(current, []byte(text)) {
 		return false, nil
 	}
-	if err := WriteFile(path, []byte(text), 0o644); err != nil {
+	if err := WriteFile(path, []byte(text), DefaultFilePerm); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -59,7 +70,7 @@ func MakeExecutable(path string) error {
 	if err != nil {
 		return err
 	}
-	return os.Chmod(path, info.Mode()|0o111)
+	return os.Chmod(path, info.Mode()|ExecutablePerm)
 }
 
 func RemoveDirIfExists(path string) error {

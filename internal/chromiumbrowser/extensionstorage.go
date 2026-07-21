@@ -6,26 +6,47 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
-	"strings"
+	"syscall"
 
-	"charm.land/log/v2"
+	"github.com/4evy/dotfiles/internal/common/fileutil"
 	lzstring "github.com/daku10/go-lz-string"
 	"github.com/syndtr/goleveldb/leveldb"
+	leveldberrors "github.com/syndtr/goleveldb/leveldb/errors"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
-const defaultRefinedGitHubID = "hlepfoohegkhhmjieoechaddaejaokhf"
+const (
+	localStorageArea           = "local"
+	syncStorageArea            = "sync"
+	localExtensionSettingsDir  = "Local Extension Settings"
+	syncExtensionSettingsDir   = "Sync Extension Settings"
+	jsonStorageEncoding        = "json"
+	lzStringURIStorageEncoding = "json-lz-string-uri"
+)
 
 type settingsFile struct {
-	Local []extensionSettings `json:"local"`
-	Sync  []extensionSettings `json:"sync"`
+	Local       []extensionSettings `json:"local"`
+	Sync        []extensionSettings `json:"sync"`
+	LocalAppend []extensionSettings `json:"local_append"`
+	SyncAppend  []extensionSettings `json:"sync_append"`
+	Inputs      []extensionInput    `json:"inputs"`
 }
 
 type extensionSettings struct {
 	ID     string         `json:"id"`
 	Values map[string]any `json:"values"`
+}
+
+type extensionInput struct {
+	Name     string `json:"name"`
+	Area     string `json:"area"`
+	ID       string `json:"id"`
+	Key      string `json:"key"`
+	Path     string `json:"path"`
+	Encoding string `json:"encoding"`
 }
 
 func ApplyExtensionSettings(options ApplyOptions) error {
@@ -40,16 +61,14 @@ func ApplyExtensionSettings(options ApplyOptions) error {
 
 	for _, source := range sources {
 		var settings settingsFile
-		decoder := json.NewDecoder(bytes.NewReader(source.Data))
-		decoder.UseNumber()
-		if err := decoder.Decode(&settings); err != nil {
+		if err := decodeJSON(bytes.NewReader(source.Data), &settings); err != nil {
 			return fmt.Errorf("parse settings file %s: %w", source.Name, err)
 		}
 		for _, entry := range settings.Local {
 			entry.ID = resolveExtensionID(options.ExtensionIDAliases, entry.ID)
 			if err := writeStorageValues(
 				options.ProfileDir,
-				"Local Extension Settings",
+				localExtensionSettingsDir,
 				entry,
 			); err != nil {
 				return err
@@ -59,92 +78,44 @@ func ApplyExtensionSettings(options ApplyOptions) error {
 			entry.ID = resolveExtensionID(options.ExtensionIDAliases, entry.ID)
 			if err := writeStorageValues(
 				options.ProfileDir,
-				"Sync Extension Settings",
+				syncExtensionSettingsDir,
 				entry,
 			); err != nil {
 				return err
 			}
 		}
-	}
-
-	if !options.GitHubToken {
-		return nil
-	}
-	return applyRefinedGitHubToken(options)
-}
-
-func applyRefinedGitHubToken(options ApplyOptions) error {
-	tokenFunc := options.TokenFunc
-	if tokenFunc == nil {
-		tokenFunc = func() string {
-			command := exec.Command("gh", "auth", "token")
-			output, err := command.Output()
-			if err == nil {
-				return strings.TrimSpace(string(output))
+		for _, entry := range settings.LocalAppend {
+			entry.ID = resolveExtensionID(options.ExtensionIDAliases, entry.ID)
+			if err := appendStorageValues(
+				options.ProfileDir,
+				localExtensionSettingsDir,
+				entry,
+			); err != nil {
+				return err
 			}
-			log.Warn(
-				"chromium: gh auth token failed; skipping Refined GitHub token setup",
-				"error",
-				err,
-			)
-			return ""
+		}
+		for _, entry := range settings.SyncAppend {
+			entry.ID = resolveExtensionID(options.ExtensionIDAliases, entry.ID)
+			if err := appendStorageValues(
+				options.ProfileDir,
+				syncExtensionSettingsDir,
+				entry,
+			); err != nil {
+				return err
+			}
+		}
+		for _, input := range settings.Inputs {
+			input.ID = resolveExtensionID(options.ExtensionIDAliases, input.ID)
+			value, ok := options.Input.ExtensionValues[input.Name]
+			if !ok || value == "" {
+				continue
+			}
+			if err := applyExtensionInput(options.ProfileDir, input, value); err != nil {
+				return fmt.Errorf("apply input %q from %s: %w", input.Name, source.Name, err)
+			}
 		}
 	}
-	token := tokenFunc()
-	if token == "" {
-		return nil
-	}
-
-	return withStorage(
-		options.ProfileDir,
-		"Sync Extension Settings",
-		options.ExtensionIDs.refinedGitHubID(),
-		func(db *leveldb.DB) error {
-			raw, err := db.Get([]byte("options"), nil)
-			refinedOptions := map[string]any{}
-			if err == nil {
-				var compressed string
-				if err := json.Unmarshal(raw, &compressed); err != nil {
-					return fmt.Errorf("parse stored Refined GitHub options: %w", err)
-				}
-				decompressed, err := lzstring.DecompressFromEncodedURIComponent(compressed)
-				if err != nil {
-					return fmt.Errorf("decompress Refined GitHub options: %w", err)
-				}
-				if decompressed != "" {
-					decoder := json.NewDecoder(strings.NewReader(decompressed))
-					decoder.UseNumber()
-					if err := decoder.Decode(&refinedOptions); err != nil {
-						return fmt.Errorf("parse Refined GitHub options: %w", err)
-					}
-				}
-			} else if !errors.Is(err, leveldb.ErrNotFound) {
-				return fmt.Errorf("read Refined GitHub options: %w", err)
-			}
-			refinedOptions["personalToken"] = token
-
-			encoded, err := json.Marshal(refinedOptions)
-			if err != nil {
-				return fmt.Errorf("encode Refined GitHub options: %w", err)
-			}
-			compressed, err := lzstring.CompressToEncodedURIComponent(string(encoded))
-			if err != nil {
-				return fmt.Errorf("compress Refined GitHub options: %w", err)
-			}
-			stored, err := json.Marshal(compressed)
-			if err != nil {
-				return fmt.Errorf("encode compressed Refined GitHub options: %w", err)
-			}
-			return db.Put([]byte("options"), stored, nil)
-		},
-	)
-}
-
-func (ids ExtensionIDs) refinedGitHubID() string {
-	if ids.RefinedGitHub != "" {
-		return ids.RefinedGitHub
-	}
-	return defaultRefinedGitHubID
+	return nil
 }
 
 func resolveExtensionID(aliases map[string]string, id string) string {
@@ -152,6 +123,87 @@ func resolveExtensionID(aliases map[string]string, id string) string {
 		return alias
 	}
 	return id
+}
+
+func applyExtensionInput(profileDir string, input extensionInput, value string) error {
+	area, err := extensionStorageArea(input.Area)
+	if err != nil {
+		return err
+	}
+	if input.ID == "" || input.Key == "" || input.Path == "" {
+		return errors.New("id, key, and path are required")
+	}
+	return withStorage(profileDir, area, input.ID, func(db *leveldb.DB) error {
+		document := map[string]any{}
+		raw, err := db.Get([]byte(input.Key), nil)
+		if err == nil {
+			document, err = decodeStorageObject(raw, input.Encoding)
+			if err != nil {
+				return fmt.Errorf("decode %s/%s/%s: %w", area, input.ID, input.Key, err)
+			}
+		} else if !errors.Is(err, leveldb.ErrNotFound) {
+			return fmt.Errorf("read %s/%s/%s: %w", area, input.ID, input.Key, err)
+		}
+		SetNestedValue(document, input.Path, value)
+		stored, err := encodeStorageObject(document, input.Encoding)
+		if err != nil {
+			return fmt.Errorf("encode %s/%s/%s: %w", area, input.ID, input.Key, err)
+		}
+		return db.Put([]byte(input.Key), stored, nil)
+	})
+}
+
+func extensionStorageArea(area string) (string, error) {
+	switch area {
+	case localStorageArea:
+		return localExtensionSettingsDir, nil
+	case syncStorageArea:
+		return syncExtensionSettingsDir, nil
+	default:
+		return "", fmt.Errorf("unsupported storage area %q", area)
+	}
+}
+
+func decodeStorageObject(raw []byte, encoding string) (map[string]any, error) {
+	if encoding == lzStringURIStorageEncoding {
+		var compressed string
+		if err := json.Unmarshal(raw, &compressed); err != nil {
+			return nil, err
+		}
+		decoded, err := lzstring.DecompressFromEncodedURIComponent(compressed)
+		if err != nil {
+			return nil, err
+		}
+		raw = []byte(decoded)
+	} else if encoding != jsonStorageEncoding {
+		return nil, fmt.Errorf("unsupported encoding %q", encoding)
+	}
+	if len(raw) == 0 {
+		return map[string]any{}, nil
+	}
+	document := map[string]any{}
+	if err := decodeJSON(bytes.NewReader(raw), &document); err != nil {
+		return nil, err
+	}
+	return document, nil
+}
+
+func encodeStorageObject(document map[string]any, encoding string) ([]byte, error) {
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		return nil, err
+	}
+	if encoding == jsonStorageEncoding {
+		return encoded, nil
+	}
+	if encoding != lzStringURIStorageEncoding {
+		return nil, fmt.Errorf("unsupported encoding %q", encoding)
+	}
+	compressed, err := lzstring.CompressToEncodedURIComponent(string(encoded))
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(compressed)
 }
 
 func writeStorageValues(profileDir, area string, entry extensionSettings) error {
@@ -168,6 +220,40 @@ func writeStorageValues(profileDir, area string, entry extensionSettings) error 
 	})
 }
 
+func appendStorageValues(profileDir, area string, entry extensionSettings) error {
+	return withStorage(profileDir, area, entry.ID, func(db *leveldb.DB) error {
+		batch := new(leveldb.Batch)
+		for key, value := range entry.Values {
+			additions, ok := value.([]any)
+			if !ok {
+				return fmt.Errorf("append %s/%s/%s: value must be an array", area, entry.ID, key)
+			}
+			existing := []any{}
+			raw, err := db.Get([]byte(key), nil)
+			if err == nil {
+				if err := decodeJSON(bytes.NewReader(raw), &existing); err != nil {
+					return fmt.Errorf("decode %s/%s/%s for append: %w", area, entry.ID, key, err)
+				}
+			} else if !errors.Is(err, leveldb.ErrNotFound) {
+				return fmt.Errorf("read %s/%s/%s for append: %w", area, entry.ID, key, err)
+			}
+			for _, addition := range additions {
+				if !slices.ContainsFunc(existing, func(current any) bool {
+					return reflect.DeepEqual(current, addition)
+				}) {
+					existing = append(existing, addition)
+				}
+			}
+			encoded, err := json.Marshal(existing)
+			if err != nil {
+				return fmt.Errorf("encode %s/%s/%s after append: %w", area, entry.ID, key, err)
+			}
+			batch.Put([]byte(key), encoded)
+		}
+		return db.Write(batch, nil)
+	})
+}
+
 func withStorage(
 	profileDir,
 	area,
@@ -175,7 +261,7 @@ func withStorage(
 	operation func(*leveldb.DB) error,
 ) (err error) {
 	path := filepath.Join(profileDir, area, extensionID)
-	if err := os.MkdirAll(path, 0o755); err != nil {
+	if err := os.MkdirAll(path, fileutil.DefaultDirPerm); err != nil {
 		return fmt.Errorf("create storage directory %s: %w", path, err)
 	}
 	db, err := leveldb.OpenFile(path, nil)
@@ -187,10 +273,13 @@ func withStorage(
 }
 
 func isStorageTemporarilyUnavailable(err error) bool {
-	if err == nil {
+	if errors.Is(err, storage.ErrLocked) || errors.Is(err, syscall.EAGAIN) {
+		return true
+	}
+	var corrupted *leveldberrors.ErrCorrupted
+	if !errors.As(err, &corrupted) {
 		return false
 	}
-	message := err.Error()
-	return strings.Contains(message, "resource temporarily unavailable") ||
-		strings.Contains(message, "file missing")
+	var missing *leveldberrors.ErrMissingFiles
+	return errors.As(corrupted.Err, &missing)
 }

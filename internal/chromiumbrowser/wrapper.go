@@ -9,36 +9,39 @@ import (
 	"strings"
 
 	"github.com/4evy/dotfiles/internal/common/fileutil"
-	"github.com/buildkite/shellwords"
+)
+
+const (
+	commandJSONPlaceholder   = "__COMMAND_JSON__"
+	flagsFileJSONPlaceholder = "__FLAGS_FILE_JSON__"
 )
 
 //go:embed scripts/wrapper.py
 var wrapperScriptTemplate string
 
-func writeWrapper(target, launcher string, options *InstallOptions) error {
-	return WriteWrapper(target, launcher, options.Flags, options.extraWrapperFlags)
+func writeWrapper(target, launcher, flagsFile string, options *InstallOptions) error {
+	return WriteWrapper(target, launcher, flagsFile, options.Flags, options.extraWrapperFlags)
 }
 
-func WriteWrapper(target, launcher, flagsText string, extraFlags []string) error {
-	var flags []string
-	if flagsText != "" {
-		var err error
-		flags, err = shellwords.SplitPosix(flagsText)
-		if err != nil {
-			return err
-		}
-	}
+func WriteWrapper(target, launcher, flagsFile string, flags, extraFlags []string) error {
 	args := slices.Concat([]string{launcher}, flags, extraFlags)
-	content := renderWrapperScript(args)
+	content := renderWrapperScript(args, flagsFile)
 	return fileutil.WriteExecutable(target, []byte(content))
 }
 
-func renderWrapperScript(args []string) string {
+func renderWrapperScript(args []string, flagsFile string) string {
 	encoded, err := json.Marshal(args)
 	if err != nil {
 		panic(err)
 	}
-	return strings.ReplaceAll(wrapperScriptTemplate, "__COMMAND_JSON__", string(encoded))
+	flagsFileJSON, err := json.Marshal(flagsFile)
+	if err != nil {
+		panic(err)
+	}
+	return strings.NewReplacer(
+		commandJSONPlaceholder, string(encoded),
+		flagsFileJSONPlaceholder, string(flagsFileJSON),
+	).Replace(wrapperScriptTemplate)
 }
 
 func replaceSymlink(oldname, newname string) error {

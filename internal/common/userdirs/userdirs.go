@@ -8,6 +8,14 @@ import (
 	"github.com/adrg/xdg"
 )
 
+const (
+	defaultConfigHome = ".config"
+	defaultDataHome   = ".local/share"
+	defaultStateHome  = ".local/state"
+	defaultCacheHome  = ".cache"
+	defaultBinHome    = ".local/bin"
+)
+
 type environment struct {
 	ConfigHome string `env:"XDG_CONFIG_HOME"`
 	DataHome   string `env:"XDG_DATA_HOME"`
@@ -19,31 +27,31 @@ type environment struct {
 func ConfigHome(home string) string {
 	environment := envx.MustParse[environment]()
 	return cmp.Or(environment.ConfigHome,
-		homeRelative(home, xdg.ConfigHome, ".config"))
+		homeRelative(home, xdg.ConfigHome, defaultConfigHome))
 }
 
 func DataHome(home string) string {
 	environment := envx.MustParse[environment]()
 	return cmp.Or(environment.DataHome,
-		homeRelative(home, xdg.DataHome, ".local/share"))
+		homeRelative(home, xdg.DataHome, defaultDataHome))
 }
 
 func StateHome(home string) string {
 	environment := envx.MustParse[environment]()
 	return cmp.Or(environment.StateHome,
-		homeRelative(home, xdg.StateHome, ".local/state"))
+		homeRelative(home, xdg.StateHome, defaultStateHome))
 }
 
 func CacheHome(home string) string {
 	environment := envx.MustParse[environment]()
 	return cmp.Or(environment.CacheHome,
-		homeRelative(home, xdg.CacheHome, ".cache"))
+		homeRelative(home, xdg.CacheHome, defaultCacheHome))
 }
 
 func BinHome(home string) string {
 	environment := envx.MustParse[environment]()
 	return cmp.Or(environment.BinHome,
-		homeRelative(home, xdg.BinHome, ".local/bin"))
+		homeRelative(home, xdg.BinHome, defaultBinHome))
 }
 
 func homeRelative(home, detected, rel string) string {
