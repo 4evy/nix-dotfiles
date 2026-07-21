@@ -265,11 +265,14 @@
     argv:
       - chflags
       - nouchg
-      - /Applications/Discord.app/Contents/Resources/app.asar
-      - /Applications/Discord.app/Contents/Resources/_app.asar
+      - "{{ item }}"
   changed_when: false
   failed_when: false
+  become: true
   when: common_is_macos
+  loop:
+    - /Applications/Discord.app/Contents/Resources/app.asar
+    - /Applications/Discord.app/Contents/Resources/_app.asar
   tags:
     - bootstrap
     - discord
@@ -371,6 +374,67 @@
     path: /Applications/Discord.app/Contents/Info.plist
   register: prerequisites_homebrew_discord_app
   when: common_is_macos
+  tags:
+    - bootstrap
+    - discord
+    - homebrew
+
+- name: Check for a Discord app backup left by an interrupted cask upgrade
+  ansible.builtin.stat:
+    path: >-
+      {{ prerequisites_homebrew_prefix }}/Caskroom/discord/{{ prerequisites_homebrew_discord_installed_version }}/Discord.app/Contents/Info.plist
+  register: prerequisites_homebrew_discord_stale_backup
+  vars:
+    prerequisites_homebrew_discord_installed_version: >-
+      {{
+        prerequisites_homebrew_discord_versions.stdout.split()[1]
+        if prerequisites_homebrew_discord_versions.stdout.split() | length > 1
+        else ''
+      }}
+  when:
+    - common_is_macos
+    - prerequisites_homebrew_discord_installed_version | length > 0
+  tags:
+    - bootstrap
+    - discord
+    - homebrew
+
+- name: Clear ASAR locks in an interrupted Discord cask backup
+  ansible.builtin.command:
+    argv:
+      - chflags
+      - nouchg
+      - "{{ item }}"
+  changed_when: false
+  failed_when: false
+  become: true
+  vars:
+    prerequisites_homebrew_discord_backup: >-
+      {{ prerequisites_homebrew_prefix }}/Caskroom/discord/{{ prerequisites_homebrew_discord_installed_version }}/Discord.app
+    prerequisites_homebrew_discord_installed_version: "{{ prerequisites_homebrew_discord_versions.stdout.split()[1] }}"
+  when:
+    - common_is_macos
+    - prerequisites_homebrew_discord_stale_backup.stat.exists | default(false)
+  loop:
+    - "{{ prerequisites_homebrew_discord_backup }}/Contents/Resources/app.asar"
+    - "{{ prerequisites_homebrew_discord_backup }}/Contents/Resources/_app.asar"
+  tags:
+    - bootstrap
+    - discord
+    - homebrew
+
+- name: Remove Discord app backup left by an interrupted cask upgrade
+  ansible.builtin.file:
+    path: >-
+      {{ prerequisites_homebrew_prefix }}/Caskroom/discord/{{ prerequisites_homebrew_discord_installed_version }}/Discord.app
+    state: absent
+  become: true
+  vars:
+    prerequisites_homebrew_discord_installed_version: "{{ prerequisites_homebrew_discord_versions.stdout.split()[1] }}"
+  when:
+    - common_is_macos
+    - prerequisites_homebrew_discord_app.stat.exists | default(false)
+    - prerequisites_homebrew_discord_stale_backup.stat.exists | default(false)
   tags:
     - bootstrap
     - discord
