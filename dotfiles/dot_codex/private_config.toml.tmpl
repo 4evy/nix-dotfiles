@@ -10,9 +10,7 @@ model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 approval_policy = "never"
 default_permissions = ":danger-full-access"
-sandbox_mode = "danger-full-access"
 web_search = "live"
-suppress_unstable_features_warning = true
 
 {{- if eq .chezmoi.os "darwin" }}
 notify = [
@@ -20,20 +18,6 @@ notify = [
   "turn-ended",
 ]
 {{- end }}
-
-[features]
-{{- if eq .chezmoi.os "darwin" }}
-in_app_browser = true
-browser_use = true
-browser_use_external = true
-computer_use = true
-{{- else }}
-in_app_browser = false
-browser_use = false
-browser_use_external = false
-computer_use = false
-{{- end }}
-js_repl = false
 
 [tui]
 notification_condition = "always"
@@ -174,24 +158,40 @@ enabled_tools = [
 {{- end }}
 
 {{- if eq .chezmoi.os "darwin" }}
-{{- $codexAppRoot := "/Applications/Codex.app" }}
-{{- $codexContentsRoot := joinPath $codexAppRoot "Contents" }}
-{{- $codexResourceRoot := joinPath $codexContentsRoot "Resources" }}
-{{- $browserClientPath := joinPath $codexResourceRoot "plugins/openai-bundled/plugins/browser/scripts/browser-client.mjs" }}
-{{- $codexInfoPlistPath := joinPath $codexContentsRoot "Info.plist" }}
+{{- $chatGPTAppRoot := "/Applications/ChatGPT.app" }}
+{{- $chatGPTContentsRoot := joinPath $chatGPTAppRoot "Contents" }}
+{{- $chatGPTResourceRoot := joinPath $chatGPTContentsRoot "Resources" }}
+{{- $browserClientPath := joinPath $chatGPTResourceRoot "plugins/openai-bundled/plugins/browser/scripts/browser-client.mjs" }}
+{{- $computerUseClientPath := joinPath $chatGPTResourceRoot "plugins/openai-bundled/plugins/computer-use/scripts/computer-use-client.mjs" }}
+{{- $computerUseServicePath := joinPath $chatGPTResourceRoot "plugins/openai-bundled/plugins/computer-use/Codex Computer Use.app" }}
+{{- $chatGPTInfoPlistPath := joinPath $chatGPTContentsRoot "Info.plist" }}
 {{- $browserClientSha := "" }}
 {{- if and (stat $browserClientPath) (lookPath "shasum") }}
 {{- $browserClientSha = (output "shasum" "-a" "256" $browserClientPath | regexFind "^[0-9a-f]+") }}
 {{- end }}
-{{- $codexAppVersion := "" }}
-{{- if and (stat $codexInfoPlistPath) (lookPath "awk") }}
-{{- $codexAppVersion = (output "awk" "/<key>CFBundleShortVersionString<\\/key>/{getline; gsub(/.*<string>|<\\/string>.*/, \"\"); print; exit}" $codexInfoPlistPath | trim) }}
+{{- $computerUseClientSha := "" }}
+{{- if and (stat $computerUseClientPath) (lookPath "shasum") }}
+{{- $computerUseClientSha = (output "shasum" "-a" "256" $computerUseClientPath | regexFind "^[0-9a-f]+") }}
 {{- end }}
-{{- $nodeReplCommand := lookPath (joinPath $codexResourceRoot "cua_node/bin/node_repl") }}
-{{- $nodePath := joinPath $codexResourceRoot "cua_node/bin/node" }}
+{{- $trustedBrowserClientShas := "" }}
+{{- if and $browserClientSha $computerUseClientSha }}
+{{- $trustedBrowserClientShas = printf "%s,%s" $browserClientSha $computerUseClientSha }}
+{{- else if $browserClientSha }}
+{{- $trustedBrowserClientShas = $browserClientSha }}
+{{- else if $computerUseClientSha }}
+{{- $trustedBrowserClientShas = $computerUseClientSha }}
+{{- end }}
+{{- $chatGPTAppVersion := "" }}
+{{- if and (stat $chatGPTInfoPlistPath) (lookPath "awk") }}
+{{- $chatGPTAppVersion = (output "awk" "/<key>CFBundleShortVersionString<\\/key>/{getline; gsub(/.*<string>|<\\/string>.*/, \"\"); print; exit}" $chatGPTInfoPlistPath | trim) }}
+{{- end }}
+{{- $nodeReplCommand := lookPath (joinPath $chatGPTResourceRoot "cua_node/bin/node_repl") }}
+{{- $nodePath := joinPath $chatGPTResourceRoot "cua_node/bin/node" }}
+{{- $nodeModuleDirs := joinPath $chatGPTResourceRoot "cua_node/lib/node_modules" }}
 {{- if not $nodeReplCommand }}
-{{- $nodeReplCommand = lookPath (joinPath $codexResourceRoot "node_repl") }}
-{{- $nodePath = joinPath $codexResourceRoot "node" }}
+{{- $nodeReplCommand = lookPath (joinPath $chatGPTResourceRoot "node_repl") }}
+{{- $nodePath = joinPath $chatGPTResourceRoot "node" }}
+{{- $nodeModuleDirs = "" }}
 {{- end }}
 {{- if $nodeReplCommand }}
 [mcp_servers.node_repl]
@@ -202,20 +202,31 @@ default_tools_approval_mode = "approve"
 
 [mcp_servers.node_repl.env]
 NODE_REPL_NATIVE_PIPE_CONNECT_TIMEOUT_MS = "1000"
-NODE_REPL_NODE_MODULE_DIRS = ""
+NODE_REPL_NODE_MODULE_DIRS = "{{ $nodeModuleDirs }}"
 NODE_REPL_NODE_PATH = "{{ $nodePath }}"
 NODE_REPL_TRUSTED_CODE_PATHS = "{{ .chezmoi.homeDir }}/.codex"
 CODEX_HOME = "{{ .chezmoi.homeDir }}/.codex"
-{{- if $browserClientSha }}
-NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "{{ $browserClientSha }}"
+{{- if $trustedBrowserClientShas }}
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "{{ $trustedBrowserClientShas }}"
 {{- end }}
-BROWSER_USE_AVAILABLE_BACKENDS = "iab,chrome"
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
 NODE_REPL_INSTRUCTIONS_USE_CASE_BROWSER = "Control the in-app browser in conjunction with the Browser Plugin."
+NODE_REPL_INSTRUCTIONS_USE_CASE_CHROME = "Control the Chrome browser in conjunction with the Chrome Plugin. Prefer this method of controlling Chrome over alternatives (such as Computer Use) unless the user explicitly mentions an alternative."
+NODE_REPL_INSTRUCTIONS_USE_CASE_COMPUTER_USE = "Control desktop apps on macOS through Computer Use."
 BROWSER_USE_CODEX_APP_BUILD_FLAVOR = "prod"
-{{- if $codexAppVersion }}
-BROWSER_USE_CODEX_APP_VERSION = "{{ $codexAppVersion }}"
+{{- if $chatGPTAppVersion }}
+BROWSER_USE_CODEX_APP_VERSION = "{{ $chatGPTAppVersion }}"
 {{- end }}
-CODEX_CLI_PATH = "/Applications/Codex.app/Contents/Resources/codex"
+{{- if stat $computerUseServicePath }}
+SKY_CUA_SERVICE_PATH = "{{ $computerUseServicePath }}"
+{{- end }}
+CODEX_CLI_PATH = "{{ joinPath $chatGPTResourceRoot "codex" }}"
+
+[mcp_servers.computer-use]
+command = "./Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient"
+args = ["mcp"]
+cwd = "."
+enabled = false
 
 [marketplaces.openai-bundled]
 source_type = "local"
@@ -224,11 +235,21 @@ source = "{{ .chezmoi.homeDir }}/.codex/.tmp/bundled-marketplaces/openai-bundled
 [plugins."browser@openai-bundled"]
 enabled = true
 
-[plugins."chrome@openai-bundled"]
+[plugins."sites@openai-bundled"]
 enabled = true
 
 [plugins."computer-use@openai-bundled"]
 enabled = true
+
+[plugins."visualize@openai-bundled"]
+enabled = true
+
+{{ if $trustedBrowserClientShas -}}
+[shell_environment_policy.set]
+BROWSER_USE_AVAILABLE_BACKENDS = "chrome,iab"
+NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S = "{{ $trustedBrowserClientShas }}"
+NODE_REPL_TRUSTED_CODE_PATHS = "{{ .chezmoi.homeDir }}/.codex"
+{{- end }}
 {{- end }}
 {{- end }}
 
@@ -245,6 +266,7 @@ hide_world_writable_warning = true
 [desktop]
 appearanceLightCodeThemeId = "catppuccin"
 appearanceDarkCodeThemeId = "catppuccin"
+followUpQueueMode = "queue"
 
 [desktop.appearanceLightChromeTheme]
 accent = "{{ index $latte "pink" }}"
