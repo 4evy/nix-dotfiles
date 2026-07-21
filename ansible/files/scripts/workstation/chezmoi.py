@@ -159,12 +159,18 @@ def yazi_init() -> None:
     )
 
 
-def _capture(command: tuple[str, ...], target: Path) -> None:
-    if which(command[0]) is None:
+def _capture(
+    command: tuple[str, ...], target: Path, *, portable_executable: bool = False
+) -> None:
+    executable = which(command[0])
+    if executable is None:
         return
     result = run(command, check=False, capture=True)
     if result.returncode == 0:
-        write_if_changed(target, result.stdout)
+        content = result.stdout
+        if portable_executable:
+            content = content.replace(os.fspath(executable), command[0])
+        write_if_changed(target, content)
     else:
         error_console.print(f"failed to generate shell init for {command[0]}")
 
@@ -190,7 +196,7 @@ def shell_init() -> None:
     """Cache shell integrations and completion scripts."""
     cache = user_cache_home()
     for shell in ("zsh", "bash"):
-        for name in ("fzf", "starship", "zoxide", "atuin"):
+        for name in ("atuin", "broot", "fzf", "starship", "zoxide"):
             ensure_directory(cache / name)
         completion_dir = ensure_directory(cache / shell / "completions")
         if shell == "zsh":
@@ -207,6 +213,10 @@ def shell_init() -> None:
         _capture(
             ("atuin", "init", shell, "--disable-up-arrow"),
             cache / f"atuin/init.{shell}",
+        )
+        _capture(
+            ("broot", "--print-shell-function", shell),
+            cache / f"broot/init.{shell}",
         )
         if which("atuin") is not None:
             run(
