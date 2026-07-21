@@ -6,16 +6,12 @@ theme = light:catppuccin-latte-pink.conf,dark:catppuccin-frappe-pink.conf
 background-image = {{ .chezmoi.homeDir }}/.config/ghostty/backgrounds/catppuccin-emoji-corner.png
 background-image-opacity = 0.24
 background-image-position = bottom-right
-{{- if eq .chezmoi.os "darwin" }}
-background-image-fit = contain
-{{- else }}
+{{- if eq .chezmoi.os "linux" }}
 background-image-fit = cover
 {{- end }}
-background-image-repeat = false
 custom-shader = {{ .chezmoi.homeDir }}/.config/ghostty/shaders/catppuccin-bubbles.glsl
 custom-shader-animation = false
 adjust-underline-position = 4
-clipboard-paste-protection = true
 confirm-close-surface = false
 cursor-style = bar
 cursor-style-blink = false
@@ -29,7 +25,6 @@ command = /bin/zsh
 env = SHELL=/bin/zsh
 {{- end }}
 font-size = 14
-mouse-scroll-multiplier = precision:1,discrete:3
 quit-after-last-window-closed = true
 scrollback-limit = 100000000
 scrollback-editor = direct:{{ .chezmoi.homeDir }}/.local/bin/terminal-theme-run helix
@@ -80,7 +75,7 @@ keybind = super+f=text:\x06
 keybind = super+h=text:\x08
 keybind = super+i=text:\x09
 keybind = super+j=text:\x0a
-keybind = super+k=clear_screen
+keybind = performable:super+k=clear_screen
 keybind = super+l=text:\x0c
 keybind = super+m=text:\x0d
 keybind = super+n=text:\x0e
@@ -96,6 +91,7 @@ keybind = super+w=text:\x17
 keybind = super+x=text:\x18
 keybind = super+y=text:\x19
 keybind = super+z=text:\x1a
+keybind = super+shift+a=select_all
 keybind = super+shift+backspace=close_surface
 keybind = super+shift+r>left=resize_split:left,20
 keybind = super+shift+r>down=resize_split:down,20
@@ -113,13 +109,13 @@ keybind = super+shift+equal=increase_font_size:1
 keybind = super+minus=decrease_font_size:1
 keybind = super+shift+minus=decrease_font_size:1
 keybind = copy=text:\x03
-keybind = super+shift+c=text:\x1bC
-keybind = super+shift+v=paste_from_clipboard
+keybind = performable:super+shift+c=copy_to_clipboard:mixed
+keybind = performable:super+shift+v=paste_from_clipboard
 keybind = super+,=reload_config
 keybind = super+shift+,=open_config
 keybind = super+shift+p=toggle_command_palette
-keybind = super+shift+g=navigate_search:previous
-keybind = super+shift+f=end_search
+keybind = performable:super+shift+g=navigate_search:previous
+keybind = performable:super+shift+f=end_search
 keybind = super+shift+w=close_window
 keybind = super+shift+[=previous_tab
 keybind = super+shift+]=next_tab
@@ -162,11 +158,12 @@ keybind = ctrl+equal=increase_font_size:1
 keybind = ctrl+shift+equal=increase_font_size:1
 keybind = ctrl+minus=decrease_font_size:1
 keybind = ctrl+shift+minus=decrease_font_size:1
-keybind = ctrl+shift+c=copy_to_clipboard:mixed
-keybind = ctrl+shift+v=paste_from_clipboard
+keybind = performable:ctrl+shift+c=copy_to_clipboard:mixed
+keybind = performable:ctrl+shift+v=paste_from_clipboard
 keybind = ctrl+shift+backspace=close_surface
-keybind = ctrl+k=clear_screen
-keybind = ctrl+a=select_all
+{{- if eq .chezmoi.os "linux" }}
+keybind = ctrl+shift+a=select_all
+{{- end }}
 keybind = ctrl+,=reload_config
 keybind = ctrl+shift+,=open_config
 keybind = ctrl+shift+p=toggle_command_palette
@@ -174,6 +171,10 @@ keybind = copy=copy_to_clipboard:mixed
 keybind = paste=paste_from_clipboard
 keybind = ctrl+insert=copy_to_clipboard:mixed
 keybind = shift+insert=paste_from_selection
+keybind = performable:shift+left=adjust_selection:left
+keybind = performable:shift+right=adjust_selection:right
+keybind = performable:shift+up=adjust_selection:up
+keybind = performable:shift+down=adjust_selection:down
 keybind = shift+page_up=scroll_page_up
 keybind = shift+page_down=scroll_page_down
 keybind = shift+home=scroll_to_top
@@ -186,41 +187,60 @@ keybind = ctrl+shift+t=new_tab
 keybind = ctrl+shift+n=new_window
 keybind = ctrl+shift+w=close_tab:this
 keybind = ctrl+enter=toggle_fullscreen
-keybind = ctrl+shift+f=start_search
+keybind = performable:ctrl+shift+f=start_search
+keybind = performable:escape=end_search
 
-# Ghostty-native tabs, splits, scrolling, and scrollback editing.
-keybind = {{ $leader }}>s>e=write_scrollback_file:open
-keybind = {{ $leader }}>s>j=scroll_page_lines:1
-keybind = {{ $leader }}>s>k=scroll_page_lines:-1
-keybind = {{ $leader }}>s>page_down=scroll_page_down
-keybind = {{ $leader }}>s>page_up=scroll_page_up
-keybind = {{ $leader }}>s>slash=start_search
-keybind = {{ $leader }}>t=new_tab
-keybind = {{ $leader }}>n=new_window
-keybind = {{ $leader }}>q=quit
-keybind = {{ $leader }}>1=goto_tab:1
-keybind = {{ $leader }}>2=goto_tab:2
-keybind = {{ $leader }}>3=goto_tab:3
-keybind = {{ $leader }}>4=goto_tab:4
-keybind = {{ $leader }}>5=goto_tab:5
-keybind = {{ $leader }}>6=goto_tab:6
-keybind = {{ $leader }}>7=goto_tab:7
-keybind = {{ $leader }}>8=goto_tab:8
-keybind = {{ $leader }}>9=goto_tab:9
-keybind = {{ $leader }}>h=goto_split:left
-keybind = {{ $leader }}>j=goto_split:down
-keybind = {{ $leader }}>k=goto_split:up
-keybind = {{ $leader }}>l=goto_split:right
-keybind = {{ $leader }}>p>left=new_split:left
-keybind = {{ $leader }}>p>down=new_split:down
-keybind = {{ $leader }}>p>up=new_split:up
-keybind = {{ $leader }}>p>right=new_split:right
-keybind = {{ $leader }}>p>p=goto_split:previous
-keybind = {{ $leader }}>p>x=close_surface
-keybind = {{ $leader }}>p>f=toggle_split_zoom
-keybind = {{ $leader }}>r>left=resize_split:left,20
-keybind = {{ $leader }}>r>down=resize_split:down,20
-keybind = {{ $leader }}>r>up=resize_split:up,20
-keybind = {{ $leader }}>r>right=resize_split:right,20
-keybind = {{ $leader }}>r>equal=equalize_splits
-keybind = {{ $leader }}>shift+k=clear_screen
+# Ghostty-native one-shot key tables for tabs, splits, scrolling, and editing.
+keybind = {{ $leader }}=activate_key_table_once:ghostty
+keybind = ghostty/t=new_tab
+keybind = ghostty/n=new_window
+keybind = ghostty/q=quit
+keybind = ghostty/1=goto_tab:1
+keybind = ghostty/2=goto_tab:2
+keybind = ghostty/3=goto_tab:3
+keybind = ghostty/4=goto_tab:4
+keybind = ghostty/5=goto_tab:5
+keybind = ghostty/6=goto_tab:6
+keybind = ghostty/7=goto_tab:7
+keybind = ghostty/8=goto_tab:8
+keybind = ghostty/9=goto_tab:9
+keybind = ghostty/h=goto_split:left
+keybind = ghostty/j=goto_split:down
+keybind = ghostty/k=goto_split:up
+keybind = ghostty/l=goto_split:right
+keybind = ghostty/shift+k=clear_screen
+keybind = ghostty/s=deactivate_key_table
+keybind = chain=activate_key_table_once:ghostty-scrollback
+keybind = ghostty/p=deactivate_key_table
+keybind = chain=activate_key_table_once:ghostty-pane
+keybind = ghostty/r=deactivate_key_table
+keybind = chain=activate_key_table_once:ghostty-resize
+keybind = ghostty/escape=deactivate_key_table
+keybind = ghostty/catch_all=deactivate_key_table
+
+keybind = ghostty-scrollback/e=write_scrollback_file:open
+keybind = ghostty-scrollback/j=scroll_page_lines:1
+keybind = ghostty-scrollback/k=scroll_page_lines:-1
+keybind = ghostty-scrollback/page_down=scroll_page_down
+keybind = ghostty-scrollback/page_up=scroll_page_up
+keybind = ghostty-scrollback/slash=start_search
+keybind = ghostty-scrollback/escape=deactivate_key_table
+keybind = ghostty-scrollback/catch_all=deactivate_key_table
+
+keybind = ghostty-pane/left=new_split:left
+keybind = ghostty-pane/down=new_split:down
+keybind = ghostty-pane/up=new_split:up
+keybind = ghostty-pane/right=new_split:right
+keybind = ghostty-pane/p=goto_split:previous
+keybind = ghostty-pane/x=close_surface
+keybind = ghostty-pane/f=toggle_split_zoom
+keybind = ghostty-pane/escape=deactivate_key_table
+keybind = ghostty-pane/catch_all=deactivate_key_table
+
+keybind = ghostty-resize/left=resize_split:left,20
+keybind = ghostty-resize/down=resize_split:down,20
+keybind = ghostty-resize/up=resize_split:up,20
+keybind = ghostty-resize/right=resize_split:right,20
+keybind = ghostty-resize/equal=equalize_splits
+keybind = ghostty-resize/escape=deactivate_key_table
+keybind = ghostty-resize/catch_all=deactivate_key_table

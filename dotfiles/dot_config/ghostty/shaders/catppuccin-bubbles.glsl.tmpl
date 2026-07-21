@@ -30,10 +30,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         (screen_uv.x + screen_uv.y) * 0.5
     );
     // Metal makes the light-theme tint read much more strongly than OpenGL.
-    // Keep Linux unchanged while making the macOS light glow much gentler.
+    // Preserve the prior macOS appearance now that a single platform config
+    // runs this shader once instead of loading it from duplicate config files.
     float glow_strength = background_luma < 0.5 ? 0.019 :
 {{- if eq .chezmoi.os "darwin" }}
-        0.040;
+        0.078;
 {{- else }}
         0.120;
 {{- end }}

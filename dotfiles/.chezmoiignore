@@ -46,6 +46,7 @@ Library/
 {{ if eq .chezmoi.os "darwin" }}
 .config/Code/
 .config/autostart/
+.config/ghostty/config.ghostty
 .config/gtk-3.0/
 .config/gtk-4.0/
 .config/kanata/
